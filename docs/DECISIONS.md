@@ -62,6 +62,23 @@
   dépend de la machine de la personne à qui le logiciel sera prêté, donc
   reporté comme prévu par la ROADMAP plutôt que décidé arbitrairement ici.
 
+## Installation facilitée (niveau 2) : script `install.sh` + lanceur `./choppeur`
+- Public visé : personne extérieure au projet, à l'aise pour coller une
+  commande dans un terminal, mais pas développeuse. Livraison par archive zip
+  (fabriquée de notre côté) que la personne décompresse ; le script est inclus
+  dedans.
+- Choix parmi trois niveaux discutés : (1) `uv sync` manuel (confirmé/
+  développeur), (2) script d'installation semi-automatique, (3) paquet binaire
+  autonome type PyInstaller. Le niveau 2 est retenu : bon rapport entre
+  simplicité pour l'utilisateur et charge de maintenance. Le niveau 3 (binaire
+  figé) reste reporté, cf. étape 11 de la ROADMAP.
+- Ce que le script fait : contrôle Linux, installe `uv` si absent, vérifie/
+  installe `ffmpeg` et `libportaudio2` via `sudo apt-get` (ces paquets étant
+  systèmes, un `sudo` interactif est assumé et accepté), lance `uv sync`,
+  puis génère un lanceur `./choppeur`.
+- Effets de bord au compte utilisateur (documentés, pas cachés) : `uv` installé
+  dans `~/.local/bin` ; paquets système via sudo ; ~2 Go téléchargés.
+
 ## Corrections suite au premier essai réel (Kubuntu 24.04, KDE Plasma)
 
 ### Bibliothèque : chargement dossier par dossier, pas tout l'arbre d'un coup

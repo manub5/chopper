@@ -7,7 +7,16 @@ depuis sa bibliothèque d'albums, avec préécoute et export nommé.
 - Linux, Python 3.12, `uv`, `ffmpeg` (lecture MP3/AAC), `libportaudio2`.
 - GPU NVIDIA facultatif (accélère l'analyse).
 
-## Installation
+## Installation facile (personne extérieure au projet)
+Depuis le dossier du projet décompressé :
+    ./install.sh
+    ./choppeur
+
+`install.sh` installe `uv`, vérifie/installe `ffmpeg` et `libportaudio2`
+(via sudo), prépare l'environnement (`uv sync`, ~2 Go au premier lancement)
+et crée un lanceur `./choppeur`. Linux uniquement.
+
+## Installation manuelle (si vous avez déjà uv)
     uv sync
     uv run choppeur
 
