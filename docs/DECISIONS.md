@@ -11,8 +11,57 @@
 - Incertitude : précision non vérifiée sur ambient/musiques sans percussions.
   À tester sur des morceaux réels dès l'étape 2 de la ROADMAP.
 
-## Attaques, séparation percussif/harmonique, tempo : librosa 0.11.0
-- Version stable du 11/03/2025, bibliothèque de référence, maintenue.
+## Attaques et séparation percussif/harmonique : librosa 1.0
+- Migration de `0.11.*` vers `1.0.*` le 29/10/2026 ; `uv.lock` fixe la
+  version 1.0.0. Le tempo reste calculé à partir des beats de `beat_this`
+  dans `core/rhythm.py`, pas par librosa.
+- Version 1.0.0 publiée le 11/08/2026, disponibilité vérifiée sur PyPI et
+  changements examinés dans la documentation officielle :
+  https://pypi.org/pypi/librosa/1.0.0/json et
+  https://librosa.org/doc/1.0.0/changelog.html.
+- Les appels utilisés (`onset.onset_detect` avec `units="time"` et
+  `effects.hpss`) restent compatibles : aucun changement du moteur requis.
+  Le retrait du backend `audioread` dans librosa 1.0 ne concerne pas notre
+  chargeur, qui utilise soundfile et ffmpeg. `uv lock --upgrade-package librosa`
+  a uniquement mis à jour librosa et retiré audioread du verrou ; aucune autre
+  version de dépendance n'a changé.
+- Vérification avant migration : `uv run pytest -q`, 104 tests réussis.
+  Après migration et ajout du test de calage décrit ci-dessous :
+  `uv run pytest`, 108 tests réussis. Aucun échec lié à la migration, donc
+  aucune correction du code métier nécessaire.
+- Effets de bord : synchronisation de `.venv` sur le nouveau verrou ; aucun
+  fichier audio source modifié. Les anciennes analyses du cache restent
+  utilisables et ne sont pas recalculées automatiquement : le cache ne
+  contient pas de version de librosa. La compatibilité testée ne garantit
+  pas des résultats numériques identiques sur tous les morceaux réels.
+
+## Vérification du rythme et de l'absence de madmom (29/10/2026)
+- Analyse des imports Python de `src/` et `tests/` : aucun import de madmom.
+  Aucun paquet madmom dans `uv.lock`, aucun module madmom chargé après
+  import de `core.rhythm`, et paquet absent de l'environnement contrôlé.
+- `core/rhythm.py` construit `File2Beats` avec `dbn=False` : le
+  post-traitement DBN facultatif utilisant madmom n'est pas activé. Cela
+  ne signifie pas que le code de la dépendance beat_this ne contient
+  aucune référence à son option madmom.
+- `analyze_rhythm()` récupère bien `(beats, downbeats)` et conserve les
+  downbeats séparément. Le calage des boucles n'a pas lieu dans ce fichier :
+  `gui/workers.analyze_track()` transmet `analysis.downbeat_times` à
+  `core/candidates.find_loop_candidates()`, qui choisit chaque début dans
+  cette liste, et non dans la liste de tous les beats.
+- Test de non-régression ajouté dans `tests/test_workers.py` : de la sortie
+  simulée du modèle jusqu'aux vrais candidats, avec beats toutes les 0,5 s
+  et downbeats à 0,5 / 2,5 / 4,5 s. Vérification avec et sans réutilisation
+  du cache, ainsi qu'en l'absence de downbeats (aucune boucle attendue).
+  Seule l'inférence du modèle est remplacée ; le chargement audio,
+  la conversion rythmique, librosa et la sélection des candidats sont réels.
+- Vérification de sensibilité du test : substitution temporaire, en mémoire,
+  des downbeats par tous les beats ; les quatre cas échouent. Cette mutation
+  n'est pas une anomalie du code existant et ne modifie aucun fichier moteur.
+  Ces vérifications caractérisent un comportement déjà correct ; aucune
+  correction artificielle n'a été introduite pour obtenir un cycle rouge/vert.
+- Limite inchangée : le début suit les downbeats, mais la fin utilise encore
+  une durée médiane de mesure. Le calage des fins à tempo variable reste un
+  problème distinct, non corrigé dans cette migration.
 
 ## Interface : PySide6
 - Qt natif, cohérent sous KDE, sans navigateur ni serveur.

@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 import soundfile as sf
 from PySide6.QtCore import QEventLoop
 
@@ -70,6 +71,42 @@ def test_analyze_track_uses_cache_without_recomputing_rhythm(tmp_path, monkeypat
         analysis, candidates = workers.analyze_track(track, Settings(), cache)
         assert analysis.tempo_bpm == 120.0
         assert len(candidates) > 0
+
+
+@pytest.mark.parametrize("use_cached_analysis", [False, True])
+@pytest.mark.parametrize(
+    ("downbeats", "expected_starts"),
+    [((0.5, 2.5, 4.5), {0.5, 2.5}), ((), set())],
+)
+def test_loop_starts_follow_tracker_downbeats_not_all_beats(
+    tmp_path, monkeypatch, use_cached_analysis, downbeats, expected_starts
+):
+    audio_path = tmp_path / "track.wav"
+    _write_click_track(audio_path, n_clicks=11)
+    track = _track(audio_path)
+
+    class FakeTracker:
+        def __call__(self, path):
+            return np.arange(0.0, 6.0, 0.5), np.asarray(downbeats)
+
+    # Replace only model inference; keep rhythm conversion and candidate selection real.
+    monkeypatch.setattr(workers.rhythm, "_get_tracker", lambda checkpoint, device: FakeTracker())
+    settings = Settings(loop_lengths_bars=(1,), candidates_per_track=20, gpu_mode="cpu")
+
+    with AnalysisCache(tmp_path / "cache.sqlite") as cache:
+        if use_cached_analysis:
+            workers.analyze_track(track, settings, cache)
+
+            def unexpected_inference(checkpoint, device):
+                raise AssertionError("Cached analysis must not run model inference")
+
+            monkeypatch.setattr(workers.rhythm, "_get_tracker", unexpected_inference)
+
+        analysis, candidates = workers.analyze_track(track, settings, cache)
+
+    loops = [candidate for candidate in candidates if candidate.type is CandidateType.LOOP]
+    assert {candidate.start_seconds for candidate in loops} == expected_starts
+    assert analysis.downbeat_times == downbeats
 
 
 def test_track_analysis_worker_emits_finished(monkeypatch, tmp_path):
