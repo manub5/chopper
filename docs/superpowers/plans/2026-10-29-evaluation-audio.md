@@ -128,3 +128,12 @@ par source et passage avec `ground_truth: null`, bornes, tempo prédit et positi
   exécuter les étapes préparatoires de la tâche 4 dès que le CLI est disponible.
 - Aucun gain n'est promis ; une absence de modèle ou une régression est un
   résultat à signaler, pas une raison de fabriquer un score.
+
+## Suivi de l'exécution
+
+- [x] Corpus déterministe et trois tests de génération.
+- [x] Mesures, CLI, tests aux limites et référence réelle avant modification.
+- [x] Trois essais mesurés : un conservé, deux rejetés et archivés.
+- [x] Nouvelle exécution synthétique et huit passages FLAC ; sources inchangées.
+- [x] Suite complète et contrôles statiques ; résultats dans `JOURNAL_EVAL.md`.
+- [ ] Revue indépendante finale et éventuelles corrections couvertes par tests.

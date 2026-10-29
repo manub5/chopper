@@ -115,3 +115,106 @@ Effet possible hors corpus : une véritable variation de tempo reste résumée p
 un tempo global ; la moyenne filtrée n'est pas une carte des variations du morceau.
 Les caches d'analyse antérieurs ne sont pas invalidés automatiquement ; les
 mesures de ce journal n'utilisent aucun cache d'analyse.
+
+### Essai 2 — recaler les boucles sur une attaque locale — rejeté
+
+- Hypothèse : les décalages de quelques ms du lot de réglage viennent de la
+  grille temporelle du modèle. Recherche d'une attaque à ±40 ms du downbeat,
+  uniquement si la fenêtre débute par au moins 5 ms sous 10 % de son pic ;
+  première amplitude à 20 % du pic comme nouveau départ. Pas de changement
+  du tempo ni de création de premiers temps supplémentaires.
+- Test d'abord rouge : attaque à 0,500 s, downbeat à 0,520 s ; attendu 0,500 s.
+  Le test et les tests de candidats passent après implémentation.
+- Commande : `uv run python evaluate.py --output tests/corpus/results/trial-2-synthetic.json`.
+
+| Lot | Score /100 | Erreur tempo BPM | F1 boucles | Décalage boucles ms | F1 shots | Décalage shots ms |
+|---|---:|---:|---:|---:|---:|---:|
+| Réglage | 97,720134 | 0,044576 | 0,931995 | 0,000000 | 1,000000 | 15,181406 |
+| Validation | 88,860740 | 0,102292 | 0,666667 | 0,000000 | 1,000000 | 12,596372 |
+
+Décision : rejeté malgré une amélioration du calage. Le score global fixé avant
+les essais est inchangé : toutes ces correspondances étaient déjà sous 100 ms.
+Le critère validé demande un gain strict de score, pas seulement un gain de
+précision à l'intérieur de la tolérance. Le score n'a pas été redéfini après coup.
+Cette limite de sensibilité devra être discutée avant une autre campagne.
+Code et test expérimentaux retirés du moteur ; leur diff est archivé dans
+`tests/corpus/results/trial-2-rejected.diff` pour rendre l'essai reproductible.
+
+### Essai 3 — retour au minimum d'énergie avant les attaques — rejeté
+
+- Hypothèse issue des retards des shots de réglage : `backtrack=True` dans
+  `librosa.onset.onset_detect` remonte au minimum précédant le pic, évitant de
+  tronquer l'attaque. Option vérifiée dans la documentation/source officielle.
+- Test d'abord rouge : trois impulsions isolées à 0,5 / 1,5 / 2,5 s, avec
+  départ attendu avant l'attaque et au plus 50 ms avant. Il passe avec l'option.
+- Commande : `uv run python evaluate.py --output tests/corpus/results/trial-3-synthetic.json`.
+
+| Lot | Score /100 | Erreur tempo BPM | F1 boucles | Décalage boucles ms | F1 shots | Décalage shots ms |
+|---|---:|---:|---:|---:|---:|---:|
+| Réglage | 97,720134 | 0,044576 | 0,931995 | 5,416667 | 1,000000 | 8,038549 |
+| Validation | 88,860740 | 0,102292 | 0,666667 | 7,431973 | 1,000000 | 10,623583 |
+
+Décision : rejeté pour le même critère strict que l'essai 2, malgré la baisse du
+décalage des shots. Le score global reste identique à celui de l'essai 1.
+Option et test expérimentaux retirés ; diff conservé dans
+`tests/corpus/results/trial-3-rejected.diff`. Aucun quatrième essai.
+
+## Vérification finale
+
+```bash
+uv run python evaluate.py --output tests/corpus/results/final-synthetic.json
+uv run python evaluate.py --real-root . --output tests/corpus/results/final-real.json
+uv run pytest -q
+uv run ruff check src tests evaluate.py
+uv run ruff format --check src tests evaluate.py
+uv run mypy src tests evaluate.py
+uv run bandit -qc pyproject.toml -r src evaluate.py -ll
+```
+
+La nouvelle exécution synthétique reproduit exactement les prédictions de
+l'essai 1 conservé : réglage **97,648992 → 97,720134**, validation
+**88,474233 → 88,860740**. Les décalages finaux de boucles restent respectivement
+5,416667 et 7,431973 ms sur les correspondances, avec les mêmes faux positifs
+qu'à la référence. Aucun gain de calage de boucle n'est revendiqué pour le
+moteur finalement livré. Les essais 2 et 3 ne sont pas actifs.
+
+### Passages réels rejoués après l'essai retenu
+
+| Fichier | Début source (s) | BPM avant | BPM après |
+|---|---:|---:|---:|
+| 01-Airbag.flac | 71,100 | 83,3333 | 84,0164 |
+| 01-Airbag.flac | 170,640 | 83,3333 | 83,9018 |
+| 07._Jesse_Bru_In_Different_Places.flac | 100,961 | 130,4348 | 128,0488 |
+| 07._Jesse_Bru_In_Different_Places.flac | 242,305 | 130,4348 | 128,1356 |
+| 08_Get_Lucky.flac | 92,407 | 115,3846 | 116,0896 |
+| 08_Get_Lucky.flac | 221,776 | 115,3846 | 116,0896 |
+| B1-Jamming.flac | 53,454 | 125,0000 | 123,4818 |
+| B1-Jamming.flac | 128,291 | 125,0000 | 123,3154 |
+
+Les bornes des huit passages sont identiques entre les deux exécutions.
+Toutes les positions de boucles et shots sont identiques avant/après ; seul
+le résumé du tempo change. Les quatre empreintes SHA-256 finales correspondent
+à celles mesurées avant la référence. **Ces différences de BPM ne démontrent
+pas une meilleure précision sur ces morceaux**, faute de tempo annoté.
+
+Tests : 126 réussis dans le dossier de travail, y compris les quatre tests de
+downbeats issus de la migration antérieure. Ruff, formatage, mypy et Bandit
+passent ; mypy rappelle sa couverture partielle des fonctions non annotées et
+Bandit émet les avertissements de commentaires `nosec` déjà présents.
+Les hooks Semgrep et Gitleaks ont également passé les commits créés.
+
+### Décisions d'exécution et limites
+
+- Travail dans la branche de fonctionnalité existante, sans nouveau worktree,
+  afin de conserver la migration non commitée et les FLAC accessibles ; risque
+  compensé par un ajout Git explicite des seuls fichiers de cette campagne.
+- Extraction réelle implémentée avec le banc de mesure, avant les essais, afin
+  d'acquérir une véritable référence avant toute modification du moteur.
+- Les sources réelles restent non annotées. Les deux rythmes synthétiques de
+  validation ne suffisent pas à généraliser à toutes les musiques ; après cette
+  campagne, ils ne doivent plus être présentés comme un nouveau lot aveugle.
+- La tolérance F1 de 100 ms masque des gains de calage plus fins : essais 2 et 3
+  rejetés selon le protocole, mais archivés pour une éventuelle autre campagne
+  avec un score continu défini **avant** ses mesures.
+- Les résultats réels sont limités à deux passages par source, pas à l'album
+  entier, et n'ont pas fait l'objet d'une validation d'écoute.

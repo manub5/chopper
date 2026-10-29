@@ -1,0 +1,54 @@
+diff --git a/src/choppeur/core/candidates.py b/src/choppeur/core/candidates.py
+index b53b8a6..c0da69d 100644
+--- a/src/choppeur/core/candidates.py
++++ b/src/choppeur/core/candidates.py
+@@ -63,6 +63,20 @@ def _cut_smoothness_score(
+     return float(np.clip(1.0 - ratio, 0.0, 1.0))
+
+
++def _align_loop_start_to_attack(samples: np.ndarray, sample_rate: int, start: float) -> float:
++    left = max(0, round((start - 0.04) * sample_rate))
++    right = min(len(samples), round((start + 0.04) * sample_rate))
++    window = np.abs(samples[left:right])
++    if len(window) == 0:
++        return start
++    peak = float(np.max(window))
++    quiet_prefix = window[: max(1, round(0.005 * sample_rate))]
++    if peak <= 1e-9 or float(np.max(quiet_prefix)) > 0.1 * peak:
++        return start
++    attacks = np.flatnonzero(window >= 0.2 * peak)
++    return (left + int(attacks[0])) / sample_rate if len(attacks) else start
++
++
+ def find_loop_candidates(
+     samples: np.ndarray,
+     sample_rate: int,
+@@ -85,6 +99,7 @@ def find_loop_candidates(
+     for bars in lengths_bars:
+         loop_duration = bar_duration * bars
+         for start in downbeat_times:
++            start = _align_loop_start_to_attack(samples, sample_rate, start)
+             end = start + loop_duration
+             if end > duration_seconds:
+                 continue
+diff --git a/tests/test_candidates.py b/tests/test_candidates.py
+index 9f0c9f3..c525df9 100644
+--- a/tests/test_candidates.py
++++ b/tests/test_candidates.py
+@@ -44,6 +44,16 @@ def test_find_loop_candidates_empty_without_enough_downbeats():
+     assert candidates.find_loop_candidates(signal, SAMPLE_RATE, 0.0, (0.0, 1.0)) == []
+
+
++def test_loop_start_refines_a_slightly_late_downbeat_to_an_isolated_attack():
++    samples = np.zeros(6000, dtype=np.float32)
++    for start in (500, 2500, 4500):
++        samples[start : start + 50] = 0.6
++    result = candidates.find_loop_candidates(
++        samples, 1000, 120.0, (0.52, 2.52, 4.52), lengths_bars=(1,)
++    )
++    assert {candidate.start_seconds for candidate in result} == {0.5, 2.5}
++
++
+ def _click_track(n_clicks=4, interval_seconds=0.5, sample_rate=SAMPLE_RATE):
+     total_samples = int((n_clicks * interval_seconds + 0.5) * sample_rate)
+     signal = np.zeros(total_samples, dtype=np.float32)

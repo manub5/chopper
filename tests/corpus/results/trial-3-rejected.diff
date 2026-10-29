@@ -1,0 +1,33 @@
+diff --git a/src/choppeur/core/onsets.py b/src/choppeur/core/onsets.py
+index d2ea293..26238bd 100644
+--- a/src/choppeur/core/onsets.py
++++ b/src/choppeur/core/onsets.py
+@@ -6,7 +6,7 @@ import numpy as np
+
+ def detect_onsets(samples: np.ndarray, sample_rate: int) -> tuple[float, ...]:
+     """Instants d'attaque (secondes), pour repérer le début des one-shots."""
+-    onset_times = librosa.onset.onset_detect(y=samples, sr=sample_rate, units="time")
++    onset_times = librosa.onset.onset_detect(y=samples, sr=sample_rate, units="time", backtrack=True)
+     return tuple(float(t) for t in onset_times)
+
+
+diff --git a/tests/test_onsets.py b/tests/test_onsets.py
+index 489172f..ab2621f 100644
+--- a/tests/test_onsets.py
++++ b/tests/test_onsets.py
+@@ -34,3 +34,15 @@ def test_separate_percussive_harmonic_preserves_length():
+
+     assert percussive.shape == signal.shape
+     assert harmonic.shape == signal.shape
++
++
++def test_detect_onsets_does_not_truncate_isolated_attacks():
++    signal = np.zeros(3 * SAMPLE_RATE, dtype=np.float32)
++    rng = np.random.default_rng(42)
++    starts = (0.5, 1.5, 2.5)
++    for start in starts:
++        index = round(start * SAMPLE_RATE)
++        signal[index : index + 220] = rng.uniform(-0.8, 0.8, 220)
++    detected = onsets.detect_onsets(signal, SAMPLE_RATE)
++    assert len(detected) == 3
++    assert all(0 <= actual - predicted <= 0.05 for actual, predicted in zip(starts, detected, strict=True))
