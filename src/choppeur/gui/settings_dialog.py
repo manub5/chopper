@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -24,6 +26,7 @@ class SettingsDialog(QDialog):
     def __init__(self, settings: Settings, parent: QWidget | None = None):
         super().__init__(parent)
         self.setWindowTitle("Paramètres")
+        self._initial_settings = replace(settings)
 
         self._library_root = QLineEdit(settings.library_root or "")
         self._export_dir = QLineEdit(settings.export_dir or "")
@@ -92,7 +95,8 @@ class SettingsDialog(QDialog):
 
     def settings(self) -> Settings:
         lengths = tuple(int(value) for value in self._loop_lengths_bars.text().split(",") if value.strip())
-        return Settings(
+        return replace(
+            self._initial_settings,
             library_root=self._library_root.text() or None,
             export_dir=self._export_dir.text() or None,
             export_format=self._export_format.currentText(),

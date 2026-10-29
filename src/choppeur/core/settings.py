@@ -20,6 +20,8 @@ class Settings:
     candidates_per_track: int = 8
     max_one_shot_seconds: float = 2.0
     gpu_mode: str = "auto"  # "auto" ou "cpu"
+    auto_play: bool = True
+    force_dark: bool = False
 
     def to_dict(self) -> dict:
         data = asdict(self)

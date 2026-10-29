@@ -32,9 +32,9 @@ NumPy/soundfile/sounddevice existants, pytest. Aucune dépendance ajoutée.
 - Suivre KDE clair/sombre ; option « Forcer sombre » désactivée par défaut.
 - Pas de serveur, navigateur, dossier nouveau dans le home, ni chemin personnel
   en dur. Sous-dossier `glissés/` créé seulement sous la destination choisie.
-- Préserver les travaux préexistants non commités : migration librosa,
-  `docs/DECISIONS.md`, `tests/test_workers.py`, `uv.lock`, audit et prototype.
-  Si une étape doit modifier le même fichier, n'inclure que son propre diff.
+- Préserver les travaux antérieurs : migration librosa, documentation, tests
+  de downbeats, audit et prototype, commités avant exécution en `21fb2c1`,
+  `a7541ae` et `d0d7863`. N'inclure dans une étape que son propre diff.
 - Ne pas confondre tests Qt sans affichage et validation réelle Bitwig/KDE.
 
 ## Review Focus
@@ -97,7 +97,7 @@ git diff --check
 Attendu : aucun test en échec, aucun défaut Ruff/format/mypy, aucun signalement
 Bandit moyen/élevé, aucun défaut d'espacement. Distinguer les avertissements
 préexistants de nouveaux problèmes. La référence actuelle est de **130 tests**
-dans le dossier de travail, incluant quatre tests du prototype non commités.
+dans le dossier de travail, incluant les quatre tests du prototype désormais commités.
 
 Charger `verification-before-completion` avant de déclarer une étape terminée.
 Relire le diff, indexer uniquement ses changements, ne pas contourner les hooks,
@@ -133,7 +133,7 @@ QTimer à 20 ms ; ne pas appeler `sd.wait()` dans l'interface. Annuler la
 surveillance précédente lors d'un nouveau play/stop. Aucun minuteur basé seulement
 sur la durée théorique de l'extrait.
 
-- [ ] **1. Écrire les tests comportementaux.** Exemple avec les fixtures ci-dessus :
+- [x] **1. Écrire les tests comportementaux.** Exemple avec les fixtures ci-dessus :
   ```python
   state = SampleState(auto_play=False)
   state.load_track(loaded_track)
@@ -150,17 +150,22 @@ sur la durée théorique de l'extrait.
   identité distincte pour deux candidats égaux, absence d'actif et ID périmé.
   Tester le découpage stéréo réel remis au lecteur, fin du flux, erreur de play,
   erreur de surveillance et stop répété. Seul l'accès PortAudio est simulé.
-- [ ] **2. Observer le rouge :** `uv run pytest -q tests/test_sample_state.py tests/test_preview_player.py`.
+- [x] **2. Observer le rouge :** `uv run pytest -q tests/test_sample_state.py tests/test_preview_player.py`.
   Attendu : échecs des contrats encore absents, pas une faute de syntaxe.
-- [ ] **3. Implémenter les interfaces ci-dessus.** IDs monotones à travers les
+- [x] **3. Implémenter les interfaces ci-dessus.** IDs monotones à travers les
   chargements, jeton nouveau à chaque demande de lecture, un seul flux actif.
   Ajouter `Settings.auto_play: bool = True` et `Settings.force_dark: bool = False`.
   Le dialogue existant doit conserver ces champs même avant d'exposer le thème.
-- [ ] **4. Vert et porte G.** Tester aussi ancien TOML sans nouvelles clés,
+- [x] **4. Vert et porte G.** Tester aussi ancien TOML sans nouvelles clés,
   sauvegarde/chargement des deux booléens et absence de perte en validant le dialogue.
-- [ ] **5. Commit :** `Introduit l’état partagé et une préécoute à fin détectée`.
+- [x] **5. Commit :** `Introduit l’état partagé et une préécoute à fin détectée`.
   **Validation utilisateur :** fondations testées ; interface actuelle inchangée.
   Attendre sa validation, sans commencer l'étape 2.
+
+**Avancement au 30/10/2026 :** code et contrôles de l'étape 1 réalisés ; 49 nouveaux
+cas de tests (179 au total). État, lecteur et préférences prêts, sans branchement
+à l'interface actuelle. Après le commit de l'étape : attendre la validation
+utilisateur avant tout travail sur le transport audio de l'étape 2.
 
 ## Étape 2 — Transporter l'audio multicanal hors du thread graphique
 

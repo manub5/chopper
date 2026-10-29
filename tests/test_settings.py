@@ -1,3 +1,5 @@
+import pytest
+
 from choppeur.core.settings import (
     Settings,
     default_cache_path,
@@ -52,3 +54,26 @@ def test_load_partial_file_fills_in_defaults(tmp_path):
 
     assert loaded.export_format == "flac"
     assert loaded.candidates_per_track == Settings().candidates_per_track
+
+
+def test_old_settings_get_new_ui_defaults_without_rewriting_the_file(tmp_path):
+    path = tmp_path / "settings.toml"
+    original = 'export_format = "flac"\n'
+    path.write_text(original)
+    loaded = load_settings(path)
+    assert loaded.auto_play is True
+    assert loaded.force_dark is False
+    assert loaded.export_format == "flac"
+    assert path.read_text() == original
+
+
+@pytest.mark.parametrize("auto_play", [False, True])
+@pytest.mark.parametrize("force_dark", [False, True])
+def test_ui_preferences_roundtrip_including_false_values(tmp_path, auto_play, force_dark):
+    path = tmp_path / "settings.toml"
+    original = Settings(auto_play=auto_play, force_dark=force_dark)
+    save_settings(original, path)
+    loaded = load_settings(path)
+    assert loaded.auto_play is auto_play
+    assert loaded.force_dark is force_dark
+    assert loaded == original

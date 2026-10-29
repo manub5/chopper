@@ -33,3 +33,15 @@ def test_settings_reads_back_edited_values(qapp):
         max_one_shot_seconds=3.5,
         gpu_mode="cpu",
     )
+
+
+def test_dialog_preserves_ui_preferences_when_editing_existing_controls(qapp):
+    original = Settings(auto_play=False, force_dark=True)
+    dialog = SettingsDialog(original)
+    dialog._export_format.setCurrentText("flac")
+    result = dialog.settings()
+    assert result.auto_play is False
+    assert result.force_dark is True
+    assert result.export_format == "flac"
+    assert result is not original
+    assert original.export_format == "wav"
