@@ -6,6 +6,25 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 29/10/2026 — Blocage après l'échec de l'analyse d'une piste (état des lieux, bug A)
+
+- Cause : `TrackAnalysisWorker` émettait `failed` en cas d'erreur, mais seul
+  `finished` demandait l'arrêt du QThread. Son calcul était terminé, mais sa
+  boucle d'événements restait active ; la fenêtre refusait alors toute nouvelle
+  analyse, même après avoir réactivé la bibliothèque.
+- Reproduction avant correction : test avec une vraie fenêtre et un vrai QThread,
+  déclinés en erreur de lecture (`OSError`) et erreur de calcul (`RuntimeError`).
+  Les deux cas échouaient sur l'attente de libération du thread.
+- Correction minimale : dans `start_in_thread`, raccorder aussi `failed` à
+  `thread.quit()` pour les workers de piste. Le signal de succès n'est pas émis
+  sur erreur et les références ne sont toujours libérées qu'à la fin du thread.
+- Non-régression : le test vérifie le message d'erreur, l'absence de faux
+  résultats, la libération du worker/thread et l'analyse réussie d'une autre piste.
+  La suite complète `uv run pytest` ainsi que Ruff, mypy et Bandit ont été lancés.
+- Effets de bord : aucun changement des sources audio, des exports, du cache ou
+  des paramètres ; aucune nouvelle écriture persistante. Le traitement des albums
+  reste inchangé. Le dépassement du délai de fermeture (bug B) reste à traiter.
+
 ## Corrections suite au premier essai réel (Kubuntu 24.04, KDE Plasma)
 
 ### Bibliothèque : chargement dossier par dossier, pas tout l'arbre d'un coup

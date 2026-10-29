@@ -140,10 +140,12 @@ class AlbumAnalysisWorker(QObject):
 
 def start_in_thread(worker: TrackAnalysisWorker | AlbumAnalysisWorker) -> QThread:
     """Câblage standard Qt : lance worker.run() dans un nouveau QThread au démarrage,
-    et détruit le thread une fois worker.finished émis."""
+    et arrête le thread sur succès comme sur échec."""
     thread = QThread()
     worker.moveToThread(thread)
     thread.started.connect(worker.run)
     worker.finished.connect(thread.quit)
+    if isinstance(worker, TrackAnalysisWorker):
+        worker.failed.connect(thread.quit)
     thread.finished.connect(thread.deleteLater)
     return thread

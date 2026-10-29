@@ -104,6 +104,36 @@ def test_selecting_a_track_runs_analysis_and_updates_panels(qapp, make_window, m
     assert window.waveform_view._waveform_item is not None
 
 
+@pytest.mark.parametrize("error", [OSError("fichier illisible"), RuntimeError("modèle indisponible")])
+def test_failed_track_analysis_releases_thread_and_allows_another_track(
+    qapp, make_window, monkeypatch, tmp_path, error
+):
+    _, paths = _make_library(tmp_path, n_tracks=2)
+
+    def analyze_with_failure(track, settings, cache=None):
+        if track.path == paths[0]:
+            raise error
+        return _fake_analyze_track(track, settings, cache)
+
+    monkeypatch.setattr(workers, "analyze_track", analyze_with_failure)
+    window = make_window()
+    window._on_track_selected(paths[0])
+
+    _pump_until(lambda: "Échec de l'analyse" in window.status_bar.currentMessage())
+    assert str(error) in window.status_bar.currentMessage()
+    assert window.candidates_panel._list.count() == 0
+    _pump_until(lambda: window._thread is None)
+    assert window._worker is None
+    assert window.library_panel.isEnabled()
+
+    window._on_track_selected(paths[1])
+    _pump_until(lambda: window.candidates_panel._list.count() == 1)
+    _pump_until(lambda: window._thread is None)
+    assert window.candidates_panel._track is not None
+    assert window.candidates_panel._track.path == paths[1]
+    assert window.library_panel.isEnabled()
+
+
 def test_second_track_selection_while_busy_does_not_replace_running_thread(
     qapp, make_window, monkeypatch, tmp_path
 ):
