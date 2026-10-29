@@ -136,4 +136,4 @@ par source et passage avec `ground_truth: null`, bornes, tempo prédit et positi
 - [x] Trois essais mesurés : un conservé, deux rejetés et archivés.
 - [x] Nouvelle exécution synthétique et huit passages FLAC ; sources inchangées.
 - [x] Suite complète et contrôles statiques ; résultats dans `JOURNAL_EVAL.md`.
-- [ ] Revue indépendante finale et éventuelles corrections couvertes par tests.
+- [x] Revue indépendante finale : aucun point critique/important ; réserves dans le journal.

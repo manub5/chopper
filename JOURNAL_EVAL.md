@@ -218,3 +218,26 @@ Les hooks Semgrep et Gitleaks ont également passé les commits créés.
   avec un score continu défini **avant** ses mesures.
 - Les résultats réels sont limités à deux passages par source, pas à l'album
   entier, et n'ont pas fait l'objet d'une validation d'écoute.
+
+## Revue indépendante finale
+
+Une revue en lecture seule n'a relevé aucun problème critique ou important.
+Vingt tests ciblés ont été exécutés et les métriques des cinq sorties
+synthétiques (référence, trois essais, résultat final) ont été recalculées
+indépendamment : elles correspondent aux valeurs du présent journal.
+
+Les réserves sont maintenues explicitement : pas de preuve de précision sur les
+FLAC sans annotations, pas de généralisation hors corpus, caches antérieurs
+inchangés et essais 2/3 rejetés selon le critère figé. Une future campagne devra
+utiliser de nouveaux exemples de validation et décider de son score avant mesure.
+
+La migration librosa 1.0 préexistante demeure volontairement non commitée :
+**reproduire les chiffres demande l'environnement 1.0 documenté, pas seulement
+un checkout des commits de cette campagne**. Elle n'a pas été absorbée dans un
+commit de correction de détection.
+
+Réserve mineure de traçabilité : l'outil de suivi temporaire a enregistré des
+plages de commits vides pour les tâches 1/2, achevées avant leur commit commun.
+Leur livraison réelle est `24dd1c9` ; le correctif tempo est `c9c6515` et les
+archives d'essais et résultats finaux sont dans `4006232`. Cette imprécision du
+suivi interne n'affecte ni les tests ni les mesures archivées.
