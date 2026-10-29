@@ -21,6 +21,16 @@ def test_estimate_tempo_returns_zero_with_fewer_than_two_beats():
     assert rhythm.estimate_tempo((1.0,)) == 0.0
 
 
+def test_estimate_tempo_averages_frame_quantization_without_octave_correction():
+    # A 90 BPM grid rounded to the model's 20 ms output frames.
+    beat_times = tuple(round((0.25 + i * 2 / 3) / 0.02) * 0.02 for i in range(33))
+    assert rhythm.estimate_tempo(beat_times) == pytest.approx(90.0, abs=0.1)
+
+
+def test_estimate_tempo_falls_back_when_irregular_intervals_have_no_central_cluster():
+    assert rhythm.estimate_tempo((0.0, 0.5, 2.5)) == pytest.approx(48.0)
+
+
 def test_analyze_rhythm_converts_tracker_output(monkeypatch, tmp_path):
     """
     Vérifie le câblage de analyze_rhythm sans télécharger le modèle beat_this

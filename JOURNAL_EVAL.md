@@ -90,3 +90,28 @@ Chaque passage atteint la limite configurée de 128 candidats one-shots : ce
 nombre n'est ni une vérité musicale ni un décompte exhaustif des attaques.
 Bornes à l'échantillon, positions exactes et empreintes des sources figurent
 dans `tests/corpus/results/baseline-real.json`. Empreintes avant/après identiques.
+
+### Essai 1 — moyenne des intervalles réguliers pour le tempo — conservé
+
+- Hypothèse issue du réglage : les intervalles de 90 BPM alternent entre 660 et
+  680 ms ; leur médiane favorise 660 ms, donc surestime le tempo. Moyenner les
+  intervalles situés à ±25 % de la médiane réduit ce biais tout en excluant les
+  temps manquants/ajoutés isolés. Le seuil est fixé avant mesure de validation.
+- Test ajouté d'abord rouge : grille à 90 BPM quantifiée à 20 ms, ancien résultat
+  90,909 au lieu de 90 ±0,1. Les tests existants d'intervalle aberrant restent verts.
+- Première exécution interrompue sans score : sur les one-shots irréguliers, le
+  filtre pouvait ne conserver aucun intervalle et produire NaN. Un second test
+  rouge reproduit ce cas ; repli sur la médiane si le groupe central est vide.
+- Commande : `uv run python evaluate.py --output tests/corpus/results/trial-1-synthetic.json`.
+
+| Lot | Score /100 | Erreur tempo BPM | F1 boucles | Décalage boucles ms | F1 shots | Décalage shots ms |
+|---|---:|---:|---:|---:|---:|---:|
+| Réglage | 97,720134 | 0,044576 | 0,931995 | 5,416667 | 1,000000 | 15,181406 |
+| Validation | 88,860740 | 0,102292 | 0,666667 | 7,431973 | 1,000000 | 12,596372 |
+
+Décision : conservé, score de réglage supérieur, validation supérieure, aucune
+composante de validation dégradée. Aucune position de boucle ni attaque déplacée.
+Effet possible hors corpus : une véritable variation de tempo reste résumée par
+un tempo global ; la moyenne filtrée n'est pas une carte des variations du morceau.
+Les caches d'analyse antérieurs ne sont pas invalidés automatiquement ; les
+mesures de ce journal n'utilisent aucun cache d'analyse.

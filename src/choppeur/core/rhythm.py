@@ -29,14 +29,17 @@ def _get_tracker(checkpoint: str, device: str) -> File2Beats:
 
 
 def estimate_tempo(beat_times: tuple[float, ...]) -> float:
-    """BPM à partir de la médiane des intervalles entre temps (robuste aux erreurs isolées)."""
+    """BPM à partir des intervalles réguliers, en moyennant leur quantification."""
     if len(beat_times) < 2:
         return 0.0
     intervals = np.diff(np.asarray(beat_times, dtype=np.float64))
     median_interval = float(np.median(intervals))
     if median_interval <= 0:
         return 0.0
-    return 60.0 / median_interval
+    # Average frame quantization while rejecting missing/extra beat outliers.
+    regular_intervals = intervals[np.abs(intervals - median_interval) <= 0.25 * median_interval]
+    mean_interval = float(np.mean(regular_intervals)) if len(regular_intervals) else median_interval
+    return 60.0 / mean_interval
 
 
 def analyze_rhythm(
