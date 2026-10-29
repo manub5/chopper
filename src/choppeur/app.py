@@ -33,10 +33,24 @@ def default_platform_for_session(env: Mapping[str, str] | None = None) -> str | 
     return None
 
 
+def default_platform_theme_for_session(env: Mapping[str, str] | None = None) -> str | None:
+    """Use KDE's desktop portal so native dialogs expose mounted network locations."""
+    env = os.environ if env is None else env
+    if env.get("QT_QPA_PLATFORMTHEME"):
+        return None
+    desktops = env.get("XDG_CURRENT_DESKTOP", "").lower().split(":")
+    if "kde" in desktops:
+        return "xdgdesktopportal"
+    return None
+
+
 def main() -> None:
     platform = default_platform_for_session()
     if platform:
         os.environ["QT_QPA_PLATFORM"] = platform
+    platform_theme = default_platform_theme_for_session()
+    if platform_theme:
+        os.environ["QT_QPA_PLATFORMTHEME"] = platform_theme
 
     app = QApplication(sys.argv)
     window = build_window()

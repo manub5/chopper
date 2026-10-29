@@ -28,7 +28,7 @@ def _label_for(candidate: Candidate) -> str:
 
 
 class CandidatesPanel(QWidget):
-    """Liste des candidats d'une piste : cocher, préécouter (boucle répétée), exporter."""
+    """Liste des candidats d'une piste : cocher, préécouter, exporter."""
 
     export_requested = Signal(list)
     preview_failed = Signal(str)
@@ -87,13 +87,18 @@ class CandidatesPanel(QWidget):
         ]
 
     def _selected_candidate(self) -> Candidate | None:
-        """Le candidat sur la ligne courante, ou à défaut le premier coché
-        (cocher une case ne place pas toujours la ligne "courante" au sens Qt)."""
+        """Choose a checked candidate first so preview and export stay consistent."""
         row = self._list.currentRow()
+        checked_rows = [
+            i for i in range(self._list.count()) if self._list.item(i).checkState() == Qt.CheckState.Checked
+        ]
+        if row in checked_rows:
+            return self._candidates[row]
+        if checked_rows:
+            return self._candidates[checked_rows[0]]
         if 0 <= row < len(self._candidates):
             return self._candidates[row]
-        checked = self.checked_candidates()
-        return checked[0] if checked else None
+        return None
 
     def _on_preview_clicked(self) -> None:
         candidate = self._selected_candidate()
@@ -114,9 +119,8 @@ class CandidatesPanel(QWidget):
             self.preview_failed.emit("Ce candidat est vide (durée nulle).")
             return
 
-        loop = candidate.type is CandidateType.LOOP
         try:
-            sd.play(segment, self._sample_rate, loop=loop)
+            sd.play(segment, self._sample_rate, loop=False)
         except Exception as exc:  # noqa: BLE001 - toute erreur PortAudio doit remonter à l'UI
             # Erreur PortAudio la plus fréquente en pratique : aucun périphérique de
             # sortie par défaut disponible/configuré. On la remonte au lieu de la

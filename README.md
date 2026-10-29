@@ -16,6 +16,10 @@ Depuis le dossier du projet décompressé :
 (via sudo), prépare l'environnement (`uv sync`, ~2 Go au premier lancement)
 et crée un lanceur `./choppeur`. Linux uniquement.
 
+Selon l'outil de décompression, `install.sh` peut arriver sans droit
+d'exécution. Si `./install.sh` répond « Permission denied » :
+    chmod +x install.sh
+
 ## Installation manuelle (si vous avez déjà uv)
     uv sync
     uv run choppeur

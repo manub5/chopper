@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import numpy as np
+import soundfile as sf
 from PySide6.QtCore import Qt
 
 from choppeur.core.models import Candidate, CandidateType, Track
@@ -51,7 +52,7 @@ def test_checked_candidates_reflects_checkbox_state(qapp, tmp_path):
     assert panel.checked_candidates() == [candidates[1]]
 
 
-def test_preview_plays_selected_candidate_with_loop_flag(qapp, tmp_path, monkeypatch):
+def test_preview_plays_selected_candidate_once(qapp, tmp_path, monkeypatch):
     panel = CandidatesPanel()
     samples = np.arange(SAMPLE_RATE * 3, dtype=np.float32)
     candidates = _candidates()
@@ -68,8 +69,29 @@ def test_preview_plays_selected_candidate_with_loop_flag(qapp, tmp_path, monkeyp
     assert len(calls) == 1
     data, sample_rate, loop = calls[0]
     assert sample_rate == SAMPLE_RATE
-    assert loop is True
+    assert loop is False
     assert len(data) == SAMPLE_RATE  # 1 seconde (0.0 -> 1.0s)
+
+
+def test_preview_and_export_use_the_same_audio_segment(qapp, tmp_path, monkeypatch):
+    panel = CandidatesPanel()
+    samples = np.linspace(-0.8, 0.8, SAMPLE_RATE * 3, dtype=np.float32)
+    candidates = _candidates()
+    panel.set_candidates(samples, SAMPLE_RATE, _track(tmp_path), candidates)
+    panel._list.item(0).setCheckState(Qt.CheckState.Checked)
+
+    previewed = []
+    monkeypatch.setattr(
+        "choppeur.gui.candidates_panel.sd.play",
+        lambda data, sample_rate, loop: previewed.append(data.copy()),
+    )
+
+    panel.preview(candidates[0])
+    exported = panel.export_checked(tmp_path / "export")
+    exported_samples, exported_rate = sf.read(exported[0], dtype="float32")
+
+    assert exported_rate == SAMPLE_RATE
+    np.testing.assert_allclose(exported_samples, previewed[0], atol=2 / 2**24)
 
 
 def test_preview_one_shot_does_not_loop(qapp, tmp_path, monkeypatch):
@@ -116,6 +138,25 @@ def test_preview_click_falls_back_to_checked_item_without_selection(qapp, tmp_pa
     panel._on_preview_clicked()
 
     assert calls == [False]  # candidats[1] est un one-shot
+
+
+def test_preview_prefers_checked_candidate_over_another_selected_row(qapp, tmp_path, monkeypatch):
+    panel = CandidatesPanel()
+    samples = np.zeros(SAMPLE_RATE * 3, dtype=np.float32)
+    candidates = _candidates()
+    panel.set_candidates(samples, SAMPLE_RATE, _track(tmp_path), candidates)
+    panel._list.setCurrentRow(0)
+    panel._list.item(1).setCheckState(Qt.CheckState.Checked)
+
+    played_lengths = []
+    monkeypatch.setattr(
+        "choppeur.gui.candidates_panel.sd.play",
+        lambda data, sample_rate, loop: played_lengths.append(len(data)),
+    )
+
+    panel._on_preview_clicked()
+
+    assert played_lengths == [200]  # le one-shot coché dure 0,2 seconde
 
 
 def test_preview_click_reports_failure_without_selection_or_check(qapp, tmp_path):
