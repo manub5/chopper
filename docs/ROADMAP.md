@@ -9,7 +9,7 @@
 5. Cache SQLite.
 6. Interface : navigation bibliothèque.
 7. Interface : forme d'onde + marqueurs.
-8. Interface : liste des candidats, préécoute (boucle répétée), export.
+8. Interface : liste des candidats, préécoute (lecture unique), export.
 9. Paramètres (fichier TOML + fenêtre).
 10. Analyse d'un album entier en arrière-plan avec barre de progression.
 11. Paquet distribuable pour le prêt (à décider à ce moment-là).

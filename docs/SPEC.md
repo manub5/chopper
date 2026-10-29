@@ -12,8 +12,8 @@ mesure, et one-shots propres.
 3. L'analyse tourne en arrière-plan ; l'interface reste utilisable.
 4. Pour chaque piste analysée : forme d'onde affichée, tempo, marqueurs des
    premiers temps de mesure, et liste de plusieurs samples candidats.
-5. Il préécoute chaque candidat (une boucle peut être jouée en répétition
-   pour vérifier qu'elle « tourne »), coche ceux qu'il garde.
+5. Il préécoute chaque candidat (lecture unique, celle du candidat coché, pour
+   entendre exactement ce qui sera exporté), coche ceux qu'il garde.
 6. Il exporte : vers le dossier cible défini dans les paramètres, ou vers
    un dossier choisi au moment de l'export.
 
