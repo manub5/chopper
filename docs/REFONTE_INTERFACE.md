@@ -1,9 +1,10 @@
 # Refonte de l'interface — design
 
-Statut : **brouillon à approuver avant planification et implémentation**.
-Les choix de disposition et d'interaction explicitement validés ne sont pas
-rouverts. Les compléments ci-dessous identifiés **Proposition** ne sont pas
-présentés comme des décisions déjà prises par l'utilisateur.
+Statut : **approuvé par l'utilisateur, avec les trois corrections intégrées
+ci-dessous**. Toutes les propositions du brouillon sont acceptées : touche
+`M` pour marquer/retirer, WAV glissés dans `glissés/` sous le dossier d'export,
+et bouton « Analyser l'album » toujours visible en haut, à côté de « Lecture auto ».
+La réalisation reste soumise à un plan puis à une validation après chaque étape.
 
 ## 1. Objectif et périmètre
 
@@ -31,13 +32,16 @@ et la réouverture d'un projet Bitwig restent à tester explicitement dans
 l'intégration complète : ne pas les déclarer validées par ce seul retour.
 
 Différence voulue avec le prototype : les WAV de l'interface finale seront
-**conservés durablement dans le dossier d'export configuré**, sans nettoyage
-automatique. Ce choix a été validé pour éviter de casser les références Bitwig.
+**conservés durablement dans le sous-dossier `glissés/` du dossier d'export
+configuré**, sans nettoyage automatique. Ils restent séparés des exports par
+bouton. Ce choix a été validé pour éviter de casser les références Bitwig.
 
 ## 3. Disposition validée, dans sa dernière version
 
 - Bibliothèque actuelle à gauche, avec arborescence dossier/album/piste.
-- En haut : case « Lecture auto » et bouton paramètres.
+- En haut : case « Lecture auto », bouton « Analyser l'album » juste à côté,
+  et bouton paramètres. L'analyse d'album reste visible même indisponible ;
+  son activation dépend du dossier choisi et de l'absence d'analyse en cours.
 - En haut à droite : titre de la piste et tempo, puis grande forme d'onde.
 - Sur la forme d'onde : **aucun rectangle de candidat permanent** ; uniquement
   la courbe et les traits fins des premiers temps de mesure.
@@ -56,18 +60,18 @@ automatique. Ce choix a été validé pour éviter de casser les références Bi
   sens ; colonnes type, tempo, durée, position et poignée `⠿`.
 - En bas : « Exporter la sélection (n) » et « Tout exporter (n) ».
 
-**Proposition technique :** conserver une hauteur minimale utilisable par
+**Décision technique acceptée :** conserver une hauteur minimale utilisable par
 sous-ligne et permettre le défilement vertical des couloirs si nécessaire,
 plutôt que de masquer des samples ou de réduire leurs rectangles à un pixel.
 Les libellés de catégorie restent séparés de la zone temporelle.
 
-**Proposition technique :** placement déterministe des rectangles par début,
+**Décision technique acceptée :** placement déterministe des rectangles par début,
 puis fin, puis identité ; réutiliser une sous-ligne dès que son dernier rectangle
 se termine. Deux intervalles qui se touchent ne se chevauchent pas. Ni la
 sélection ni le marquage ne changent ce placement.
 
 Les boucles de longueurs non standard éventuellement issues d'anciens paramètres
-ne doivent pas disparaître : **Proposition**, afficher aussi un couloir libellé
+ne doivent pas disparaître : afficher aussi un couloir libellé
 avec leur longueur, après les quatre catégories standard et avant les shots.
 
 ## 4. Sélection, marquage et lecture
@@ -87,7 +91,7 @@ Comportements validés sur les rectangles :
 - Espace = lancer/arrêter le sample actif.
 - Pas d'édition des rectangles et de leurs bornes.
 
-**Propositions pour les cas non précisés :**
+**Décisions complémentaires acceptées :**
 
 1. La liste suit les mêmes règles de clic et de lecture auto que les rectangles.
    Un clic sur sa poignée prépare seulement le glisser, sans écouter ni marquer.
@@ -112,7 +116,7 @@ marquage « à garder » ; la lecture a une indication supplémentaire, par exem
 
 La synchronisation révèle la ligne ou sous-ligne active par défilement si besoin,
 sans changer les bornes des samples ni provoquer une seconde lecture par rebond
-de signaux. **Proposition :** ne pas modifier automatiquement le zoom temporel.
+de signaux. Ne pas modifier automatiquement le zoom temporel.
 
 ## 5. Informations et couleurs
 
@@ -126,7 +130,7 @@ Paramètres : option « Forcer sombre », désactivée par défaut. Quand elle e
 désactivée, suivre aussi un changement du thème système pendant l'exécution.
 La même palette doit être appliquée aux widgets Qt et aux vues pyqtgraph.
 
-**Propositions de présentation :** durée et position en `mm:ss.mmm` ; tempo en
+**Présentation acceptée :** durée et position en `mm:ss.mmm` ; tempo en
 BPM avec au plus une décimale, `—` si inconnu. Pour un one-shot sans BPM propre,
 afficher le tempo de la piste lorsqu'il est disponible, en précisant « tempo de
 la piste » dans l'info-bulle ; ne pas inventer un tempo de l'événement isolé.
@@ -142,8 +146,9 @@ de l'étape visuelle, sans ajouter une troisième couleur d'accent.
 - Les exports par bouton conservent les réglages WAV/FLAC existants.
 - Le glisser part exclusivement de la poignée `⠿` d'une ligne et concerne son
   sample, indépendamment des autres marques.
-- Au vrai début du glisser, créer un WAV 24 bits dans le dossier d'export
-  configuré, puis fournir son URL locale au système ; action copie uniquement.
+- Au vrai début du glisser, créer un WAV 24 bits dans le sous-dossier `glissés/`
+  du dossier d'export configuré, puis fournir son URL locale au système ; action
+  copie uniquement. Créer ce sous-dossier à la demande, jamais au simple clic.
 - Conserver ce fichier même si le dépôt est annulé ou la fenêtre fermée : il
   peut déjà être référencé par Bitwig. Aucun nettoyage automatique.
 - Aucun écrasement : nommage actuel nettoyé et suffixe anti-collision atomique.
@@ -153,7 +158,7 @@ de l'étape visuelle, sans ajouter une troisième couleur d'accent.
 - Toute erreur d'export est affichée ; ne pas lancer un glisser avec une URL
   vide/inexistante ni annoncer un import Bitwig réussi sur le seul retour de Qt.
 
-**Propositions pour les cas non précisés :**
+**Décisions complémentaires acceptées :**
 
 - Les boutons exportent directement dans le dossier configuré ; s'il manque,
   demander une destination avant cet export. Ne pas modifier silencieusement
@@ -178,7 +183,7 @@ Les actions sont définies une seule fois pour garder menus, boutons et aide
 cohérents. Les commandes de lecture ne capturent pas les espaces saisis dans
 un champ texte ou les interactions avec un dialogue.
 
-**Proposition de raccourcis :**
+**Raccourcis acceptés :**
 
 | Action | Raccourci |
 |---|---|
@@ -186,7 +191,7 @@ un champ texte ou les interactions avec un dialogue.
 | Paramètres | Ctrl+, |
 | Lecture/arrêt du sample actif | Espace |
 | Arrêter la lecture | Échap |
-| Marquer/retirer le sample actif | Ctrl+Espace |
+| Marquer/retirer le sample actif | M |
 | Marquer tous les samples de la piste | Ctrl+A |
 | Retirer toutes les marques | Ctrl+Maj+A |
 | Exporter les samples marqués | Ctrl+E |
@@ -199,11 +204,11 @@ lecture automatique sur chaque déplacement au clavier ; Espace joue le choix.
 Les raccourcis de marquage restent limités au contexte des candidats, sans
 intercepter Ctrl+A dans un champ texte ou dans la bibliothèque.
 
-Les fonctions actuelles d'ouverture de bibliothèque et d'analyse d'album
-restent accessibles par menus/actions ; elles ne disparaissent pas pour faire
-place à la case « Lecture auto » en haut.
+L'ouverture de bibliothèque reste accessible par menu/action. L'analyse d'album
+dispose aussi d'une action de menu, mais son bouton reste visible en haut à côté
+de « Lecture auto » : une entrée de menu ne remplace pas ce bouton.
 
-## 8. Approche technique proposée
+## 8. Approche technique acceptée
 
 Évolution progressive de l'interface Qt existante ; pas de réécriture du moteur,
 pas de nouvelle boîte à outils, pas de version web. C'est l'approche cohérente
@@ -225,7 +230,7 @@ au clic sur Arrêter. Une erreur de périphérique ne doit pas laisser un sample
 affiché comme en lecture. Les écritures et erreurs du glisser ont un traitement
 commun avec les exports, sans construire les fichiers à l'ouverture de la piste.
 
-**Proposition de validation plateforme :** intégrer et tester sous Wayland natif
+**Validation plateforme acceptée :** intégrer et tester sous Wayland natif
 comme le prototype, conserver le choix explicite `QT_QPA_PLATFORM=xcb` comme
 solution de secours. Le retrait du forçage XCB actuel sera une étape explicite
 avec test utilisateur des anciens problèmes de rafraîchissement KDE ; il ne sera
@@ -233,7 +238,7 @@ pas assimilé à une simple conséquence de la réussite du prototype.
 
 ## 9. Vérifications requises et ordre de réalisation
 
-Après approbation de ce design : rédiger un plan avec `writing-plans`, puis
+Ce design étant approuvé : rédiger un plan avec `writing-plans`, puis
 travailler **une étape à la fois**, tests et résultat présentés, validation
 utilisateur avant l'étape suivante. Ne pas lancer toute la refonte en continu.
 
@@ -259,5 +264,5 @@ Le plan devra couvrir, avant les modifications correspondantes :
 - Régression : suite pytest complète, contrôles statiques et essai manuel
   Bitwig/Dolphin sous Wayland, puis test de la solution de secours XCB si utile.
 
-Les choix validés dans les sections 2/3 restent acquis. Les compléments
-« Proposition » doivent être acceptés ou corrigés avant de figer le plan.
+Les choix de ce document sont acquis. Ne pas les rouvrir pendant la réalisation ;
+signaler uniquement un blocage technique nouveau qui empêcherait leur respect.
