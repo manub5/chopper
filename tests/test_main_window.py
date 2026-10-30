@@ -3,7 +3,6 @@ import time
 import numpy as np
 import pytest
 import soundfile as sf
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDialog, QFileDialog
 
 from choppeur.core.cache import AnalysisCache
@@ -70,6 +69,129 @@ def test_window_starts_with_album_analysis_disabled(qapp, make_window, tmp_path)
     assert window.analyze_album_button.isEnabled() is False
 
 
+def test_shared_layout_title_and_auto_persistence(qapp, make_window, monkeypatch, loaded_track):
+    window = make_window()
+    window.show()
+    qapp.processEvents()
+    saved = []
+    monkeypatch.setattr(
+        main_window_module, "save_settings", lambda settings: saved.append(settings.auto_play)
+    )
+    window._on_track_analyzed(loaded_track)
+    assert loaded_track.analysis.track.title in window.track_label.text()
+    assert "120" in window.track_label.text()
+    assert window.auto_play_checkbox.isChecked()
+    assert window.auto_play_checkbox.parent() is window.analyze_album_button.parent()
+    assert window.auto_play_checkbox.geometry().right() < window.analyze_album_button.geometry().left()
+    assert window.library_panel.geometry().left() == 0
+    assert window.waveform_view.height() > window.candidates_panel.height()
+    window.auto_play_checkbox.click()
+    assert window.sample_state.auto_play is False
+    assert saved == [False]
+
+
+@pytest.mark.parametrize("completion", ["finish", "failure", "close", "new_track"])
+def test_shared_player_transitions_stop_output_and_clear_indicator(
+    qapp, make_window, monkeypatch, loaded_track, tmp_path, completion
+):
+    import sounddevice as sd
+    from PySide6.QtCore import QTimer
+
+    class Stream:
+        active = True
+
+    stream = Stream()
+
+    def stop(**kwargs):
+        stream.active = False
+
+    monkeypatch.setattr(sd, "play", lambda *args, **kwargs: None)
+    monkeypatch.setattr(sd, "get_stream", lambda: stream)
+    monkeypatch.setattr(sd, "stop", stop)
+    window = make_window()
+    window._on_track_analyzed(loaded_track)
+    state = window.sample_state
+    state.toggle_mark(state.items[0].id)
+    state.click(state.items[0].id)
+    assert "▶" in window.candidates_panel.table.item(0, 0).text()
+    if completion == "close":
+        window.close()
+    elif completion == "new_track":
+        _, paths = _make_library(tmp_path)
+        monkeypatch.setattr(workers, "analyze_track", _fake_analyze_track)
+        window._on_track_selected(paths[0])
+        assert not state.marked_ids
+        _pump_until(lambda: window._thread is None)
+    elif completion == "failure":
+
+        class BrokenStream:
+            @property
+            def active(self):
+                raise RuntimeError("disconnected")
+
+        window.preview_player._stream = BrokenStream()
+        _pump_until(lambda: state.playing_id is None)
+        assert "disconnected" in window.status_bar.currentMessage()
+    else:
+        stream.active = False
+        _pump_until(lambda: state.playing_id is None)
+    assert not stream.active
+    assert not window.preview_player.findChild(QTimer).isActive()
+    assert state.playing_id is None
+    if completion in {"finish", "failure"}:
+        assert state.marked_ids
+        assert "▶" not in window.candidates_panel.table.item(0, 0).text()
+
+
+def test_auto_preference_survives_settings_dialog(qapp, make_window, monkeypatch):
+    window = make_window(auto_play=False)
+    monkeypatch.setattr(QDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
+    saved = []
+    monkeypatch.setattr(
+        main_window_module, "save_settings", lambda settings: saved.append(settings.auto_play)
+    )
+    window._on_settings_clicked()
+    assert window.sample_state.auto_play is False
+    assert not window.auto_play_checkbox.isChecked()
+    assert saved == [False]
+
+
+def test_new_analysis_clears_old_state_title_and_exports(
+    qapp, make_window, monkeypatch, loaded_track, tmp_path
+):
+    _, paths = _make_library(tmp_path)
+    window = make_window()
+    window._on_track_analyzed(loaded_track)
+    window.sample_state.mark_all()
+    monkeypatch.setattr(workers, "analyze_track", lambda *args: (_ for _ in ()).throw(RuntimeError("failed")))
+    window._on_track_selected(paths[0])
+    assert window.sample_state.loaded_track is None
+    assert not window.track_label.text()
+    assert window.candidates_panel.table.rowCount() == 0
+    _pump_until(lambda: window._thread is None)
+    assert not window.candidates_panel.export_all_button.isEnabled()
+
+
+@pytest.mark.parametrize("mode, expected_count", [("all", 2), ("marked", 1)])
+def test_export_mode_uses_exact_state_subset(
+    qapp, make_window, monkeypatch, loaded_track, tmp_path, mode, expected_count
+):
+    window = make_window()
+    window._on_track_analyzed(loaded_track)
+    state = window.sample_state
+    state.navigate(state.items[0].id)
+    state.toggle_mark(state.items[1].id)
+    destination = tmp_path / "exports"
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args: str(destination))
+    window._on_export_requested(mode)
+    files = list(destination.glob("*.wav"))
+    assert len(files) == expected_count
+    if mode == "marked":
+        data, rate = sf.read(files[0])
+        assert rate == 1000
+        np.testing.assert_allclose(data, loaded_track.samples[1000:1200], atol=2 / 2**24)
+
+
 def test_selecting_a_folder_enables_album_analysis(qapp, make_window, tmp_path):
     album, _ = _make_library(tmp_path)
     window = make_window()
@@ -98,9 +220,9 @@ def test_selecting_a_track_runs_analysis_and_updates_panels(qapp, make_window, m
     window = make_window()
     window._on_track_selected(paths[0])
 
-    _pump_until(lambda: window.candidates_panel._list.count() > 0)
+    _pump_until(lambda: window.candidates_panel.table.rowCount() > 0)
 
-    assert window.candidates_panel._list.count() == 1
+    assert window.candidates_panel.table.rowCount() == 1
     assert window.waveform_view._waveform_item is not None
 
 
@@ -112,9 +234,9 @@ def test_gui_does_not_reload_audio_after_worker_result(qapp, make_window, monkey
 
     monkeypatch.setattr(main_window_module.audio_io, "load", unexpected_load)
     window._on_track_analyzed(loaded_track)
-    assert window.candidates_panel._samples is loaded_track.samples
-    assert window.candidates_panel._sample_rate == 1000
-    assert window.candidates_panel._list.count() == 2
+    assert window.sample_state.loaded_track.samples is loaded_track.samples
+    assert window.sample_state.loaded_track.sample_rate == 1000
+    assert window.candidates_panel.table.rowCount() == 2
 
 
 def test_worker_audio_stays_stereo_for_preview_and_export(qapp, make_window, monkeypatch, tmp_path):
@@ -128,15 +250,23 @@ def test_worker_audio_stays_stereo_for_preview_and_export(qapp, make_window, mon
     window = make_window()
     window._on_track_selected(path)
     _pump_until(lambda: window._thread is None)
-    panel = window.candidates_panel
     received = []
     monkeypatch.setattr(sd, "play", lambda data, rate, **kwargs: received.append((data.copy(), rate)))
-    panel._list.item(0).setCheckState(Qt.CheckState.Checked)
-    panel._on_preview_clicked()
+
+    class Stream:
+        active = True
+
+    monkeypatch.setattr(sd, "get_stream", Stream)
+    monkeypatch.setattr(sd, "stop", lambda **kwargs: None)
+    state = window.sample_state
+    state.toggle_mark(state.items[0].id)
+    state.click(state.items[0].id)
     np.testing.assert_array_equal(received[0][0], samples[:100])
     assert received[0][1] == 1000
-    exported = panel.export_checked(tmp_path / "exports")
-    data, rate = sf.read(exported[0], dtype="float32")
+    destination = tmp_path / "exports"
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args: str(destination))
+    window._on_export_requested("marked")
+    data, rate = sf.read(next(destination.glob("*.wav")), dtype="float32")
     assert rate == 1000
     np.testing.assert_array_equal(data, samples[:100])
     assert path.read_bytes() == before
@@ -156,11 +286,11 @@ def test_second_load_failure_releases_thread_and_allows_retry(qapp, make_window,
     window._on_track_selected(paths[0])
     _pump_until(lambda: window._thread is None)
     assert "Échec de l'analyse" in window.status_bar.currentMessage()
-    assert window.candidates_panel._list.count() == 0
+    assert window.candidates_panel.table.rowCount() == 0
     assert window.library_panel.isEnabled()
     window._on_track_selected(paths[1])
     _pump_until(lambda: window._thread is None)
-    assert window.candidates_panel._list.count() == 1
+    assert window.candidates_panel.table.rowCount() == 1
 
 
 @pytest.mark.parametrize("error", [OSError("fichier illisible"), RuntimeError("modèle indisponible")])
@@ -180,16 +310,16 @@ def test_failed_track_analysis_releases_thread_and_allows_another_track(
 
     _pump_until(lambda: "Échec de l'analyse" in window.status_bar.currentMessage())
     assert str(error) in window.status_bar.currentMessage()
-    assert window.candidates_panel._list.count() == 0
+    assert window.candidates_panel.table.rowCount() == 0
     _pump_until(lambda: window._thread is None)
     assert window._worker is None
     assert window.library_panel.isEnabled()
 
     window._on_track_selected(paths[1])
-    _pump_until(lambda: window.candidates_panel._list.count() == 1)
+    _pump_until(lambda: window.candidates_panel.table.rowCount() == 1)
     _pump_until(lambda: window._thread is None)
-    assert window.candidates_panel._track is not None
-    assert window.candidates_panel._track.path == paths[1]
+    assert window.sample_state.loaded_track is not None
+    assert window.sample_state.loaded_track.analysis.track.path == paths[1]
     assert window.library_panel.isEnabled()
 
 
@@ -216,7 +346,7 @@ def test_second_track_selection_while_busy_does_not_replace_running_thread(
     assert window._thread is first_thread
     assert "en cours" in window.status_bar.currentMessage()
 
-    _pump_until(lambda: window.candidates_panel._list.count() > 0)
+    _pump_until(lambda: window.candidates_panel.table.rowCount() > 0)
 
 
 def test_library_panel_disabled_while_a_track_analysis_runs(qapp, make_window, monkeypatch, tmp_path):
@@ -227,7 +357,7 @@ def test_library_panel_disabled_while_a_track_analysis_runs(qapp, make_window, m
     window._on_track_selected(paths[0])
     assert window.library_panel.isEnabled() is False
 
-    _pump_until(lambda: window.candidates_panel._list.count() > 0)
+    _pump_until(lambda: window.candidates_panel.table.rowCount() > 0)
     assert window.library_panel.isEnabled() is True
 
 
@@ -326,14 +456,14 @@ def test_export_flow_writes_checked_candidate_to_chosen_directory(qapp, make_win
 
     window = make_window()
     window._on_track_selected(paths[0])
-    _pump_until(lambda: window.candidates_panel._list.count() > 0)
+    _pump_until(lambda: window.candidates_panel.table.rowCount() > 0)
 
-    window.candidates_panel._list.item(0).setCheckState(Qt.CheckState.Checked)
+    window.sample_state.mark_all()
 
     export_dir = tmp_path / "export"
     monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args, **kwargs: str(export_dir))
 
-    window._on_export_requested(window.candidates_panel.checked_candidates())
+    window._on_export_requested("marked")
 
     exported_files = list(export_dir.glob("*.wav"))
     assert len(exported_files) == 1
@@ -350,13 +480,13 @@ def test_export_respects_the_flac_format_setting(qapp, make_window, monkeypatch,
 
     window = make_window(export_format="flac")
     window._on_track_selected(paths[0])
-    _pump_until(lambda: window.candidates_panel._list.count() > 0)
-    window.candidates_panel._list.item(0).setCheckState(Qt.CheckState.Checked)
+    _pump_until(lambda: window.candidates_panel.table.rowCount() > 0)
+    window.sample_state.mark_all()
 
     export_dir = tmp_path / "export"
     monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args, **kwargs: str(export_dir))
 
-    window._on_export_requested(window.candidates_panel.checked_candidates())
+    window._on_export_requested("marked")
 
     assert len(list(export_dir.glob("*.flac"))) == 1
     assert list(export_dir.glob("*.wav")) == []

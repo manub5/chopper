@@ -1,235 +1,132 @@
-from pathlib import Path
+from dataclasses import replace
 
-import numpy as np
-import soundfile as sf
+import pytest
 from PySide6.QtCore import Qt
+from PySide6.QtTest import QTest
 
-from choppeur.core.models import Candidate, CandidateType, Track
 from choppeur.gui.candidates_panel import CandidatesPanel
+from choppeur.gui.sample_state import SampleState
 
-SAMPLE_RATE = 1000
+
+def make_panel(loaded_track, auto_play=False):
+    state = SampleState(auto_play=auto_play)
+    state.load_track(loaded_track)
+    panel = CandidatesPanel(state)
+    panel.resize(800, 250)
+    panel.show()
+    return panel, state
 
 
-def _track(tmp_path: Path) -> Track:
-    return Track(
-        path=tmp_path / "source.wav",
-        artist="Burial",
-        album="Untrue",
-        title="Etched Headplate",
-        track_number=3,
-        duration_seconds=3.0,
-        sample_rate=SAMPLE_RATE,
+def click(panel, row, column=0, control=False):
+    table = panel.table
+    QTest.mouseClick(
+        table.viewport(),
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.ControlModifier if control else Qt.KeyboardModifier.NoModifier,
+        table.visualItemRect(table.item(row, column)).center(),
     )
 
 
-def _candidates() -> list[Candidate]:
-    return [
-        Candidate(type=CandidateType.LOOP, start_seconds=0.0, end_seconds=1.0, score=1.0, bpm=120, bars=1),
-        Candidate(type=CandidateType.ONE_SHOT, start_seconds=1.0, end_seconds=1.2, score=0.5),
-    ]
+def test_table_has_five_noneditable_columns_and_initial_order(qapp, loaded_track):
+    panel, state = make_panel(loaded_track)
+    assert panel.table.columnCount() == 5
+    assert panel.table.rowCount() == 2
+    assert panel.table.item(0, 0).data(Qt.ItemDataRole.UserRole) == state.items[0].id
+    assert "Boucle" in panel.table.item(0, 0).text()
+    assert not panel.table.item(0, 0).flags() & Qt.ItemFlag.ItemIsEditable
+    panel.close()
 
 
-def test_set_candidates_populates_list_unchecked(qapp, tmp_path):
-    panel = CandidatesPanel()
-    samples = np.zeros(SAMPLE_RATE * 3, dtype=np.float32)
-
-    panel.set_candidates(samples, SAMPLE_RATE, _track(tmp_path), _candidates())
-
-    assert panel._list.count() == 2
-    assert panel.checked_candidates() == []
-    assert "Boucle 1 mesures" in panel._list.item(0).text()
-    assert "One-shot" in panel._list.item(1).text()
-
-
-def test_checked_candidates_reflects_checkbox_state(qapp, tmp_path):
-    panel = CandidatesPanel()
-    samples = np.zeros(SAMPLE_RATE * 3, dtype=np.float32)
-    candidates = _candidates()
-    panel.set_candidates(samples, SAMPLE_RATE, _track(tmp_path), candidates)
-
-    panel._list.item(1).setCheckState(Qt.CheckState.Checked)
-
-    assert panel.checked_candidates() == [candidates[1]]
+@pytest.mark.parametrize("auto_play", [False, True])
+def test_click_selects_and_optionally_requests_play(qapp, loaded_track, auto_play):
+    panel, state = make_panel(loaded_track, auto_play)
+    requests = []
+    state.play_requested.connect(lambda item_id, token: requests.append(item_id))
+    click(panel, 1)
+    assert state.active_id == state.items[1].id
+    assert requests == ([state.items[1].id] if auto_play else [])
+    panel.close()
 
 
-def test_preview_plays_selected_candidate_once(qapp, tmp_path, monkeypatch):
-    panel = CandidatesPanel()
-    samples = np.arange(SAMPLE_RATE * 3, dtype=np.float32)
-    candidates = _candidates()
-    panel.set_candidates(samples, SAMPLE_RATE, _track(tmp_path), candidates)
+def test_ctrl_click_marks_without_selecting_or_playing(qapp, loaded_track):
+    panel, state = make_panel(loaded_track, True)
+    click(panel, 0)
+    first = state.active_id
+    click(panel, 1, control=True)
+    assert state.active_id == first
+    assert state.marked_ids == {state.items[1].id}
+    assert "✓" in panel.table.item(1, 0).text()
+    assert panel.table.currentRow() == 0
+    click(panel, 1, control=True)
+    assert not state.marked_ids
+    panel.close()
 
-    calls = []
-    monkeypatch.setattr(
-        "choppeur.gui.candidates_panel.sd.play",
-        lambda data, sample_rate, loop: calls.append((data, sample_rate, loop)),
+
+def test_keyboard_navigation_does_not_play_or_mark(qapp, loaded_track):
+    panel, state = make_panel(loaded_track, True)
+    state.navigate(state.items[0].id)
+    requests = []
+    state.play_requested.connect(lambda *args: requests.append(args))
+    QTest.keyClick(panel.table, Qt.Key.Key_Down)
+    assert state.active_id == state.items[1].id
+    assert requests == []
+    assert not state.marked_ids
+    panel.close()
+
+
+def test_handle_does_not_select_play_or_mark(qapp, loaded_track):
+    panel, state = make_panel(loaded_track, True)
+    click(panel, 1, 4)
+    assert state.active_id is None
+    assert state.playing_id is None
+    assert not state.marked_ids
+    panel.close()
+
+
+def test_sorted_duplicate_candidates_keep_distinct_ids(qapp, loaded_track):
+    duplicate = loaded_track.candidates[0]
+    panel, state = make_panel(
+        replace(loaded_track, candidates=(duplicate, loaded_track.candidates[1], duplicate))
     )
-
-    panel.preview(candidates[0])
-
-    assert len(calls) == 1
-    data, sample_rate, loop = calls[0]
-    assert sample_rate == SAMPLE_RATE
-    assert loop is False
-    assert len(data) == SAMPLE_RATE  # 1 seconde (0.0 -> 1.0s)
-
-
-def test_preview_and_export_use_the_same_audio_segment(qapp, tmp_path, monkeypatch):
-    panel = CandidatesPanel()
-    samples = np.linspace(-0.8, 0.8, SAMPLE_RATE * 3, dtype=np.float32)
-    candidates = _candidates()
-    panel.set_candidates(samples, SAMPLE_RATE, _track(tmp_path), candidates)
-    panel._list.item(0).setCheckState(Qt.CheckState.Checked)
-
-    previewed = []
-    monkeypatch.setattr(
-        "choppeur.gui.candidates_panel.sd.play",
-        lambda data, sample_rate, loop: previewed.append(data.copy()),
-    )
-
-    panel.preview(candidates[0])
-    exported = panel.export_checked(tmp_path / "export")
-    exported_samples, exported_rate = sf.read(exported[0], dtype="float32")
-
-    assert exported_rate == SAMPLE_RATE
-    np.testing.assert_allclose(exported_samples, previewed[0], atol=2 / 2**24)
+    panel.table.sortItems(0, Qt.SortOrder.DescendingOrder)
+    target = panel.table.item(2, 0).data(Qt.ItemDataRole.UserRole)
+    click(panel, 2)
+    click(panel, 2, control=True)
+    assert state.active_id == target
+    assert state.marked_ids == {target}
+    assert len({panel.table.item(row, 0).data(Qt.ItemDataRole.UserRole) for row in range(3)}) == 3
+    panel.close()
 
 
-def test_preview_one_shot_does_not_loop(qapp, tmp_path, monkeypatch):
-    panel = CandidatesPanel()
-    samples = np.zeros(SAMPLE_RATE * 3, dtype=np.float32)
-    candidates = _candidates()
-    panel.set_candidates(samples, SAMPLE_RATE, _track(tmp_path), candidates)
-
-    calls = []
-    monkeypatch.setattr(
-        "choppeur.gui.candidates_panel.sd.play",
-        lambda data, sample_rate, loop: calls.append(loop),
-    )
-
-    panel.preview(candidates[1])
-
-    assert calls == [False]
-
-
-def test_stop_preview_calls_sounddevice_stop(qapp, monkeypatch):
-    panel = CandidatesPanel()
-    calls = []
-    monkeypatch.setattr("choppeur.gui.candidates_panel.sd.stop", lambda: calls.append(True))
-
-    panel.stop_preview()
-
-    assert calls == [True]
+def test_external_state_updates_selection_playing_marks_and_counts(qapp, loaded_track):
+    panel, state = make_panel(loaded_track, True)
+    tokens = []
+    state.play_requested.connect(lambda item_id, token: tokens.append(token))
+    state.click(state.items[0].id)
+    state.playback_started(tokens[0])
+    state.toggle_mark(state.items[1].id)
+    assert panel.table.currentRow() == 0
+    assert "▶" in panel.table.item(0, 0).text()
+    assert "✓" not in panel.table.item(0, 0).text()
+    assert "✓" in panel.table.item(1, 0).text()
+    assert "(1)" in panel.export_marked_button.text()
+    assert "(2)" in panel.export_all_button.text()
+    state.playback_finished(tokens[0])
+    assert "▶" not in panel.table.item(0, 0).text()
+    assert panel.table.currentRow() == 0
+    state.clear()
+    assert panel.table.rowCount() == 0
+    assert not panel.export_all_button.isEnabled()
+    panel.close()
 
 
-def test_preview_click_falls_back_to_checked_item_without_selection(qapp, tmp_path, monkeypatch):
-    panel = CandidatesPanel()
-    samples = np.zeros(SAMPLE_RATE * 3, dtype=np.float32)
-    candidates = _candidates()
-    panel.set_candidates(samples, SAMPLE_RATE, _track(tmp_path), candidates)
-    panel._list.setCurrentRow(-1)  # aucune ligne "courante" au sens Qt
-    panel._list.item(1).setCheckState(Qt.CheckState.Checked)
-
-    calls = []
-    monkeypatch.setattr(
-        "choppeur.gui.candidates_panel.sd.play",
-        lambda data, sample_rate, loop: calls.append(loop),
-    )
-
-    panel._on_preview_clicked()
-
-    assert calls == [False]  # candidats[1] est un one-shot
-
-
-def test_preview_prefers_checked_candidate_over_another_selected_row(qapp, tmp_path, monkeypatch):
-    panel = CandidatesPanel()
-    samples = np.zeros(SAMPLE_RATE * 3, dtype=np.float32)
-    candidates = _candidates()
-    panel.set_candidates(samples, SAMPLE_RATE, _track(tmp_path), candidates)
-    panel._list.setCurrentRow(0)
-    panel._list.item(1).setCheckState(Qt.CheckState.Checked)
-
-    played_lengths = []
-    monkeypatch.setattr(
-        "choppeur.gui.candidates_panel.sd.play",
-        lambda data, sample_rate, loop: played_lengths.append(len(data)),
-    )
-
-    panel._on_preview_clicked()
-
-    assert played_lengths == [200]  # le one-shot coché dure 0,2 seconde
-
-
-def test_preview_click_reports_failure_without_selection_or_check(qapp, tmp_path):
-    panel = CandidatesPanel()
-    samples = np.zeros(SAMPLE_RATE * 3, dtype=np.float32)
-    panel.set_candidates(samples, SAMPLE_RATE, _track(tmp_path), _candidates())
-    panel._list.setCurrentRow(-1)
-
-    received = []
-    panel.preview_failed.connect(received.append)
-
-    panel._on_preview_clicked()
-
-    assert len(received) == 1
-
-
-def test_preview_emits_preview_failed_when_sounddevice_raises(qapp, tmp_path, monkeypatch):
-    panel = CandidatesPanel()
-    samples = np.zeros(SAMPLE_RATE * 3, dtype=np.float32)
-    candidates = _candidates()
-    panel.set_candidates(samples, SAMPLE_RATE, _track(tmp_path), candidates)
-
-    def _boom(data, sample_rate, loop):
-        raise RuntimeError("aucun périphérique de sortie")
-
-    monkeypatch.setattr("choppeur.gui.candidates_panel.sd.play", _boom)
-
-    received = []
-    panel.preview_failed.connect(received.append)
-    panel.preview(candidates[0])
-
-    assert len(received) == 1
-    assert "aucun périphérique de sortie" in received[0]
-
-
-def test_stop_preview_emits_preview_failed_when_sounddevice_raises(qapp, monkeypatch):
-    panel = CandidatesPanel()
-
-    def _boom():
-        raise RuntimeError("erreur PortAudio")
-
-    monkeypatch.setattr("choppeur.gui.candidates_panel.sd.stop", _boom)
-
-    received = []
-    panel.preview_failed.connect(received.append)
-    panel.stop_preview()
-
-    assert len(received) == 1
-
-
-def test_export_checked_writes_only_checked_candidates(qapp, tmp_path):
-    panel = CandidatesPanel()
-    samples = np.zeros(SAMPLE_RATE * 3, dtype=np.float32)
-    candidates = _candidates()
-    panel.set_candidates(samples, SAMPLE_RATE, _track(tmp_path), candidates)
-    panel._list.item(0).setCheckState(Qt.CheckState.Checked)
-
-    exported = panel.export_checked(tmp_path / "export")
-
-    assert len(exported) == 1
-    assert exported[0].exists()
-    assert "loop" in exported[0].name
-
-
-def test_export_button_emits_checked_candidates(qapp, tmp_path):
-    panel = CandidatesPanel()
-    samples = np.zeros(SAMPLE_RATE * 3, dtype=np.float32)
-    candidates = _candidates()
-    panel.set_candidates(samples, SAMPLE_RATE, _track(tmp_path), candidates)
-    panel._list.item(1).setCheckState(Qt.CheckState.Checked)
-
-    received = []
-    panel.export_requested.connect(received.append)
-    panel._export_button.click()
-
-    assert received == [[candidates[1]]]
+def test_export_buttons_request_modes_not_the_active_candidate(qapp, loaded_track):
+    panel, state = make_panel(loaded_track)
+    state.navigate(state.items[0].id)
+    state.toggle_mark(state.items[1].id)
+    requests = []
+    panel.export_requested.connect(requests.append)
+    panel.export_marked_button.click()
+    panel.export_all_button.click()
+    assert requests == ["marked", "all"]
+    panel.close()

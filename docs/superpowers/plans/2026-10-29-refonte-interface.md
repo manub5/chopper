@@ -213,23 +213,23 @@ avant l'étape 3.
 ni de copie indépendante de la sélection. Signaux `export_requested(mode: str)`
 avec `mode` égal à `marked` ou `all`, et `drag_requested(id: int)` réservé étape 6.
 
-- [ ] **1. Écrire les tests :** titre/tempo de la piste affichée, bibliothèque à
+- [x] **1. Écrire les tests :** titre/tempo de la piste affichée, bibliothèque à
   gauche, onde prioritaire en hauteur, boutons album/auto voisins et visibles,
   cases et compteurs synchronisés. Vérifier que le mode `all` fournit les deux
   candidats de la fixture et `marked` seulement celui marqué, pas l'actif.
   Vérifier clic liste avec/sans auto, Ctrl sans changement d'actif, navigation
   clavier sans lecture, état de lecture distinct de la marque et du focus.
   Tester deux candidats égaux et un tri de la liste : le bon ID reste ciblé.
-- [ ] **2. Observer le rouge :**
+- [x] **2. Observer le rouge :**
   `uv run pytest -q tests/test_main_window.py tests/test_candidates_panel.py`.
-- [ ] **3. Intégrer un seul état et un seul lecteur.** Utiliser une table Qt non
+- [x] **3. Intégrer un seul état et un seul lecteur.** Utiliser une table Qt non
   éditable avec les cinq colonnes et repères `✓`/`▶`, ordre initial des candidats
   conservé. Identifier les lignes par ID en rôle utilisateur, pas leur index.
   La poignée ne sélectionne, ne joue ni ne marque ; elle sera activée étape 6.
   Les boutons export gardent à cette étape une destination choisie par dialogue
   et appellent l'export actuel avec la liste exacte calculée par l'état ; l'étape 6
   remplacera ce raccordement par le service commun et la destination configurée.
-- [ ] **4. Brancher les transitions.** Case auto persistée immédiatement ; le
+- [x] **4. Brancher les transitions.** Case auto persistée immédiatement ; le
   dialogue paramètres ne la remet pas à sa valeur par défaut. Changement de piste :
   arrêter et vider les anciens résultats avant l'analyse ; échec sans titre/exports
   d'une autre piste. Lecture finie/échouée répercute son état dans la liste.
@@ -237,10 +237,16 @@ avec `mode` égal à `marked` ou `all`, et `drag_requested(id: int)` réservé �
   d'arrêt des analyses ; tester qu'aucun audio ne continue après cette fermeture.
   Mettre à jour les anciens tests qui imposaient la préécoute d'une case cochée :
   ce comportement est explicitement remplacé par la lecture du sample actif.
-- [ ] **5. Vert et porte G ; commit :** `Réorganise la fenêtre et synchronise la liste des samples`.
+- [x] **5. Vert et porte G ; commit :** `Réorganise la fenêtre et synchronise la liste des samples`.
   **Validation native Wayland :** disposition, titre/tempo, bouton album visible,
   clic/auto/Ctrl et compteurs ; signaler que couloirs, thème et raccourcis complets
   arrivent aux étapes suivantes. Attendre validation.
+
+**Résultat étape 3 :** 189 tests réussis ; porte G réussie. Tests de l'ancien
+panneau adaptés au contrat approuvé (actif distinct des marques). Arrêt réel du
+flux simulé et du minuteur vérifié à la fermeture ; sources inchangées.
+Validation visuelle et écoute native Wayland à réaliser par l'utilisateur avant
+l'étape 4. Aucun couloir, thème ou registre de raccourcis ajouté à cette étape.
 
 ## Étape 4 — Forme d'onde nette et couloirs à sous-lignes
 

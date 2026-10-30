@@ -4,9 +4,11 @@ from pathlib import Path
 
 from PySide6.QtCore import QThread
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QFileDialog,
     QHBoxLayout,
+    QLabel,
     QMainWindow,
     QMessageBox,
     QProgressBar,
@@ -19,7 +21,7 @@ from PySide6.QtWidgets import (
 
 from choppeur.core import audio_io
 from choppeur.core.cache import AnalysisCache
-from choppeur.core.models import Candidate, Track
+from choppeur.core.models import Track
 from choppeur.core.settings import (
     Settings,
     default_cache_path,
@@ -29,6 +31,8 @@ from choppeur.core.settings import (
 from choppeur.gui.candidates_panel import CandidatesPanel
 from choppeur.gui.library_panel import LibraryPanel
 from choppeur.gui.presentation import LoadedTrack
+from choppeur.gui.preview_player import PreviewPlayer
+from choppeur.gui.sample_state import SampleState
 from choppeur.gui.settings_dialog import SettingsDialog
 from choppeur.gui.waveform_view import WaveformView
 from choppeur.gui.workers import (
@@ -63,7 +67,20 @@ class MainWindow(QMainWindow):
 
         self.library_panel = LibraryPanel()
         self.waveform_view = WaveformView()
-        self.candidates_panel = CandidatesPanel()
+        self.sample_state = SampleState(auto_play=self.settings.auto_play, parent=self)
+        self.preview_player = PreviewPlayer(self)
+        self.sample_state.play_requested.connect(self._play_sample)
+        self.sample_state.stop_requested.connect(self.preview_player.stop)
+        self.sample_state.error_reported.connect(self._on_preview_failed)
+        self.preview_player.started.connect(self.sample_state.playback_started)
+        self.preview_player.finished.connect(self.sample_state.playback_finished)
+        self.preview_player.failed.connect(self.sample_state.playback_failed)
+        self.candidates_panel = CandidatesPanel(self.sample_state)
+        self.track_label = QLabel()
+        font = self.track_label.font()
+        font.setPointSize(font.pointSize() + 2)
+        font.setBold(True)
+        self.track_label.setFont(font)
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
 
@@ -82,20 +99,26 @@ class MainWindow(QMainWindow):
 
         top_buttons = QHBoxLayout()
         top_buttons.addWidget(open_library_button)
+        self.auto_play_checkbox = QCheckBox("Lecture auto")
+        self.auto_play_checkbox.setChecked(self.settings.auto_play)
+        self.auto_play_checkbox.toggled.connect(self._on_auto_play_toggled)
+        top_buttons.addWidget(self.auto_play_checkbox)
         top_buttons.addWidget(self.analyze_album_button)
         top_buttons.addStretch(1)
         top_buttons.addWidget(settings_button)
 
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
-        right_layout.addWidget(self.waveform_view)
-        right_layout.addWidget(self.candidates_panel)
+        right_layout.addWidget(self.track_label)
+        right_layout.addWidget(self.waveform_view, 3)
+        right_layout.addWidget(self.candidates_panel, 1)
         right_layout.addWidget(self.progress_bar)
 
         splitter = QSplitter()
         splitter.addWidget(self.library_panel)
         splitter.addWidget(right_panel)
         splitter.setStretchFactor(1, 1)
+        splitter.setSizes([250, 850])
 
         central = QWidget()
         central_layout = QVBoxLayout(central)
@@ -107,7 +130,6 @@ class MainWindow(QMainWindow):
         self.library_panel.folder_selected.connect(self._on_folder_selected)
         self.library_panel.load_failed.connect(self._on_library_load_failed)
         self.candidates_panel.export_requested.connect(self._on_export_requested)
-        self.candidates_panel.preview_failed.connect(self._on_preview_failed)
 
         if self.settings.library_root:
             self.library_panel.set_root(Path(self.settings.library_root))
@@ -143,6 +165,9 @@ class MainWindow(QMainWindow):
             return
 
         track = audio_io.read_track(path)
+        self.sample_state.clear()
+        self.track_label.clear()
+        self.waveform_view.clear()
         self._current_track = track
         self.status_bar.showMessage(f"Analyse de {track.title}…")
 
@@ -160,7 +185,8 @@ class MainWindow(QMainWindow):
 
         self.waveform_view.set_waveform(samples, sample_rate)
         self.waveform_view.set_candidates(candidates)
-        self.candidates_panel.set_candidates(samples, sample_rate, analysis.track, candidates)
+        self.sample_state.load_track(result)
+        self.track_label.setText(f"{analysis.track.title} — {round(analysis.tempo_bpm)} BPM")
 
         self.status_bar.showMessage(
             f"{analysis.track.title} — {round(analysis.tempo_bpm)} BPM, {len(candidates)} candidats",
@@ -232,6 +258,7 @@ class MainWindow(QMainWindow):
         dialog = SettingsDialog(self.settings, self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.settings = dialog.settings()
+            self.auto_play_checkbox.setChecked(self.settings.auto_play)
             save_settings(self.settings)
 
     # --- préécoute -------------------------------------------------------
@@ -239,9 +266,28 @@ class MainWindow(QMainWindow):
     def _on_preview_failed(self, message: str) -> None:
         self.status_bar.showMessage(message, 8000)
 
+    def _on_auto_play_toggled(self, enabled: bool) -> None:
+        self.sample_state.set_auto_play(enabled)
+        self.settings.auto_play = enabled
+        save_settings(self.settings)
+
+    def _play_sample(self, item_id: int, token: int) -> None:
+        loaded = self.sample_state.loaded_track
+        if loaded is not None:
+            item = next(item for item in self.sample_state.items if item.id == item_id)
+            self.preview_player.play(loaded.samples, loaded.sample_rate, item.candidate, token)
+
     # --- export -------------------------------------------------------
 
-    def _on_export_requested(self, candidates: list[Candidate]) -> None:
+    def _on_export_requested(self, mode: str) -> None:
+        loaded = self.sample_state.loaded_track
+        if loaded is None or mode not in {"marked", "all"}:
+            return
+        candidates = [
+            item.candidate
+            for item in self.sample_state.items
+            if mode == "all" or item.id in self.sample_state.marked_ids
+        ]
         if not candidates:
             QMessageBox.information(self, "Choppeur", "Aucun candidat coché à exporter.")
             return
@@ -251,8 +297,13 @@ class MainWindow(QMainWindow):
         if not directory:
             return
 
-        exported = self.candidates_panel.export_checked(
-            Path(directory), file_format=self.settings.export_format
+        exported = audio_io.export_candidates(
+            loaded.samples,
+            loaded.sample_rate,
+            loaded.analysis.track,
+            candidates,
+            Path(directory),
+            file_format=self.settings.export_format,
         )
         self.status_bar.showMessage(f"{len(exported)} fichier(s) exporté(s)", 5000)
 
@@ -286,6 +337,8 @@ class MainWindow(QMainWindow):
         self._worker = None
 
     def closeEvent(self, event) -> None:
+        self.sample_state.stop()
+        self.preview_player.stop()
         if isinstance(self._worker, AlbumAnalysisWorker):
             # Demande l'arrêt après la piste en cours plutôt que de laisser tourner
             # tout le reste de l'album pendant qu'on ferme la fenêtre.
