@@ -162,10 +162,8 @@ sur la durée théorique de l'extrait.
   **Validation utilisateur :** fondations testées ; interface actuelle inchangée.
   Attendre sa validation, sans commencer l'étape 2.
 
-**Avancement au 30/10/2026 :** code et contrôles de l'étape 1 réalisés ; 49 nouveaux
-cas de tests (179 au total). État, lecteur et préférences prêts, sans branchement
-à l'interface actuelle. Après le commit de l'étape : attendre la validation
-utilisateur avant tout travail sur le transport audio de l'étape 2.
+**Avancement au 30/10/2026 :** étape 1 commitée en `ee2f522` et validée ; étape 2
+autorisée. État et nouveau lecteur seront raccordés à l'étape 3.
 
 ## Étape 2 — Transporter l'audio multicanal hors du thread graphique
 
@@ -177,7 +175,7 @@ utilisateur avant tout travail sur le transport audio de l'étape 2.
 `MainWindow._on_track_analyzed(result: LoadedTrack)` ne décode plus le fichier.
 `analyze_track()` et les signaux d'album gardent leur contrat actuel.
 
-- [ ] **1. Écrire les tests :**
+- [x] **1. Écrire les tests :**
   `test_track_worker_returns_original_stereo_audio`,
   `test_gui_does_not_reload_audio_after_worker_result`,
   `test_stereo_waveform_is_only_a_display_projection`.
@@ -185,19 +183,24 @@ utilisateur avant tout travail sur le transport audio de l'étape 2.
   `result.samples.shape == (1000, 2)`, fréquence 1 000, données intactes et
   projection mono seulement dans les données du graphe. Tester source devenue
   illisible au second chargement : signal d'échec, thread libéré, aucun résultat.
-- [ ] **2. Observer le rouge :**
+- [x] **2. Observer le rouge :**
   `uv run pytest -q tests/test_workers.py tests/test_main_window.py tests/test_waveform_view.py`.
-- [ ] **3. Charger l'audio avec `audio_io.load(path, mono=False)` dans le worker
+- [x] **3. Charger l'audio avec `audio_io.load(path, mono=False)` dans le worker
   après l'analyse, puis émettre `LoadedTrack`.** Cela déplace la relecture
   actuelle, sans prétendre supprimer les décodages internes de beat_this.
   Adapter tous les consommateurs/tests du signal dans le même commit.
   Ne pas convertir le tableau de lecture/export en mono pour tracer la courbe.
-- [ ] **4. Vert et porte G.** Rejouer notamment les tests de refus d'analyse
+- [x] **4. Vert et porte G.** Rejouer notamment les tests de refus d'analyse
   concurrente et de reprise après échec. Les tests de workers simulant le calcul
   doivent fournir un vrai petit fichier audio pour cette relecture.
-- [ ] **5. Commit :** `Conserve la stéréo et charge l’audio d’affichage en arrière-plan`.
+- [x] **5. Commit :** `Conserve la stéréo et charge l’audio d’affichage en arrière-plan`.
   **Validation :** préécoute/export stéréo sur une piste ; aucune modification source.
   Attendre avant l'étape suivante.
+
+**Résultat étape 2 :** 184 tests réussis, dont cinq nouveaux ; porte G réussie.
+WAV stéréo réel vérifié jusqu'à la préécoute simulée et l'export réel, sans
+modification source. Écoute matérielle non validée ; attendre l'accord utilisateur
+avant l'étape 3.
 
 ## Étape 3 — Disposition, liste compacte et interactions communes
 

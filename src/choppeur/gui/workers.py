@@ -10,6 +10,7 @@ from choppeur.core.audio_io import AUDIO_EXTENSIONS
 from choppeur.core.cache import AnalysisCache
 from choppeur.core.models import Analysis, Candidate, Track
 from choppeur.core.settings import Settings
+from choppeur.gui.presentation import LoadedTrack
 
 
 def tracks_in_folder(folder: Path) -> list[Track]:
@@ -65,7 +66,7 @@ def analyze_track(
 class TrackAnalysisWorker(QObject):
     """Analyse une piste ; à déplacer dans un QThread pour ne pas geler l'interface."""
 
-    finished = Signal(object, list)  # Analysis, list[Candidate]
+    finished = Signal(object)  # LoadedTrack
     failed = Signal(str)
 
     def __init__(self, track: Track, settings: Settings, cache: AnalysisCache | None = None):
@@ -77,10 +78,11 @@ class TrackAnalysisWorker(QObject):
     def run(self) -> None:
         try:
             analysis, candidates = analyze_track(self._track, self._settings, self._cache)
+            samples, sample_rate = audio_io.load(self._track.path, mono=False)
         except Exception as exc:  # noqa: BLE001 - remonté à l'interface plutôt qu'avalé
             self.failed.emit(str(exc))
         else:
-            self.finished.emit(analysis, candidates)
+            self.finished.emit(LoadedTrack(analysis, tuple(candidates), samples, sample_rate))
 
 
 class AlbumAnalysisWorker(QObject):

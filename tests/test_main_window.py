@@ -104,6 +104,65 @@ def test_selecting_a_track_runs_analysis_and_updates_panels(qapp, make_window, m
     assert window.waveform_view._waveform_item is not None
 
 
+def test_gui_does_not_reload_audio_after_worker_result(qapp, make_window, monkeypatch, loaded_track):
+    window = make_window()
+
+    def unexpected_load(*args, **kwargs):
+        raise AssertionError("GUI must not decode audio")
+
+    monkeypatch.setattr(main_window_module.audio_io, "load", unexpected_load)
+    window._on_track_analyzed(loaded_track)
+    assert window.candidates_panel._samples is loaded_track.samples
+    assert window.candidates_panel._sample_rate == 1000
+    assert window.candidates_panel._list.count() == 2
+
+
+def test_worker_audio_stays_stereo_for_preview_and_export(qapp, make_window, monkeypatch, tmp_path):
+    import sounddevice as sd
+
+    path = tmp_path / "stereo.wav"
+    samples = np.column_stack([np.full(1000, 0.25), np.full(1000, -0.5)]).astype(np.float32)
+    sf.write(path, samples, 1000, subtype="FLOAT")
+    before = path.read_bytes()
+    monkeypatch.setattr(workers, "analyze_track", _fake_analyze_track)
+    window = make_window()
+    window._on_track_selected(path)
+    _pump_until(lambda: window._thread is None)
+    panel = window.candidates_panel
+    received = []
+    monkeypatch.setattr(sd, "play", lambda data, rate, **kwargs: received.append((data.copy(), rate)))
+    panel._list.item(0).setCheckState(Qt.CheckState.Checked)
+    panel._on_preview_clicked()
+    np.testing.assert_array_equal(received[0][0], samples[:100])
+    assert received[0][1] == 1000
+    exported = panel.export_checked(tmp_path / "exports")
+    data, rate = sf.read(exported[0], dtype="float32")
+    assert rate == 1000
+    np.testing.assert_array_equal(data, samples[:100])
+    assert path.read_bytes() == before
+
+
+def test_second_load_failure_releases_thread_and_allows_retry(qapp, make_window, monkeypatch, tmp_path):
+    _, paths = _make_library(tmp_path)
+
+    def analyze_then_remove(track, settings, cache=None):
+        result = _fake_analyze_track(track, settings, cache)
+        if track.path == paths[0]:
+            track.path.unlink()
+        return result
+
+    monkeypatch.setattr(workers, "analyze_track", analyze_then_remove)
+    window = make_window()
+    window._on_track_selected(paths[0])
+    _pump_until(lambda: window._thread is None)
+    assert "Échec de l'analyse" in window.status_bar.currentMessage()
+    assert window.candidates_panel._list.count() == 0
+    assert window.library_panel.isEnabled()
+    window._on_track_selected(paths[1])
+    _pump_until(lambda: window._thread is None)
+    assert window.candidates_panel._list.count() == 1
+
+
 @pytest.mark.parametrize("error", [OSError("fichier illisible"), RuntimeError("modèle indisponible")])
 def test_failed_track_analysis_releases_thread_and_allows_another_track(
     qapp, make_window, monkeypatch, tmp_path, error

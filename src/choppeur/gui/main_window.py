@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 
 from choppeur.core import audio_io
 from choppeur.core.cache import AnalysisCache
-from choppeur.core.models import Analysis, Candidate, Track
+from choppeur.core.models import Candidate, Track
 from choppeur.core.settings import (
     Settings,
     default_cache_path,
@@ -28,6 +28,7 @@ from choppeur.core.settings import (
 )
 from choppeur.gui.candidates_panel import CandidatesPanel
 from choppeur.gui.library_panel import LibraryPanel
+from choppeur.gui.presentation import LoadedTrack
 from choppeur.gui.settings_dialog import SettingsDialog
 from choppeur.gui.waveform_view import WaveformView
 from choppeur.gui.workers import (
@@ -151,9 +152,11 @@ class MainWindow(QMainWindow):
         self._set_busy(True)
         self._run_worker(worker)
 
-    def _on_track_analyzed(self, analysis: Analysis, candidates: list[Candidate]) -> None:
+    def _on_track_analyzed(self, result: LoadedTrack) -> None:
         self._set_busy(False)
-        samples, sample_rate = audio_io.load(analysis.track.path)
+        analysis = result.analysis
+        samples, sample_rate = result.samples, result.sample_rate
+        candidates = list(result.candidates)
 
         self.waveform_view.set_waveform(samples, sample_rate)
         self.waveform_view.set_candidates(candidates)

@@ -6,6 +6,17 @@ from choppeur.gui.waveform_view import WaveformView
 SAMPLE_RATE = 22050
 
 
+def test_stereo_waveform_is_only_a_display_projection(qapp):
+    view = WaveformView()
+    samples = np.column_stack([np.full(1000, 0.25), np.full(1000, -0.5)]).astype(np.float32)
+    before = samples.copy()
+    view.set_waveform(samples, 1000)
+    x_data, y_data = view._waveform_item.getData()
+    np.testing.assert_array_equal(y_data, np.full(1000, -0.125))
+    assert x_data[-1] == 0.999
+    np.testing.assert_array_equal(samples, before)
+
+
 def test_set_waveform_plots_downsampled_data(qapp):
     view = WaveformView()
     samples = np.sin(np.linspace(0, 20, 50_000)).astype(np.float32)

@@ -33,7 +33,8 @@ class WaveformView(pg.PlotWidget):
         self.clear()
         self._marker_lines = []
 
-        downsampled = _downsample(samples, max_points)
+        display_samples = samples.mean(axis=1) if samples.ndim > 1 else samples
+        downsampled = _downsample(display_samples, max_points)
         duration = len(samples) / sample_rate
         times = np.linspace(0, duration, num=len(downsampled), endpoint=False)
         self._waveform_item = self.plot(times, downsampled, pen=pg.mkPen(width=1))

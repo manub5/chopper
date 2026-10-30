@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 import soundfile as sf
-from PySide6.QtCore import QEventLoop
+from PySide6.QtCore import QEventLoop, QTimer
 
 from choppeur.core.cache import AnalysisCache
 from choppeur.core.models import Analysis, Candidate, CandidateType, Track
@@ -111,17 +111,19 @@ def test_loop_starts_follow_tracker_downbeats_not_all_beats(
 
 def test_track_analysis_worker_emits_finished(monkeypatch, tmp_path):
     track = _track(tmp_path / "track.wav")
+    _write_click_track(track.path)
     fake_analysis = Analysis(track=track, tempo_bpm=120.0, beat_times=(), downbeat_times=())
     fake_candidates = [Candidate(type=CandidateType.ONE_SHOT, start_seconds=0.0, end_seconds=0.2, score=1.0)]
     monkeypatch.setattr(workers, "analyze_track", lambda *a, **k: (fake_analysis, fake_candidates))
 
     worker = workers.TrackAnalysisWorker(track, Settings())
     received = []
-    worker.finished.connect(lambda analysis, candidates: received.append((analysis, candidates)))
+    worker.finished.connect(received.append)
 
     worker.run()
 
-    assert received == [(fake_analysis, fake_candidates)]
+    assert received[0].analysis == fake_analysis
+    assert received[0].candidates == tuple(fake_candidates)
 
 
 def test_track_analysis_worker_emits_failed_on_error(monkeypatch, tmp_path):
@@ -295,12 +297,13 @@ def test_tracks_in_folder_reads_only_direct_children(tmp_path):
 
 def test_start_in_thread_runs_worker_to_completion(qapp, monkeypatch, tmp_path):
     track = _track(tmp_path / "track.wav")
+    _write_click_track(track.path)
     fake_analysis = Analysis(track=track, tempo_bpm=120.0, beat_times=(), downbeat_times=())
     monkeypatch.setattr(workers, "analyze_track", lambda *a, **k: (fake_analysis, []))
 
     worker = workers.TrackAnalysisWorker(track, Settings())
     received = []
-    worker.finished.connect(lambda analysis, candidates: received.append(analysis))
+    worker.finished.connect(lambda result: received.append(result.analysis))
 
     thread = workers.start_in_thread(worker)
 
@@ -309,9 +312,28 @@ def test_start_in_thread_runs_worker_to_completion(qapp, monkeypatch, tmp_path):
     # besoin que la boucle d'évènements du thread principal tourne pour être
     # traité. On la fait tourner jusqu'à la fin de l'analyse (ou timeout).
     loop = QEventLoop()
-    worker.finished.connect(lambda *_: loop.quit())
+    thread.finished.connect(loop.quit)
+    QTimer.singleShot(5000, loop.quit)
     thread.start()
     loop.exec()
 
-    assert thread.wait(5000), "le thread d'analyse ne s'est pas terminé à temps"
+    assert received, "aucun résultat reçu"
     assert received == [fake_analysis]
+
+
+def test_track_worker_returns_original_stereo_audio(monkeypatch, tmp_path):
+    path = tmp_path / "stereo.wav"
+    samples = np.column_stack([np.full(1000, 0.25), np.full(1000, -0.5)]).astype(np.float32)
+    sf.write(path, samples, 1000, subtype="FLOAT")
+    before = path.read_bytes()
+    analysis = Analysis(workers.audio_io.read_track(path), 120.0, (), ())
+    monkeypatch.setattr(workers, "analyze_track", lambda *args: (analysis, []))
+    worker = workers.TrackAnalysisWorker(workers.audio_io.read_track(path), Settings())
+    results = []
+    worker.finished.connect(results.append)
+    worker.run()
+    assert len(results) == 1
+    assert results[0].sample_rate == 1000
+    np.testing.assert_array_equal(results[0].samples, samples)
+    assert results[0].samples.shape == (1000, 2)
+    assert path.read_bytes() == before
