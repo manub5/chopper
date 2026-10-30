@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -39,7 +40,13 @@ class SettingsDialog(QDialog):
         self._loop_lengths_bars.addItem("1/2 mesure et 1 mesure", (0.5, 1.0))
         self._loop_lengths_bars.addItem("1/2 mesure", (0.5,))
         self._loop_lengths_bars.addItem("1 mesure", (1.0,))
-        self._loop_lengths_bars.setCurrentIndex(self._loop_lengths_bars.findData(settings.loop_lengths_bars))
+        # QVariant equality does not compare Python tuple contents in findData().
+        index = next(
+            i
+            for i in range(self._loop_lengths_bars.count())
+            if self._loop_lengths_bars.itemData(i) == settings.loop_lengths_bars
+        )
+        self._loop_lengths_bars.setCurrentIndex(index)
 
         self._candidates_per_track = QSpinBox()
         self._candidates_per_track.setRange(1, 50)
@@ -53,6 +60,8 @@ class SettingsDialog(QDialog):
         self._gpu_mode = QComboBox()
         self._gpu_mode.addItems(["auto", "cpu"])
         self._gpu_mode.setCurrentText(settings.gpu_mode)
+        self._force_dark = QCheckBox("Forcer sombre")
+        self._force_dark.setChecked(settings.force_dark)
 
         form = QFormLayout()
         form.addRow(
@@ -67,6 +76,7 @@ class SettingsDialog(QDialog):
         form.addRow("Nombre de candidats par piste", self._candidates_per_track)
         form.addRow("Durée maximale d'un one-shot (s)", self._max_one_shot_seconds)
         form.addRow("Utilisation du GPU", self._gpu_mode)
+        form.addRow("Apparence", self._force_dark)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -108,4 +118,5 @@ class SettingsDialog(QDialog):
             candidates_per_track=self._candidates_per_track.value(),
             max_one_shot_seconds=self._max_one_shot_seconds.value(),
             gpu_mode=self._gpu_mode.currentText(),
+            force_dark=self._force_dark.isChecked(),
         )

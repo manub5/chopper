@@ -6,6 +6,22 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 30/10/2026 — Apparence KDE et conservation des paramètres de boucle
+
+- Thème commun aux widgets, à l'onde et aux couloirs, suivi via `colorSchemeChanged`
+  et changements de palette ; option « Forcer sombre » dans les paramètres.
+- En cas de thème Qt `Unknown`, observer la palette de l'application, jamais
+  celle de la fenêtre forcée. Les couleurs personnalisées sont appliquées à la
+  fenêtre et à ses enfants uniquement : aucune modification du thème système.
+- Défaut découvert par le test de conservation des préférences : `findData`
+  ne retrouvait pas les tuples Python de longueurs de boucles malgré leur égalité
+  en Python. Le dialogue rouvrait avec l'index -1 et rétablissait les deux longueurs.
+  Correction : comparaison explicite du contenu des `itemData`.
+- Vérifications : 232 tests réussis ; contrastes des textes >=4,5:1, suivi du
+  système, retour après forçage, bascules répétées, zoom, marques et lecture
+  conservés. Captures Wayland clair/sombre réalisées, sans modification audio.
+  Changement global KDE à chaud restant à confirmer par l'utilisateur.
+
 ## 30/10/2026 — Trois catégories et couloirs temporels (révision utilisateur)
 
 - Boucles limitées à 1/2 et 1 mesure : moteur et nommage refusent 2/4/8 et les

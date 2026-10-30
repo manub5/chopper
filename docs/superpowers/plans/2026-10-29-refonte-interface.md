@@ -332,13 +332,13 @@ utilisateur avant l'étape 5.
 **Produit :** `ThemeManager(QObject)` avec `set_force_dark(enabled: bool)` et
 `changed()` ; `palette` fournit les mêmes rôles de couleurs aux widgets et graphes.
 
-- [ ] **1. Tests :** couleurs de fond/texte différentes entre clair/sombre, orange
+- [x] **1. Tests :** couleurs de fond/texte différentes entre clair/sombre, orange
   pour boucles et bleu-gris pour shots, marquage plus vif mais même teinte,
   focus et lecture distincts. Vérifier restauration du suivi système après
   désactivation du forçage et conservation des autres paramètres par le dialogue.
-- [ ] **2. Observer le rouge :**
+- [x] **2. Observer le rouge :**
   `uv run pytest -q tests/test_theme.py tests/test_settings_dialog.py`.
-- [ ] **3. Implémenter le gestionnaire et la case.** Lire le thème via
+- [x] **3. Implémenter le gestionnaire et la case.** Lire le thème via
   `QGuiApplication.styleHints().colorScheme()` et son signal ; quand Qt annonce
   `Unknown`, utiliser la palette système observée avant application des couleurs
   personnalisées, jamais déduire le système de sa propre palette forcée. Réagir
@@ -353,9 +353,17 @@ utilisateur avant l'étape 5.
   changer la direction validée. Garder la police KDE, deux graisses au maximum,
   chiffres de durée alignés et aucun effet décoratif. L'axe temporel et les
   rectangles restent l'élément structurant, pas une grille de cartes générique.
-- [ ] **4. Vert et porte G ; commit :** `Suit le thème KDE et ajoute le forçage sombre`.
+- [x] **4. Vert et porte G ; commit :** `Suit le thème KDE et ajoute le forçage sombre`.
   **Validation KDE :** clair/sombre à chaud, forçage puis retour au système, tous
-  les états marqué/actif/lecture et absence de dégradé/lueur. Attendre validation.
+   les états marqué/actif/lecture et absence de dégradé/lueur. Attendre validation.
+
+**Résultat étape 5 :** 232 tests réussis, dont 8 nouveaux ; porte G réussie.
+Captures natives Wayland du thème clair et du sombre forcé, retour au clair observé.
+La palette personnalisée reste locale à la fenêtre et ses enfants pour ne jamais
+masquer les changements de la palette système. Conservation du lecteur, de la
+lecture, du zoom et des marques vérifiée. Correction incluse du choix de longueur
+de boucle à la réouverture des paramètres (`findData` ne comparait pas les tuples
+Python par leur contenu). Attendre validation KDE avant l'étape 6.
 
 ## Étape 6 — Exports communs et glisser permanent dans `glissés/`
 

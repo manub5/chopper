@@ -1,6 +1,7 @@
 """Compact sample table, projecting the shared state without owning audio."""
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QHBoxLayout,
@@ -15,6 +16,7 @@ from PySide6.QtWidgets import (
 from choppeur.core.models import CandidateType
 from choppeur.gui.presentation import format_time
 from choppeur.gui.sample_state import SampleState
+from choppeur.gui.theme import LIGHT, ThemePalette
 
 
 class SampleTable(QTableWidget):
@@ -46,6 +48,7 @@ class CandidatesPanel(QWidget):
     def __init__(self, state: SampleState, parent: QWidget | None = None):
         super().__init__(parent)
         self.state = state
+        self._theme = LIGHT
         self._item_ids: tuple[int, ...] = ()
         self._syncing = False
         self.table = SampleTable(0, 5)
@@ -75,6 +78,11 @@ class CandidatesPanel(QWidget):
         layout.addWidget(self.table)
         layout.addLayout(buttons)
         state.changed.connect(self._sync)
+        self._sync()
+
+    def apply_theme(self, palette: ThemePalette) -> None:
+        self._theme = palette
+        self.setPalette(palette.to_qpalette())
         self._sync()
 
     def _sort(self, column: int) -> None:
@@ -118,6 +126,10 @@ class CandidatesPanel(QWidget):
                         new_cell = QTableWidgetItem(value)
                         new_cell.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
                         new_cell.setData(Qt.ItemDataRole.UserRole, item.id)
+                        if column in (1, 2, 3):
+                            new_cell.setTextAlignment(
+                                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                            )
                         self.table.setItem(row, column, new_cell)
                 self._item_ids = ids
             by_id = {item.id: item for item in self.state.items}
@@ -133,6 +145,11 @@ class CandidatesPanel(QWidget):
                 marks = "✓ " if item_id in self.state.marked_ids else ""
                 playing = "▶ " if item_id == self.state.playing_id else ""
                 cell.setText(playing + marks + label)
+                swatch = QPixmap(10, 10)
+                swatch.fill(
+                    self._theme.sample_color(candidate.type.value, marked=item_id in self.state.marked_ids)
+                )
+                cell.setIcon(QIcon(swatch))
                 if item_id == self.state.active_id and self.table.currentRow() != row:
                     self.table.setCurrentCell(row, 0)
             if self.state.active_id is None:

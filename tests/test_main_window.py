@@ -487,6 +487,29 @@ def test_settings_dialog_accepted_updates_and_saves_settings(qapp, make_window, 
     assert saved == [new_settings]
 
 
+def test_settings_dialog_toggles_theme_without_resetting_audio_or_preferences(
+    qapp, make_window, monkeypatch, loaded_track
+):
+    window = make_window(auto_play=False, loop_lengths_bars=(0.5,))
+    window._on_track_analyzed(loaded_track)
+    original_player = window.preview_player
+    saved = []
+    monkeypatch.setattr(main_window_module, "save_settings", saved.append)
+
+    def accept_dark(dialog):
+        dialog._force_dark.setChecked(True)
+        return QDialog.DialogCode.Accepted
+
+    monkeypatch.setattr(QDialog, "exec", accept_dark)
+    window._on_settings_clicked()
+    assert saved[-1].force_dark is True
+    assert window.theme_manager.palette.dark
+    assert window.settings.auto_play is False
+    assert window.settings.loop_lengths_bars == (0.5,)
+    assert window.preview_player is original_player
+    assert window.sample_state.loaded_track is loaded_track
+
+
 def test_export_flow_writes_checked_candidate_to_chosen_directory(qapp, make_window, monkeypatch, tmp_path):
     _, paths = _make_library(tmp_path, n_tracks=1)
     monkeypatch.setattr(workers, "analyze_track", _fake_analyze_track)

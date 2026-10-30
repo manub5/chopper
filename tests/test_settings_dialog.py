@@ -55,3 +55,15 @@ def test_loop_lengths_are_closed_choices(qapp):
         (0.5,),
         (1.0,),
     }
+
+
+def test_force_dark_control_updates_only_its_preference(qapp):
+    original = Settings(auto_play=False, force_dark=False, loop_lengths_bars=(0.5,))
+    dialog = SettingsDialog(original)
+    assert not dialog._force_dark.isChecked()
+    dialog._force_dark.setChecked(True)
+    result = dialog.settings()
+    assert result.force_dark is True
+    assert result.auto_play is False
+    assert result.loop_lengths_bars == (0.5,)
+    assert original.force_dark is False

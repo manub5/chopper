@@ -35,6 +35,7 @@ from choppeur.gui.preview_player import PreviewPlayer
 from choppeur.gui.sample_lanes import SampleLanesView
 from choppeur.gui.sample_state import SampleState
 from choppeur.gui.settings_dialog import SettingsDialog
+from choppeur.gui.theme import ThemeManager
 from choppeur.gui.waveform_view import WaveformView
 from choppeur.gui.workers import (
     AlbumAnalysisWorker,
@@ -135,6 +136,10 @@ class MainWindow(QMainWindow):
         self.library_panel.folder_selected.connect(self._on_folder_selected)
         self.library_panel.load_failed.connect(self._on_library_load_failed)
         self.candidates_panel.export_requested.connect(self._on_export_requested)
+
+        self.theme_manager = ThemeManager(force_dark=self.settings.force_dark, parent=self)
+        self.theme_manager.changed.connect(self._apply_theme)
+        self._apply_theme()
 
         if self.settings.library_root:
             self.library_panel.set_root(Path(self.settings.library_root))
@@ -264,7 +269,15 @@ class MainWindow(QMainWindow):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.settings = dialog.settings()
             self.auto_play_checkbox.setChecked(self.settings.auto_play)
+            self.theme_manager.set_force_dark(self.settings.force_dark)
             save_settings(self.settings)
+
+    def _apply_theme(self) -> None:
+        palette = self.theme_manager.palette
+        self.setPalette(palette.to_qpalette())
+        self.waveform_view.apply_theme(palette)
+        self.sample_lanes.apply_theme(palette)
+        self.candidates_panel.apply_theme(palette)
 
     # --- préécoute -------------------------------------------------------
 

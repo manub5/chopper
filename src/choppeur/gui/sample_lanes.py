@@ -10,6 +10,7 @@ from choppeur.core.models import CandidateType
 from choppeur.gui.lane_layout import CATEGORIES, LanePlacement, layout_samples
 from choppeur.gui.presentation import format_time
 from choppeur.gui.sample_state import SampleState
+from choppeur.gui.theme import LIGHT, ThemePalette
 from choppeur.gui.waveform_view import WaveformView
 
 _ROW_HEIGHT = 26
@@ -20,6 +21,7 @@ class SampleLanesView(QAbstractScrollArea):
     def __init__(self, state: SampleState, parent: QWidget | None = None):
         super().__init__(parent)
         self.state = state
+        self._theme = LIGHT
         self._waveform: WaveformView | None = None
         self._placements: tuple[LanePlacement, ...] = ()
         self._tops: dict[int, int] = {}
@@ -35,6 +37,11 @@ class SampleLanesView(QAbstractScrollArea):
         self.verticalScrollBar().valueChanged.connect(lambda _value: self.viewport().update())
         state.changed.connect(self._sync)
         self._sync()
+
+    def apply_theme(self, palette: ThemePalette) -> None:
+        self._theme = palette
+        self.setPalette(palette.to_qpalette())
+        self.viewport().update()
 
     def link_time_axis(self, waveform: WaveformView) -> None:
         self._waveform = waveform
@@ -137,14 +144,13 @@ class SampleLanesView(QAbstractScrollArea):
             rect = self.sample_rect(placement.item_id)
             if not rect.intersects(QRectF(self.viewport().rect())):
                 continue
-            color = QColor("#D99A64" if placement.category[0] == "loop" else "#7F98A8")
-            if placement.item_id in self.state.marked_ids:
-                color = color.lighter(125)
-            color.setAlpha(220 if placement.item_id in self.state.marked_ids else 145)
+            color = self._theme.sample_color(
+                placement.category[0], marked=placement.item_id in self.state.marked_ids
+            )
             painter.setBrush(color)
             painter.setPen(
                 QPen(
-                    self.palette().highlight().color()
+                    QColor(self._theme.active)
                     if placement.item_id == self.state.active_id
                     else color.darker(130),
                     2 if placement.item_id == self.state.active_id else 1,
@@ -152,7 +158,7 @@ class SampleLanesView(QAbstractScrollArea):
             )
             painter.drawRect(rect)
             if placement.item_id == self.state.playing_id:
-                painter.setPen(self.palette().text().color())
+                painter.setPen(QColor(self._theme.sample_text))
                 painter.drawText(rect.adjusted(3, 0, -3, 0), Qt.AlignmentFlag.AlignVCenter, "▶")
 
     def _hit(self, point: QPointF) -> int | None:
