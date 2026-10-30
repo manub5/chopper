@@ -13,8 +13,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from choppeur.core.models import CandidateType
-from choppeur.gui.presentation import format_time
+from choppeur.gui.presentation import format_time, sample_type_label
 from choppeur.gui.sample_state import SampleState
 from choppeur.gui.theme import LIGHT, ThemePalette
 
@@ -139,9 +138,7 @@ class CandidatesPanel(QWidget):
                     continue
                 item_id = cell.data(Qt.ItemDataRole.UserRole)
                 candidate = by_id[item_id].candidate
-                label = "Boucle 1/2 mesure" if candidate.bars == 0.5 else "Boucle 1 mesure"
-                if candidate.type is CandidateType.ONE_SHOT:
-                    label = "One-shot"
+                label = sample_type_label(candidate)
                 marks = "✓ " if item_id in self.state.marked_ids else ""
                 playing = "▶ " if item_id == self.state.playing_id else ""
                 cell.setText(playing + marks + label)

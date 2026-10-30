@@ -12,7 +12,7 @@ from choppeur.core.settings import (
 def test_defaults():
     settings = Settings()
     assert settings.export_format == "wav"
-    assert settings.loop_lengths_bars == (0.5, 1.0)
+    assert settings.loop_lengths_bars == (0.25, 0.5, 1.0)
     assert settings.gpu_mode == "auto"
 
 
@@ -37,21 +37,58 @@ def test_save_then_load_roundtrip(tmp_path):
 @pytest.mark.parametrize(
     "old, expected",
     [
-        ([2, 4, 8], (0.5, 1.0)),
+        ([2, 4, 8], (0.25, 0.5, 1.0)),
         ([1, 2, 4, 8], (1.0,)),
         ([0.5, 1, 0.5, 8], (0.5, 1.0)),
-        ([True, "1/2", None, -1], (0.5, 1.0)),
-        ([], (0.5, 1.0)),
-        (None, (0.5, 1.0)),
+        ([True, "1/2", None, -1], (0.25, 0.5, 1.0)),
+        ([], (0.25, 0.5, 1.0)),
+        (None, (0.25, 0.5, 1.0)),
     ],
 )
 def test_old_lengths_migrate_idempotently(old, expected, tmp_path):
-    settings = Settings.from_dict({"loop_lengths_bars": old})
+    settings = Settings.from_dict({"loop_lengths_bars": old, "loop_lengths_version": 2})
     assert settings.loop_lengths_bars == expected
     path = tmp_path / "settings.toml"
     save_settings(settings, path)
     assert load_settings(path).loop_lengths_bars == expected
     assert Settings.from_dict(settings.to_dict()).to_dict() == settings.to_dict()
+
+
+@pytest.mark.parametrize("version", [None, 1, "invalid", True])
+def test_legacy_single_length_reactivates_all_once_without_rewriting(version, tmp_path):
+    data = {"loop_lengths_bars": [1.0], "auto_play": False, "force_dark": True}
+    if version is not None:
+        data["loop_lengths_version"] = version
+    loaded = Settings.from_dict(data)
+    assert loaded.loop_lengths_bars == (0.25, 0.5, 1.0)
+    assert loaded.loop_lengths_version == 2
+    assert not loaded.auto_play and loaded.force_dark
+    loaded.loop_lengths_bars = (1.0,)
+    path = tmp_path / "settings.toml"
+    save_settings(loaded, path)
+    assert load_settings(path).loop_lengths_bars == (1.0,)
+    assert load_settings(path).loop_lengths_version == 2
+
+
+def test_loading_legacy_file_is_read_only_and_migration_is_stable(tmp_path):
+    path = tmp_path / "settings.toml"
+    before = "loop_lengths_bars = [1.0]\ncandidates_per_track = 50\n"
+    path.write_text(before)
+    migrated = load_settings(path)
+    assert path.read_text() == before
+    assert migrated.loop_lengths_bars == (0.25, 0.5, 1.0)
+    assert migrated.candidates_per_track == 8
+    assert Settings.from_dict(migrated.to_dict()) == migrated
+
+
+@pytest.mark.parametrize("value, expected", [(0, 1), (-10, 1), (3, 3), (50, 8)])
+def test_category_count_is_bounded(value, expected):
+    assert Settings(candidates_per_track=value).candidates_per_track == expected
+
+
+@pytest.mark.parametrize("value", [None, True, "8", 2.5, float("inf"), float("nan")])
+def test_invalid_category_count_falls_back_to_eight(value):
+    assert Settings.from_dict({"candidates_per_track": value}).candidates_per_track == 8
 
 
 def test_load_missing_file_returns_defaults(tmp_path):

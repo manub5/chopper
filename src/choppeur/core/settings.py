@@ -19,6 +19,7 @@ class Settings:
     export_dir: str | None = None
     export_format: str = "wav"  # "wav" (24 bits, défaut) ou "flac"
     loop_lengths_bars: tuple[float, ...] = _DEFAULT_LOOP_LENGTHS_BARS
+    loop_lengths_version: int = 2
     candidates_per_track: int = 8
     max_one_shot_seconds: float = 2.0
     gpu_mode: str = "auto"  # "auto" ou "cpu"
@@ -26,6 +27,8 @@ class Settings:
     force_dark: bool = False
 
     def __post_init__(self) -> None:
+        count = self.candidates_per_track
+        self.candidates_per_track = max(1, min(8, count)) if type(count) is int else 8
         values = self.loop_lengths_bars
         if isinstance(values, (tuple, list)):
             valid = {float(value) for value in values if is_loop_length(value)}
@@ -43,6 +46,10 @@ class Settings:
     @classmethod
     def from_dict(cls, data: dict) -> Settings:
         merged = {**cls().to_dict(), **data}
+        version = data.get("loop_lengths_version")
+        if type(version) is not int or version < 2:
+            merged["loop_lengths_bars"] = LOOP_LENGTHS_BARS
+            merged["loop_lengths_version"] = 2
         return cls(**merged)
 
 

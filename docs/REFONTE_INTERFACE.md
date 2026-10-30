@@ -48,9 +48,11 @@ bouton. Ce choix a été validé pour éviter de casser les références Bitwig.
 - Pendant la lecture d'un sample : sa durée est légèrement surlignée sur la
   forme d'onde. Le surlignage disparaît à la fin ou à l'arrêt.
 - Sous la forme d'onde : couloirs fins, dans cet ordre : boucles 1 mesure,
-  boucles 1/2 mesure, puis one-shots. Les couloirs vides sont masqués.
+  boucles 1/2 mesure, boucles 1/4 de mesure, puis one-shots. Les couloirs vides sont masqués.
 - Forme d'onde et couloirs partagent exactement le même axe du temps, y compris
   lors des changements de zoom et de position de la vue.
+- Dézoom maximal et déplacement bornés à `[0, durée audio]`, sans marge extérieure,
+  depuis l'onde comme depuis les couloirs ; les limites suivent chaque nouvelle piste.
 - Zoom et déplacement uniquement horizontaux. L'amplitude est ajustée à pleine
   hauteur lors du chargement puis figée : aucune interaction verticale ni bouton « A ».
 - Dans chaque couloir, un rectangle par sample ; tout chevauchement crée
@@ -72,12 +74,17 @@ puis fin, puis identité ; réutiliser une sous-ligne dès que son dernier recta
 se termine. Deux intervalles qui se touchent ne se chevauchent pas. Ni la
 sélection ni le marquage ne changent ce placement.
 
-**Révision utilisateur du 30/10/2026 :** seules les boucles de 1 et 1/2 mesure
-sont autorisées. Les anciennes longueurs 2/4/8 et les longueurs non standard
+**Dernière révision utilisateur du 30/10/2026 :** seules les boucles de 1, 1/2
+et 1/4 de mesure sont autorisées. Les anciennes longueurs 2/4/8 et les longueurs non standard
 sont supprimées du moteur et des réglages, sans couloir de compatibilité.
-Les anciens paramètres sont filtrés ; sans longueur valide restante, rétablir
-les deux longueurs autorisées. Les analyses rythmiques en cache restent réutilisables,
-car les candidats sont recalculés. Noms d'export : `1bars` et `0.5bars`.
+Les anciens paramètres sont migrés une fois vers les trois longueurs actives ;
+un marqueur de version permet ensuite de préserver les choix volontaires.
+Les analyses rythmiques en cache restent réutilisables, car les candidats sont
+recalculés. Noms d'export : `1bars`, `0.5bars` et `0.25bars`.
+Quota validé : jusqu'à 8 par longueur et 8 one-shots (32 au maximum), si le morceau
+le permet. Le classement se fait séparément pour chaque longueur afin qu'une
+catégorie ne fasse plus disparaître les autres. Le réglage de quantité est libellé
+« Nombre de candidats par catégorie », limité à 1–8.
 Le tempo s'affiche à une décimale ; durée et position en `mm:ss.mmm`.
 
 ## 4. Sélection, marquage et lecture

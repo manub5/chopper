@@ -1,4 +1,5 @@
 import time
+from collections import Counter
 
 import numpy as np
 import pytest
@@ -100,10 +101,10 @@ def test_find_loop_candidates_stays_fast_on_a_very_long_track():
     assert elapsed < 10.0, f"trop lent ({elapsed:.1f}s) : régression de performance probable"
 
 
-def test_default_loops_only_half_and_one_bar_with_exact_durations():
+def test_default_loops_quarter_half_and_one_bar_with_exact_durations():
     result = candidates.find_loop_candidates(np.ones(6000, dtype=np.float32), 1000, 120, (0.0, 2.0, 4.0))
-    assert {c.bars for c in result} == {0.5, 1.0}
-    assert {(c.bars, c.duration_seconds) for c in result} == {(0.5, 1.0), (1.0, 2.0)}
+    assert {c.bars for c in result} == {0.25, 0.5, 1.0}
+    assert {(c.bars, c.duration_seconds) for c in result} == {(0.25, 0.5), (0.5, 1.0), (1.0, 2.0)}
     assert all(c.start_seconds in (0.0, 2.0, 4.0) for c in result)
 
 
@@ -111,3 +112,33 @@ def test_default_loops_only_half_and_one_bar_with_exact_durations():
 def test_engine_refuses_unsupported_loop_lengths(bars):
     with pytest.raises(ValueError):
         candidates.find_loop_candidates(np.ones(6000), 1000, 120, (0.0, 2.0), lengths_bars=(bars,))
+
+
+@pytest.mark.parametrize("quota", [1, 8])
+def test_each_length_keeps_its_own_quota_even_when_scores_compete(quota):
+    # Repeated quiet tails favor the shorter lengths without mocking scoring.
+    samples = np.tile(np.r_[np.ones(500), np.full(1500, 0.2)], 9)
+    result = candidates.find_loop_candidates(
+        samples, 1000, 120, tuple(float(t) for t in range(0, 18, 2)), max_candidates=quota
+    )
+    assert Counter(c.bars for c in result) == {0.25: quota, 0.5: quota, 1.0: quota}
+    assert [c.score for c in result] == sorted((c.score for c in result), reverse=True)
+
+
+def test_short_track_only_returns_lengths_that_fit():
+    result = candidates.find_loop_candidates(np.ones(750), 1000, 120, (0.0, 2.0))
+    assert len(result) == 1
+    assert result[0].bars == 0.25
+    assert result[0].end_seconds == 0.5
+
+
+def test_repeated_length_does_not_multiply_quota():
+    result = candidates.find_loop_candidates(
+        np.ones(18000),
+        1000,
+        120,
+        tuple(float(t) for t in range(0, 18, 2)),
+        lengths_bars=(0.5, 0.5),
+        max_candidates=1,
+    )
+    assert len(result) == 1

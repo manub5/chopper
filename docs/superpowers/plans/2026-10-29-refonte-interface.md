@@ -1,5 +1,11 @@
 # Refonte de l'interface — Implementation Plan
 
+> **Révision après validation de l'étape 5 :** avant l'étape 6, appliquer le plan
+> complémentaire `2026-10-30-categories-completes-et-zoom-borne.md` (validé).
+> Il remplace les anciennes règles de quota commun et de longueurs 1/0,5 par
+> trois longueurs 1/0,5/0,25, quota indépendant et navigation bornée au morceau.
+> Les résultats des étapes déjà commités ci-dessous restent historiques.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans pour réaliser les tâches dans cette session. **Exception impérative à son exécution continue : arrêter après chaque étape et attendre la validation utilisateur**, conformément au design et à AGENTS.md. Ne pas lancer automatiquement l'étape suivante. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Livrer l'interface approuvée, avec tous les samples visibles et

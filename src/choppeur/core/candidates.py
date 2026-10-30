@@ -72,9 +72,9 @@ def find_loop_candidates(
     lengths_bars: tuple[float, ...] = DEFAULT_LOOP_LENGTHS_BARS,
     max_candidates: int = 8,
 ) -> list[Candidate]:
-    """Candidats de boucles calées sur le premier temps de mesure, classés par score."""
+    """Downbeat-aligned loops, ranked by score with an independent quota per length."""
     if any(not is_loop_length(bars) for bars in lengths_bars):
-        raise ValueError("Seules les boucles de 1/2 et 1 mesure sont autorisées.")
+        raise ValueError("Seules les boucles de 1/4, 1/2 et 1 mesure sont autorisées.")
     bar_duration = _bar_duration(downbeat_times)
     if bar_duration is None or tempo_bpm <= 0:
         return []
@@ -84,7 +84,7 @@ def find_loop_candidates(
     downbeat_array = np.asarray(downbeat_times, dtype=np.float64)
     candidates: list[Candidate] = []
 
-    for bars in lengths_bars:
+    for bars in dict.fromkeys(lengths_bars):
         loop_duration = bar_duration * bars
         for start in downbeat_times:
             end = start + loop_duration
@@ -112,7 +112,14 @@ def find_loop_candidates(
             )
 
     candidates.sort(key=lambda c: c.score, reverse=True)
-    return candidates[:max_candidates]
+    counts: dict[float | None, int] = {}
+    selected = []
+    for candidate in candidates:
+        count = counts.get(candidate.bars, 0)
+        if count < max_candidates:
+            selected.append(candidate)
+            counts[candidate.bars] = count + 1
+    return selected
 
 
 def _find_return_to_silence(

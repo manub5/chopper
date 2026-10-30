@@ -37,9 +37,13 @@ class SettingsDialog(QDialog):
         self._export_format.setCurrentText(settings.export_format)
 
         self._loop_lengths_bars = QComboBox()
-        self._loop_lengths_bars.addItem("1/2 mesure et 1 mesure", (0.5, 1.0))
+        self._loop_lengths_bars.addItem("1/4, 1/2 et 1 mesure", (0.25, 0.5, 1.0))
         self._loop_lengths_bars.addItem("1/2 mesure", (0.5,))
         self._loop_lengths_bars.addItem("1 mesure", (1.0,))
+        self._loop_lengths_bars.addItem("1/4 de mesure", (0.25,))
+        self._loop_lengths_bars.addItem("1/4 et 1/2 mesure", (0.25, 0.5))
+        self._loop_lengths_bars.addItem("1/4 et 1 mesure", (0.25, 1.0))
+        self._loop_lengths_bars.addItem("1/2 et 1 mesure", (0.5, 1.0))
         # QVariant equality does not compare Python tuple contents in findData().
         index = next(
             i
@@ -49,7 +53,7 @@ class SettingsDialog(QDialog):
         self._loop_lengths_bars.setCurrentIndex(index)
 
         self._candidates_per_track = QSpinBox()
-        self._candidates_per_track.setRange(1, 50)
+        self._candidates_per_track.setRange(1, 8)
         self._candidates_per_track.setValue(settings.candidates_per_track)
 
         self._max_one_shot_seconds = QDoubleSpinBox()
@@ -73,7 +77,7 @@ class SettingsDialog(QDialog):
         )
         form.addRow("Format d'export", self._export_format)
         form.addRow("Longueurs de boucle", self._loop_lengths_bars)
-        form.addRow("Nombre de candidats par piste", self._candidates_per_track)
+        form.addRow("Nombre de candidats par catégorie", self._candidates_per_track)
         form.addRow("Durée maximale d'un one-shot (s)", self._max_one_shot_seconds)
         form.addRow("Utilisation du GPU", self._gpu_mode)
         form.addRow("Apparence", self._force_dark)

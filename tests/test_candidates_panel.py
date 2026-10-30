@@ -46,6 +46,22 @@ def test_table_formats_tempo_and_times_with_millisecond_carry(qapp, loaded_track
     panel.close()
 
 
+def test_quarter_bar_label_and_duration(qapp, loaded_track):
+    candidate = replace(loaded_track.candidates[0], bars=0.25, end_seconds=0.25)
+    panel, _state = make_panel(replace(loaded_track, candidates=(candidate,)))
+    assert panel.table.item(0, 0).text() == "Boucle 1/4 de mesure"
+    assert panel.table.item(0, 2).text() == "00:00.250"
+    panel.close()
+
+
+@pytest.mark.parametrize("bars", [None, 2, True])
+def test_invalid_loop_label_fails_explicitly(loaded_track, bars):
+    from choppeur.gui.presentation import sample_type_label
+
+    with pytest.raises(ValueError):
+        sample_type_label(replace(loaded_track.candidates[0], bars=bars))
+
+
 @pytest.mark.parametrize("auto_play", [False, True])
 def test_click_selects_and_optionally_requests_play(qapp, loaded_track, auto_play):
     panel, state = make_panel(loaded_track, auto_play)

@@ -11,6 +11,38 @@ from choppeur.gui import workers
 SAMPLE_RATE = 22050
 
 
+def test_cached_track_worker_provides_all_four_categories(qapp, tmp_path):
+    from collections import Counter
+
+    path = tmp_path / "source.wav"
+    samples = np.column_stack([np.full(18000, 0.25), np.full(18000, -0.5)]).astype(np.float32)
+    sf.write(path, samples, 1000, subtype="FLOAT")
+    before = path.read_bytes()
+    track = workers.audio_io.read_track(path)
+    analysis = Analysis(
+        track, 120, (), tuple(float(t) for t in range(0, 18, 2)), tuple(float(t) + 0.1 for t in range(9))
+    )
+    with AnalysisCache(tmp_path / "cache.sqlite") as cache:
+        cache.set(analysis)
+        settings = Settings.from_dict({"loop_lengths_bars": [1.0]})
+        worker = workers.TrackAnalysisWorker(track, settings, cache)
+        results = []
+        errors = []
+        worker.finished.connect(results.append)
+        worker.failed.connect(errors.append)
+        worker.run()
+    assert errors == []
+    assert len(results) == 1
+    assert Counter((c.type.value, c.bars) for c in results[0].candidates) == {
+        ("loop", 1.0): 8,
+        ("loop", 0.5): 8,
+        ("loop", 0.25): 8,
+        ("shot", None): 8,
+    }
+    np.testing.assert_array_equal(results[0].samples, samples)
+    assert path.read_bytes() == before
+
+
 def _write_click_track(path, n_clicks=6, interval_seconds=0.5, sample_rate=SAMPLE_RATE):
     total_samples = int((n_clicks * interval_seconds + 0.5) * sample_rate)
     signal = np.zeros(total_samples, dtype=np.float32)

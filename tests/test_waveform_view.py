@@ -1,12 +1,63 @@
 import numpy as np
 import pytest
-from PySide6.QtCore import QPointF, Qt
+from PySide6.QtCore import QPoint, QPointF, Qt
+from PySide6.QtGui import QWheelEvent
 from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QApplication
 
 from choppeur.core.models import Candidate, CandidateType
 from choppeur.gui.waveform_view import WaveformView
 
 SAMPLE_RATE = 22050
+
+
+def wheel(view, delta):
+    center = view.viewport().rect().center()
+    event = QWheelEvent(
+        QPointF(center),
+        QPointF(view.viewport().mapToGlobal(center)),
+        QPoint(),
+        QPoint(0, delta),
+        Qt.MouseButton.NoButton,
+        Qt.KeyboardModifier.NoModifier,
+        Qt.ScrollPhase.NoScrollPhase,
+        False,
+    )
+    QApplication.sendEvent(view.viewport(), event)
+
+
+def test_zoom_out_and_pan_never_leave_the_track(qapp):
+    view = WaveformView()
+    view.resize(800, 400)
+    view.show()
+    view.set_waveform(np.tile([-0.5, 0.5], 1500), 1000)
+    qapp.processEvents()
+    assert view.viewRange()[0] == pytest.approx([0, 3])
+    y_range = view.viewRange()[1][:]
+    for _ in range(3):
+        wheel(view, -1200)
+        qapp.processEvents()
+        assert view.viewRange()[0] == pytest.approx([0, 3])
+    view.setXRange(1, 2, padding=0)
+    view.getViewBox().translateBy(x=-100)
+    assert view.viewRange()[0] == pytest.approx([0, 1])
+    view.getViewBox().translateBy(x=100)
+    assert view.viewRange()[0] == pytest.approx([2, 3])
+    assert view.viewRange()[1] == pytest.approx(y_range)
+    view.close()
+
+
+def test_loading_short_long_short_replaces_bounds_and_survives_resize(qapp):
+    view = WaveformView()
+    view.show()
+    for duration in (1, 9, 2):
+        view.set_waveform(np.tile([-0.5, 0.5], duration * 500), 1000)
+        view.setXRange(-100, 100, padding=0)
+        for width in (500, 900):
+            view.resize(width, 400)
+            qapp.processEvents()
+            assert view.viewRange()[0] == pytest.approx([0, duration])
+    view.close()
 
 
 def test_waveform_locks_vertical_range_and_hides_auto_button(qapp):

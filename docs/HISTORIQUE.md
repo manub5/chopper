@@ -6,6 +6,25 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 30/10/2026 — Catégories indépendantes, quarts de mesure et dézoom borné
+
+- Deux causes à l'absence de demi-mesures : anciens paramètres `[1.0]` encore
+  actifs, et classement global pouvant exclure entièrement une longueur. La
+  piste 16 réelle reproduisait ces deux comportements selon les réglages.
+- Correction : activer aussi les quarts de mesure ; sélectionner jusqu'à 8
+  candidats par longueur, plus 8 one-shots, sans changer le score ni le détecteur.
+- Migration versionnée : ancien fichier sans `loop_lengths_version = 2` réactive
+  les trois longueurs ; les choix volontaires enregistrés ensuite sont préservés.
+  Aucun fichier n'est réécrit à la simple lecture. Le quota devient « par catégorie »
+  dans le dialogue, borné à 1–8 ; valeur non entière invalide : repli sur 8.
+- Une seule limite temporelle dans la vue de l'onde : début 0, fin durée audio,
+  largeur maximale durée audio. Les couloirs utilisent cette même vue, donc les
+  gestes des deux vues restent dans les bornes, sans modifier l'amplitude.
+- Tests rouges puis verts pour quotas, migration, quarts de mesure et navigation.
+  Vérifications : 269 tests, 15 tests graphiques à 150 %, porte statique réussie.
+  Piste 16 : 8 résultats dans chacune des quatre catégories ; capture Wayland.
+  Les fichiers audio et paramètres utilisateur n'ont pas été modifiés par ce contrôle.
+
 ## 30/10/2026 — Apparence KDE et conservation des paramètres de boucle
 
 - Thème commun aux widgets, à l'onde et aux couloirs, suivi via `colorSchemeChanged`

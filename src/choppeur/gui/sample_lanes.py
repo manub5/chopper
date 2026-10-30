@@ -6,9 +6,8 @@ from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QAbstractScrollArea, QApplication, QWidget
 
-from choppeur.core.models import CandidateType
 from choppeur.gui.lane_layout import CATEGORIES, LanePlacement, layout_samples
-from choppeur.gui.presentation import format_time
+from choppeur.gui.presentation import format_time, sample_type_label
 from choppeur.gui.sample_state import SampleState
 from choppeur.gui.theme import LIGHT, ThemePalette
 from choppeur.gui.waveform_view import WaveformView
@@ -64,7 +63,9 @@ class SampleLanesView(QAbstractScrollArea):
             label = (
                 "One-shots"
                 if category[0] == "shot"
-                else ("Boucles 1 mesure" if category[1] == 1 else "Boucles 1/2 mesure")
+                else {1.0: "Boucles 1 mesure", 0.5: "Boucles 1/2 mesure", 0.25: "Boucles 1/4 de mesure"}[
+                    category[1]
+                ]
             )
             self._headers.append((label, y))
             y += _HEADER_HEIGHT
@@ -109,11 +110,7 @@ class SampleLanesView(QAbstractScrollArea):
 
     def sample_tooltip(self, item_id: int) -> str:
         candidate = next(item.candidate for item in self.state.items if item.id == item_id)
-        label = (
-            "One-shot"
-            if candidate.type is CandidateType.ONE_SHOT
-            else ("Boucle 1 mesure" if candidate.bars == 1 else "Boucle 1/2 mesure")
-        )
+        label = sample_type_label(candidate)
         tempo = f"{candidate.bpm:.1f} BPM" if candidate.bpm else "Tempo inconnu"
         return (
             f"{label}\n{tempo}\nDurée : {format_time(candidate.duration_seconds)}\n"

@@ -64,7 +64,7 @@ def test_shared_time_axis_alignment_resize_pan_zoom_and_scroll(lane_ui, qapp, lo
     for width in (800, 1100, 700):
         window.resize(width, 600)
         qapp.processEvents()
-        for x_range in ((0, 3), (0.4, 1.6), (-0.5, 2.5)):
+        for x_range in ((0, 3), (0.4, 1.6), (0.0, 2.5)):
             waveform.setXRange(*x_range, padding=0)
             qapp.processEvents()
             rect = lanes.sample_rect(state.items[0].id)
@@ -133,3 +133,43 @@ def test_lane_auto_second_click_stops_without_losing_mark(lane_ui):
     assert state.playing_id is None
     assert stops == [True]
     assert state.marked_ids == {item_id}
+
+
+def test_quarter_bar_rectangle_is_clickable_and_labeled(lane_ui, loaded_track):
+    _, _, state, lanes = lane_ui
+    quarter = replace(loaded_track.candidates[0], bars=0.25, end_seconds=0.25)
+    state.load_track(replace(loaded_track, candidates=(quarter,)))
+    item_id = state.items[0].id
+    QTest.mouseClick(
+        lanes.viewport(), Qt.MouseButton.LeftButton, pos=lanes.sample_rect(item_id).center().toPoint()
+    )
+    assert state.active_id == item_id
+    assert "Boucle 1/4 de mesure" in lanes.sample_tooltip(item_id)
+
+
+def test_lane_zoom_out_and_drag_share_track_bounds(lane_ui, qapp):
+    _, waveform, _, lanes = lane_ui
+    center = lanes.viewport().rect().center()
+    before_y = waveform.viewRange()[1][:]
+    for _ in range(3):
+        event = QWheelEvent(
+            QPointF(center),
+            QPointF(lanes.viewport().mapToGlobal(center)),
+            QPoint(),
+            QPoint(0, -1200),
+            Qt.MouseButton.NoButton,
+            Qt.KeyboardModifier.NoModifier,
+            Qt.ScrollPhase.NoScrollPhase,
+            False,
+        )
+        QApplication.sendEvent(lanes.viewport(), event)
+        qapp.processEvents()
+        assert waveform.viewRange()[0] == pytest.approx([0, 3])
+    for distance, expected in [(1000, (0, 1)), (-1000, (2, 3))]:
+        waveform.setXRange(1, 2, padding=0)
+        QTest.mousePress(lanes.viewport(), Qt.MouseButton.LeftButton, pos=center)
+        QTest.mouseMove(lanes.viewport(), center + QPoint(distance, 0))
+        QTest.mouseRelease(lanes.viewport(), Qt.MouseButton.LeftButton, pos=center + QPoint(distance, 0))
+        qapp.processEvents()
+        assert waveform.viewRange()[0] == pytest.approx(expected)
+    assert waveform.viewRange()[1] == pytest.approx(before_y)

@@ -59,9 +59,13 @@ class WaveformView(pg.PlotWidget):
         display_samples = samples.mean(axis=1) if samples.ndim > 1 else samples
         downsampled = _downsample(display_samples, max_points)
         duration = len(samples) / sample_rate
+        if duration > 0:
+            self.getViewBox().setLimits(xMin=0, xMax=duration, maxXRange=duration)
         times = np.linspace(0, duration, num=len(downsampled), endpoint=False)
         self._waveform_item = self.plot(times, downsampled, pen=pg.mkPen(width=1))
         self.autoRange(items=[self._waveform_item])
+        if duration > 0:
+            self.setXRange(0, duration, padding=0)
         self._playing_region = pg.LinearRegionItem(movable=False, pen=None)
         self._playing_region.setZValue(-1)
         self.addItem(self._playing_region, ignoreBounds=True)

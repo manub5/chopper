@@ -17,26 +17,30 @@ mesure, et one-shots propres.
 6. Il exporte : vers le dossier cible défini dans les paramètres, ou vers
    un dossier choisi au moment de l'export.
 
-## Trois catégories de samples
+## Quatre catégories de samples
 ### Boucles
 - Début exactement sur un premier temps de mesure.
-- Deux longueurs seulement : 1 mesure et 1/2 mesure (0,5), activées par défaut.
+- Trois longueurs : 1 mesure, 1/2 mesure (0,5), 1/4 de mesure (0,25), activées par défaut.
 - Les longueurs 2, 4 et 8 mesures ne sont plus proposées ni générées.
-- Les anciens paramètres sont filtrés aux longueurs autorisées ; si aucune
-  ne reste, restaurer 1/2 et 1 mesure. Migration idempotente, sauvegarde normale.
-- Plusieurs candidats par piste, classés par score (régularité du tempo sur
-  la zone, énergie, absence de coupure brutale).
+- À la migration des anciens paramètres, réactiver les trois longueurs une fois,
+  même si seule 1 mesure était activée. Conserver ensuite les choix explicitement
+  enregistrés dans le nouveau format. Migration idempotente, sauvegarde normale.
+- Jusqu'à 8 candidats **par longueur**, classés par score à l'intérieur de chaque
+  catégorie : une longueur ne peut plus évincer les autres par son score.
+- Ne rien inventer si une piste est trop courte ou sans grille rythmique exploitable.
 
 ### One-shots
 - Début sur une attaque nette.
 - Fin : retour au silence relatif ou attaque suivante, avec court fondu.
 - Durée maximale réglable.
+- Jusqu'à 8 one-shots ; avec les trois longueurs activées, 32 samples maximum par piste.
 
 ## Nommage automatique
 Format par défaut (modifiable dans les paramètres) :
 `{artiste}_{album}_{piste}_{type}_{bpm}bpm_{mesures}bars_{position}.wav`
 Exemples : `Burial_Untrue_03_loop_139bpm_1bars_01m12s.wav`,
-`Burial_Untrue_03_loop_139bpm_0.5bars_01m12s.wav` (pas de barre oblique).
+`Burial_Untrue_03_loop_139bpm_0.5bars_01m12s.wav`,
+`Burial_Untrue_03_loop_139bpm_0.25bars_01m12s.wav` (pas de barre oblique).
 One-shot : `Burial_Untrue_03_shot_01m12s340.wav`
 Caractères interdits nettoyés, pas d'écrasement (suffixe `_2`, `_3`…).
 
@@ -44,7 +48,8 @@ Caractères interdits nettoyés, pas d'écrasement (suffixe `_2`, `_3`…).
 - Dossier racine de la bibliothèque.
 - Dossier cible d'export par défaut.
 - Format d'export : WAV 24 bits (défaut) ou FLAC ; fréquence d'origine conservée.
-- Longueurs de boucle proposées : choix limités à 1/2 et 1 mesure ; nombre de candidats par piste.
+- Longueurs de boucle proposées : choix limités à 1/4, 1/2 et 1 mesure.
+- Nombre de candidats **par catégorie** : de 1 à 8, 8 par défaut (même quota pour les one-shots).
 - Durée maximale d'un one-shot.
 - Utilisation du GPU : auto / forcé CPU.
 
@@ -54,11 +59,13 @@ Caractères interdits nettoyés, pas d'écrasement (suffixe `_2`, `_3`…).
 - Traitement de toute la bibliothèque en tâche de fond.
 
 ## Vue temporelle
-- Couloirs cliquables : 1 mesure, 1/2 mesure, one-shots ; catégories vides masquées.
+- Couloirs cliquables : 1 mesure, 1/2 mesure, 1/4 de mesure, one-shots ; catégories vides masquées.
 - Les samples n'apparaissent que dans ces couloirs : pas de grands traits de
   début/fin de candidat sur l'onde. Seuls les traits fins des premiers temps de
   mesure et le surlignage temporaire du sample en lecture restent sur l'onde.
 - Onde et couloirs partagent le même axe du temps, pour zoom et déplacement.
+- Dézoom maximal : le morceau entier, exactement de 0 à sa durée audio.
+  Aucun déplacement ni zoom ne doit montrer du temps avant le début ou après la fin.
 - Interaction uniquement horizontale : axe vertical ajusté à pleine hauteur au
   chargement puis figé ; aucun zoom/pan vertical, aucun bouton « A ».
 - Tempo à une décimale ; durée et position en `mm:ss.mmm`.

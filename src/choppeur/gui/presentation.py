@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from choppeur.core.models import Analysis, Candidate
+from choppeur.core.models import Analysis, Candidate, CandidateType, is_loop_length
 
 
 def format_time(seconds: float) -> str:
@@ -13,6 +13,15 @@ def format_time(seconds: float) -> str:
     minutes, remainder = divmod(total_ms, 60_000)
     seconds_part, milliseconds = divmod(remainder, 1000)
     return f"{minutes:02d}:{seconds_part:02d}.{milliseconds:03d}"
+
+
+def sample_type_label(candidate: Candidate) -> str:
+    if candidate.type is CandidateType.ONE_SHOT:
+        return "One-shot"
+    bars = candidate.bars
+    if bars is None or not is_loop_length(bars):
+        raise ValueError("Longueur de boucle non autorisée pour l'affichage.")
+    return {1.0: "Boucle 1 mesure", 0.5: "Boucle 1/2 mesure", 0.25: "Boucle 1/4 de mesure"}[bars]
 
 
 @dataclass(frozen=True)

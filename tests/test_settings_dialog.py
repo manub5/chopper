@@ -1,3 +1,5 @@
+import pytest
+
 from choppeur.core.settings import Settings
 from choppeur.gui.settings_dialog import SettingsDialog
 
@@ -29,7 +31,7 @@ def test_settings_reads_back_edited_values(qapp):
         export_dir="/musique/export",
         export_format="flac",
         loop_lengths_bars=(0.5,),
-        candidates_per_track=10,
+        candidates_per_track=8,
         max_one_shot_seconds=3.5,
         gpu_mode="cpu",
     )
@@ -51,10 +53,15 @@ def test_loop_lengths_are_closed_choices(qapp):
     dialog = SettingsDialog(Settings())
     assert not dialog._loop_lengths_bars.isEditable()
     assert {dialog._loop_lengths_bars.itemData(i) for i in range(dialog._loop_lengths_bars.count())} == {
+        (0.25, 0.5, 1.0),
+        (0.25,),
+        (0.25, 0.5),
+        (0.25, 1.0),
         (0.5, 1.0),
         (0.5,),
         (1.0,),
     }
+    assert dialog._candidates_per_track.maximum() == 8
 
 
 def test_force_dark_control_updates_only_its_preference(qapp):
@@ -67,3 +74,11 @@ def test_force_dark_control_updates_only_its_preference(qapp):
     assert result.auto_play is False
     assert result.loop_lengths_bars == (0.5,)
     assert original.force_dark is False
+
+
+@pytest.mark.parametrize(
+    "lengths", [(0.25,), (0.5,), (1.0,), (0.25, 0.5), (0.25, 1.0), (0.5, 1.0), (0.25, 0.5, 1.0)]
+)
+def test_all_seven_choices_reopen_without_losing_selection(qapp, lengths):
+    dialog = SettingsDialog(Settings(loop_lengths_bars=lengths))
+    assert dialog.settings().loop_lengths_bars == lengths

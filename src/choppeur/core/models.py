@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
-LOOP_LENGTHS_BARS = (0.5, 1.0)
+LOOP_LENGTHS_BARS = (0.25, 0.5, 1.0)
 
 
 def is_loop_length(value: object) -> bool:

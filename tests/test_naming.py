@@ -39,6 +39,11 @@ def test_half_bar_filename_has_no_slash_or_integer_truncation():
     assert build_filename(_track(), candidate) == "Burial_Untrue_03_loop_120bpm_0.5bars_01m12s.wav"
 
 
+def test_quarter_bar_filename():
+    candidate = Candidate(CandidateType.LOOP, 72, 72.5, 1, bpm=120, bars=0.25)
+    assert build_filename(_track(), candidate) == "Burial_Untrue_03_loop_120bpm_0.25bars_01m12s.wav"
+
+
 @pytest.mark.parametrize("bars", [2, 4, 8, None])
 def test_naming_refuses_removed_loop_lengths(bars):
     with pytest.raises(ValueError):

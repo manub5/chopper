@@ -36,3 +36,11 @@ def test_layout_has_only_three_ordered_nonempty_categories():
     assert [p.category for p in layout_samples((shot,))] == [("shot", 0.0)]
     assert layout_samples(()) == ()
     assert layout_samples((items[0],)) == layout_samples((replace(items[0]),))
+
+
+def test_quarter_bar_lane_is_between_half_bars_and_shots():
+    from choppeur.gui.lane_layout import layout_samples
+
+    shot = SampleItem(4, Candidate(CandidateType.ONE_SHOT, 0, 0.2, 1))
+    placed = layout_samples((shot, item(3, 0, 0.5, 0.25), item(2, 0, 1, 0.5), item(1, 0, 2)))
+    assert [p.item_id for p in placed] == [1, 2, 3, 4]
