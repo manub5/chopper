@@ -79,19 +79,17 @@ def test_set_waveform_keeps_short_signals_untouched(qapp):
     assert len(y_data) == 100
 
 
-def test_set_candidates_adds_two_marker_lines_per_candidate(qapp):
+def test_only_downbeats_and_passive_playback_highlight_remain(qapp):
     view = WaveformView()
     view.set_waveform(np.zeros(1000, dtype=np.float32), SAMPLE_RATE)
 
-    candidates = [
-        Candidate(type=CandidateType.LOOP, start_seconds=0.0, end_seconds=1.0, score=1.0),
-        Candidate(type=CandidateType.ONE_SHOT, start_seconds=2.0, end_seconds=2.2, score=0.5),
-    ]
-
-    view.set_candidates(candidates)
-
-    assert len(view._marker_lines) == 4
-
-    # Un second appel doit remplacer les marqueurs, pas les cumuler
-    view.set_candidates(candidates[:1])
-    assert len(view._marker_lines) == 2
+    candidate = Candidate(CandidateType.ONE_SHOT, 0.1, 0.2, 1)
+    view.set_downbeats((0.0, 0.5))
+    assert [line.value() for line in view._downbeat_lines] == [0.0, 0.5]
+    view.set_playing_candidate(candidate)
+    assert view._playing_region.getRegion() == (0.1, 0.2)
+    assert not view._playing_region.movable
+    view.set_playing_candidate(None)
+    assert not view._playing_region.isVisible()
+    view.set_downbeats(())
+    assert not view._downbeat_lines

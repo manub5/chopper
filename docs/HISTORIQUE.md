@@ -6,6 +6,23 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 30/10/2026 — Trois catégories et couloirs temporels (révision utilisateur)
+
+- Boucles limitées à 1/2 et 1 mesure : moteur et nommage refusent 2/4/8 et les
+  autres longueurs ; anciens paramètres filtrés, repli sur les deux longueurs si
+  aucune valide. Migration répétable, sans écriture automatique lors de la lecture.
+- Le cache des temps/mesures reste utilisable ; les candidats sont recalculés.
+  Le détecteur, le score, la durée médiane d'une mesure et les sources ne changent pas.
+- Rectangles répartis par début/fin/identité sur des sous-lignes sans occultation,
+  avec catégories vides masquées et défilement vertical dédié.
+- Le temps se transforme en pixels depuis la vue réelle de l'onde : pas de
+  deuxième échelle indépendante. Zoom/pan uniquement horizontaux, Y cadré au
+  chargement puis figé ; bouton d'auto-ajustement masqué.
+- Les traits de début/fin des candidats sont supprimés. Restent les downbeats
+  fins et le surlignage passif du seul sample effectivement en lecture.
+- Vérifications : suite complète 224 tests, contrôles statiques et tests
+  graphiques à 150 % ; capture Wayland de la piste 16. Thème définitif à venir.
+
 ## 30/10/2026 — Onde plate après conservation d'une échelle manuelle
 
 - Diagnostic sur le FLAC stéréo de la piste 16 : fréquence et canaux intacts,

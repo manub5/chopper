@@ -100,6 +100,30 @@ def test_title_and_status_show_tempo_with_one_decimal(qapp, make_window, loaded_
     assert "118.6 BPM" in window.status_bar.currentMessage()
 
 
+def test_lane_and_table_clicks_share_active_and_marked_state(qapp, make_window, loaded_track):
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+
+    window = make_window(auto_play=False)
+    window.show()
+    window._on_track_analyzed(loaded_track)
+    qapp.processEvents()
+    state = window.sample_state
+    point = window.sample_lanes.sample_rect(state.items[1].id).center().toPoint()
+    QTest.mouseClick(window.sample_lanes.viewport(), Qt.MouseButton.LeftButton, pos=point)
+    assert window.candidates_panel.table.currentRow() == 1
+    table = window.candidates_panel.table
+    QTest.mouseClick(
+        table.viewport(),
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.ControlModifier,
+        table.visualItemRect(table.item(0, 0)).center(),
+    )
+    assert state.active_id == state.items[1].id
+    assert state.marked_ids == {state.items[0].id}
+    assert len(window.waveform_view._downbeat_lines) == len(loaded_track.analysis.downbeat_times)
+
+
 @pytest.mark.parametrize("completion", ["finish", "failure", "close", "new_track"])
 def test_shared_player_transitions_stop_output_and_clear_indicator(
     qapp, make_window, monkeypatch, loaded_track, tmp_path, completion
@@ -124,6 +148,7 @@ def test_shared_player_transitions_stop_output_and_clear_indicator(
     state.toggle_mark(state.items[0].id)
     state.click(state.items[0].id)
     assert "▶" in window.candidates_panel.table.item(0, 0).text()
+    assert window.waveform_view._playing_region.isVisible()
     if completion == "close":
         window.close()
     elif completion == "new_track":
@@ -148,6 +173,8 @@ def test_shared_player_transitions_stop_output_and_clear_indicator(
     assert not stream.active
     assert not window.preview_player.findChild(QTimer).isActive()
     assert state.playing_id is None
+    if completion != "new_track":
+        assert not window.waveform_view._playing_region.isVisible()
     if completion in {"finish", "failure"}:
         assert state.marked_ids
         assert "▶" not in window.candidates_panel.table.item(0, 0).text()

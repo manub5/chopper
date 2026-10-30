@@ -32,6 +32,7 @@ from choppeur.gui.candidates_panel import CandidatesPanel
 from choppeur.gui.library_panel import LibraryPanel
 from choppeur.gui.presentation import LoadedTrack
 from choppeur.gui.preview_player import PreviewPlayer
+from choppeur.gui.sample_lanes import SampleLanesView
 from choppeur.gui.sample_state import SampleState
 from choppeur.gui.settings_dialog import SettingsDialog
 from choppeur.gui.waveform_view import WaveformView
@@ -76,6 +77,9 @@ class MainWindow(QMainWindow):
         self.preview_player.finished.connect(self.sample_state.playback_finished)
         self.preview_player.failed.connect(self.sample_state.playback_failed)
         self.candidates_panel = CandidatesPanel(self.sample_state)
+        self.sample_lanes = SampleLanesView(self.sample_state)
+        self.sample_lanes.link_time_axis(self.waveform_view)
+        self.sample_state.changed.connect(self._sync_playback_highlight)
         self.track_label = QLabel()
         font = self.track_label.font()
         font.setPointSize(font.pointSize() + 2)
@@ -111,6 +115,7 @@ class MainWindow(QMainWindow):
         right_layout = QVBoxLayout(right_panel)
         right_layout.addWidget(self.track_label)
         right_layout.addWidget(self.waveform_view, 3)
+        right_layout.addWidget(self.sample_lanes, 1)
         right_layout.addWidget(self.candidates_panel, 1)
         right_layout.addWidget(self.progress_bar)
 
@@ -184,7 +189,7 @@ class MainWindow(QMainWindow):
         candidates = list(result.candidates)
 
         self.waveform_view.set_waveform(samples, sample_rate)
-        self.waveform_view.set_candidates(candidates)
+        self.waveform_view.set_downbeats(analysis.downbeat_times)
         self.sample_state.load_track(result)
         self.track_label.setText(f"{analysis.track.title} — {analysis.tempo_bpm:.1f} BPM")
 
@@ -276,6 +281,13 @@ class MainWindow(QMainWindow):
         if loaded is not None:
             item = next(item for item in self.sample_state.items if item.id == item_id)
             self.preview_player.play(loaded.samples, loaded.sample_rate, item.candidate, token)
+
+    def _sync_playback_highlight(self) -> None:
+        candidate = next(
+            (item.candidate for item in self.sample_state.items if item.id == self.sample_state.playing_id),
+            None,
+        )
+        self.waveform_view.set_playing_candidate(candidate)
 
     # --- export -------------------------------------------------------
 

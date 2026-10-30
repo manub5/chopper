@@ -290,20 +290,20 @@ uniquement. Sous-lignes de 22 pixels logiques minimum.
 `set_playing_candidate(candidate: Candidate | None)` ; ce dernier surlignage
 est passif, sans poignées ni possibilité d'édition.
 
-- [ ] **1. Tests d'abord :** pour les boucles 1 mesure ID 10 `[0,2]`, 11 `[1,3]`,
+- [x] **1. Tests d'abord :** pour les boucles 1 mesure ID 10 `[0,2]`, 11 `[1,3]`,
   12 `[2,4]`, attendre les sous-lignes `{10: 0, 11: 1, 12: 0}`. Ajouter intervalles
   inclus, débuts identiques, deux copies exactes, entrée mélangée, trois recouvrements,
   catégories 1/0,5/shot et catégories vides. Chaque ID doit apparaître une fois.
   Tester géométrie/hit-test des rectangles réellement affichés, infobulles,
   Ctrl+clic, non-édition après glisser et stabilité après marquage.
-- [ ] **2. Observer le rouge :**
+- [x] **2. Observer le rouge :**
   `uv run pytest -q tests/test_lane_layout.py tests/test_sample_lanes.py tests/test_waveform_view.py`.
-- [ ] **3. Implémenter le placement pur puis le rendu.** Trier par début/fin/ID,
+- [x] **3. Implémenter le placement pur puis le rendu.** Trier par début/fin/ID,
   affecter la première sous-ligne libre avec `fin <= début`, sans écraser d'item.
   Conteneur à défilement vertical plutôt qu'une limite de sous-lignes. Les clics
   appellent l'état ; les rafraîchissements depuis l'état n'émettent aucun clic.
   Afficher type/tempo/durée/position selon le design, y compris tempo inconnu.
-- [ ] **4. Lier les vues temporelles et remplacer les anciens marqueurs de candidats
+- [x] **4. Lier les vues temporelles et remplacer les anciens marqueurs de candidats
   sur la courbe par les seuls downbeats.** Tester zoom et pan depuis les deux vues,
   redimensionnement et apparition de la barre verticale : même seconde à la même
   abscisse, à un pixel près. Le défilement pour révéler un sample ne modifie pas le
@@ -312,9 +312,15 @@ est passif, sans poignées ni possibilité d'édition.
    bouton A ; même contrainte sur les couloirs (défilement vertical dédié seulement).
   Remplacer le test historique « deux marqueurs par candidat », devenu contraire
   au design, par ces invariants ; conserver les tests de réduction de la courbe.
-- [ ] **5. Vert et porte G ; commit :** `Affiche les samples dans des couloirs sans occultation`.
+- [x] **5. Vert et porte G ; commit :** `Affiche les samples dans des couloirs sans occultation`.
   **Validation :** contrôler manuellement les chevauchements, toutes les sous-lignes,
-  la synchronisation avec la liste et l'alignement lors du zoom. Attendre validation.
+   la synchronisation avec la liste et l'alignement lors du zoom. Attendre validation.
+
+**Résultat étape 4 :** 224 tests réussis ; porte G réussie. Tests graphiques
+complémentaires sous `QT_SCALE_FACTOR=1.5` réussis. Capture native Wayland sur
+la piste 16 réelle ; couleurs/thème définitifs et raccourcis restent les étapes
+5 et 7. Les catégories sans candidat restent masquées. Attendre la validation
+utilisateur avant l'étape 5.
 
 ## Étape 5 — Thèmes KDE et option « Forcer sombre »
 
