@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from choppeur.core.models import Candidate, CandidateType, Track
+from choppeur.core.models import Candidate, CandidateType, Track, is_loop_length
 
 _FORBIDDEN_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
@@ -34,9 +34,11 @@ def build_filename(track: Track, candidate: Candidate, *, extension: str = "wav"
     piste = _track_label(track)
 
     if candidate.type is CandidateType.LOOP:
+        if not is_loop_length(candidate.bars):
+            raise ValueError("Longueur de boucle non autorisée pour l'export.")
         position = _format_position(candidate.start_seconds, with_millis=False)
         bpm = round(candidate.bpm or 0)
-        return f"{artist}_{album}_{piste}_loop_{bpm}bpm_{candidate.bars}bars_{position}.{extension}"
+        return f"{artist}_{album}_{piste}_loop_{bpm}bpm_{candidate.bars:g}bars_{position}.{extension}"
 
     position = _format_position(candidate.start_seconds, with_millis=True)
     return f"{artist}_{album}_{piste}_shot_{position}.{extension}"

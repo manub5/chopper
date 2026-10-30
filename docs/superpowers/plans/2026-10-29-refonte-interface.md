@@ -19,10 +19,12 @@ NumPy/soundfile/sounddevice existants, pytest. Aucune dépendance ajoutée.
 
 - Une étape à la fois : tests rouges, correction minimale, tests verts, commit,
   résultat présenté, puis **attente de validation** avant toute étape suivante.
-- Aucun changement de rythme, attaques, scores, candidats ou bornes calculées.
+- Aucun changement du détecteur de rythme, attaques ou scores. Révision du
+  30/10 : longueurs de boucles limitées à 0,5 et 1 mesure avant l'étape 4.
 - Aucun import Qt dans `core/`. Sources audio exclusivement en lecture seule.
 - Forme d'onde sans rectangles permanents ; surlignage uniquement pendant lecture.
-- Couloirs 8/4/2/1/shots, catégories vides masquées, sous-lignes sans occultation.
+- Couloirs 1/0,5/shots, catégories vides masquées, sous-lignes sans occultation.
+- Axe vertical ajusté au chargement puis figé, zoom/pan horizontaux seuls, bouton A masqué.
 - `M` marque/retire le sample actif ; ne pas enregistrer Ctrl+Espace.
 - Les glissers créent leurs WAV PCM24 dans `<export_dir>/glissés/`, à la demande.
   Les boutons exportent dans `<export_dir>/`, avec WAV/FLAC selon les paramètres.
@@ -41,7 +43,7 @@ NumPy/soundfile/sounddevice existants, pytest. Aucune dépendance ajoutée.
 
 1. Signal de fin d'une ancienne lecture après changement de piste/sample : ne
    jamais effacer l'état d'une nouvelle lecture ; couvert étape 1.
-2. Samples de bornes identiques ou longueurs non standard : tous doivent rester
+2. Samples de bornes identiques : tous doivent rester
    identifiables et accessibles, même après tri ; couvert étapes 3/4.
 3. Barre de défilement, redimensionnement ou écran haute densité : conserver
    l'alignement en pixels de l'onde et des couloirs ; couvert étape 4.
@@ -248,6 +250,26 @@ flux simulé et du minuteur vérifié à la fermeture ; sources inchangées.
 Validation visuelle et écoute native Wayland à réaliser par l'utilisateur avant
 l'étape 4. Aucun couloir, thème ou registre de raccourcis ajouté à cette étape.
 
+## Préalable à l'étape 4 — Trois catégories et navigation horizontale
+
+**Fichiers :** `core/models.py`, `core/candidates.py`, `core/settings.py`,
+`core/naming.py`, `gui/settings_dialog.py`, `gui/candidates_panel.py`,
+`gui/waveform_view.py` et leurs tests.
+
+- [x] Tests rouges : boucles 0,5 et 1 mesure seulement, durées moitié/entière
+  sur la même grille existante ; refus des longueurs non autorisées ; migration
+  TOML avec 2/4/8, mélange et valeurs inattendues, répétée sans changement ;
+  noms `0.5bars`/`1bars` ; réglages sans saisie libre ; axe Y inchangé après gestes.
+- [x] Implémenter `Candidate.bars: float | None`, longueurs par défaut `(0.5, 1.0)`,
+  validation moteur/nommage et migration paramètres. Ne pas modifier la détection
+  des downbeats ni le calcul actuel de durée médiane d'une mesure.
+  Réglage par choix fermés 1/2, 1 ou les deux ; anciens réglages filtrés,
+  repli sur les deux si aucun valide. Étiquette « Boucle 1/2 mesure »/« Boucle 1 mesure ».
+- [x] Verrouiller Y à la plage calculée au chargement, conserver le zoom X,
+  désactiver interactions Y et auto Y après le cadrage, masquer le bouton A.
+- [x] Porte G, commit, présenter les tests puis commencer l'étape 4 selon
+  l'autorisation explicite de l'utilisateur (pas de nouvelle validation intermédiaire).
+
 ## Étape 4 — Forme d'onde nette et couloirs à sous-lignes
 
 **Fichiers :** créer `gui/lane_layout.py`, `gui/sample_lanes.py`,
@@ -256,11 +278,11 @@ l'étape 4. Aucun couloir, thème ou registre de raccourcis ajouté à cette ét
 `tests/test_main_window.py`.
 
 **Consomme :** `SampleItem`, `SampleState`, `Analysis.downbeat_times`.
-**Produit :** `LanePlacement(item_id: int, category: tuple[str, int], row: int,
+**Produit :** `LanePlacement(item_id: int, category: tuple[str, float], row: int,
 start_seconds: float, end_seconds: float)` ;
 `layout_samples(items: tuple[SampleItem, ...]) -> tuple[LanePlacement, ...]`.
-Catégories : `('loop', bars)` et `('shot', 0)` ; ordre 8/4/2/1, autres longueurs
-positives décroissantes, shots. Sous-lignes de 22 pixels logiques minimum.
+Catégories : `('loop', 1.0)`, `('loop', 0.5)`, `('shot', 0.0)`, dans cet ordre
+uniquement. Sous-lignes de 22 pixels logiques minimum.
 
 `SampleLanesView(state: SampleState)` expose
 `link_time_axis(waveform: WaveformView)` et `reveal(item_id: int)`.
@@ -268,10 +290,10 @@ positives décroissantes, shots. Sous-lignes de 22 pixels logiques minimum.
 `set_playing_candidate(candidate: Candidate | None)` ; ce dernier surlignage
 est passif, sans poignées ni possibilité d'édition.
 
-- [ ] **1. Tests d'abord :** pour les boucles 4 mesures ID 10 `[0,8]`, 11 `[2,10]`,
-  12 `[8,16]`, attendre les sous-lignes `{10: 0, 11: 1, 12: 0}`. Ajouter intervalles
+- [ ] **1. Tests d'abord :** pour les boucles 1 mesure ID 10 `[0,2]`, 11 `[1,3]`,
+  12 `[2,4]`, attendre les sous-lignes `{10: 0, 11: 1, 12: 0}`. Ajouter intervalles
   inclus, débuts identiques, deux copies exactes, entrée mélangée, trois recouvrements,
-  longueur 3 héritée et catégories vides. Chaque ID doit apparaître une fois.
+  catégories 1/0,5/shot et catégories vides. Chaque ID doit apparaître une fois.
   Tester géométrie/hit-test des rectangles réellement affichés, infobulles,
   Ctrl+clic, non-édition après glisser et stabilité après marquage.
 - [ ] **2. Observer le rouge :**
@@ -285,7 +307,9 @@ est passif, sans poignées ni possibilité d'édition.
   sur la courbe par les seuls downbeats.** Tester zoom et pan depuis les deux vues,
   redimensionnement et apparition de la barre verticale : même seconde à la même
   abscisse, à un pixel près. Le défilement pour révéler un sample ne modifie pas le
-  zoom. Le surlignage de lecture disparaît à la fin, à l'arrêt et sur erreur.
+   zoom. Le surlignage de lecture disparaît à la fin, à l'arrêt et sur erreur.
+   Interdire tout zoom/pan vertical, garder l'amplitude pleine hauteur et aucun
+   bouton A ; même contrainte sur les couloirs (défilement vertical dédié seulement).
   Remplacer le test historique « deux marqueurs par candidat », devenu contraire
   au design, par ces invariants ; conserver les tests de réduction de la courbe.
 - [ ] **5. Vert et porte G ; commit :** `Affiche les samples dans des couloirs sans occultation`.

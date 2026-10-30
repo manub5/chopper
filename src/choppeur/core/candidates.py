@@ -4,9 +4,9 @@ from bisect import bisect_left, bisect_right
 
 import numpy as np
 
-from choppeur.core.models import Candidate, CandidateType
+from choppeur.core.models import LOOP_LENGTHS_BARS, Candidate, CandidateType, is_loop_length
 
-DEFAULT_LOOP_LENGTHS_BARS = (1, 2, 4, 8)
+DEFAULT_LOOP_LENGTHS_BARS = LOOP_LENGTHS_BARS
 DEFAULT_MAX_ONE_SHOT_SECONDS = 2.0
 DEFAULT_SILENCE_THRESHOLD_RATIO = 0.1
 
@@ -69,10 +69,12 @@ def find_loop_candidates(
     tempo_bpm: float,
     downbeat_times: tuple[float, ...],
     *,
-    lengths_bars: tuple[int, ...] = DEFAULT_LOOP_LENGTHS_BARS,
+    lengths_bars: tuple[float, ...] = DEFAULT_LOOP_LENGTHS_BARS,
     max_candidates: int = 8,
 ) -> list[Candidate]:
     """Candidats de boucles calées sur le premier temps de mesure, classés par score."""
+    if any(not is_loop_length(bars) for bars in lengths_bars):
+        raise ValueError("Seules les boucles de 1/2 et 1 mesure sont autorisées.")
     bar_duration = _bar_duration(downbeat_times)
     if bar_duration is None or tempo_bpm <= 0:
         return []

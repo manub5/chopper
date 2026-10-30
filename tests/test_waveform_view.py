@@ -1,9 +1,32 @@
 import numpy as np
+import pytest
+from PySide6.QtCore import QPointF, Qt
+from PySide6.QtTest import QTest
 
 from choppeur.core.models import Candidate, CandidateType
 from choppeur.gui.waveform_view import WaveformView
 
 SAMPLE_RATE = 22050
+
+
+def test_waveform_locks_vertical_range_and_hides_auto_button(qapp):
+    view = WaveformView()
+    view.resize(800, 400)
+    view.show()
+    view.set_waveform(np.tile([-0.5, 0.5], 500), 1000)
+    qapp.processEvents()
+    vb = view.getViewBox()
+    before = view.viewRange()[1][:]
+    assert vb.state["mouseEnabled"] == [True, False]
+    assert not view.plotItem.autoBtn.isVisible()
+    center = view.viewport().rect().center()
+    QTest.mousePress(view.viewport(), Qt.MouseButton.LeftButton, pos=center)
+    QTest.mouseMove(view.viewport(), center + QPointF(80, 60).toPoint())
+    QTest.mouseRelease(view.viewport(), Qt.MouseButton.LeftButton, pos=center + QPointF(80, 60).toPoint())
+    vb.scaleBy((0.5, 1))
+    qapp.processEvents()
+    assert view.viewRange()[1] == pytest.approx(before)
+    view.close()
 
 
 def test_loading_waveform_resets_manual_scale_that_would_flatten_new_audio(qapp):

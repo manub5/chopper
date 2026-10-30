@@ -1,6 +1,8 @@
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 from choppeur.core.models import Candidate, CandidateType, Track
 from choppeur.core.naming import build_filename, unique_path
 
@@ -24,12 +26,23 @@ def test_loop_filename_matches_spec_example():
     candidate = Candidate(
         type=CandidateType.LOOP,
         start_seconds=72.0,
-        end_seconds=72.0 + 4 * 60 / 139 * 4,
+        end_seconds=72.0 + 4 * 60 / 139,
         score=0.9,
         bpm=139,
-        bars=4,
+        bars=1,
     )
-    assert build_filename(track, candidate) == "Burial_Untrue_03_loop_139bpm_4bars_01m12s.wav"
+    assert build_filename(track, candidate) == "Burial_Untrue_03_loop_139bpm_1bars_01m12s.wav"
+
+
+def test_half_bar_filename_has_no_slash_or_integer_truncation():
+    candidate = Candidate(CandidateType.LOOP, 72.0, 73.0, 1.0, bpm=120, bars=0.5)
+    assert build_filename(_track(), candidate) == "Burial_Untrue_03_loop_120bpm_0.5bars_01m12s.wav"
+
+
+@pytest.mark.parametrize("bars", [2, 4, 8, None])
+def test_naming_refuses_removed_loop_lengths(bars):
+    with pytest.raises(ValueError):
+        build_filename(_track(), Candidate(CandidateType.LOOP, 0, 1, 1, bpm=120, bars=bars))
 
 
 def test_one_shot_filename_matches_spec_example():

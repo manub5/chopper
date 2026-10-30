@@ -127,9 +127,9 @@ class CandidatesPanel(QWidget):
                     continue
                 item_id = cell.data(Qt.ItemDataRole.UserRole)
                 candidate = by_id[item_id].candidate
-                label = (
-                    f"Boucle {candidate.bars} mesures" if candidate.type is CandidateType.LOOP else "One-shot"
-                )
+                label = "Boucle 1/2 mesure" if candidate.bars == 0.5 else "Boucle 1 mesure"
+                if candidate.type is CandidateType.ONE_SHOT:
+                    label = "One-shot"
                 marks = "✓ " if item_id in self.state.marked_ids else ""
                 playing = "▶ " if item_id == self.state.playing_id else ""
                 cell.setText(playing + marks + label)

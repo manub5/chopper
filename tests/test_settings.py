@@ -12,7 +12,7 @@ from choppeur.core.settings import (
 def test_defaults():
     settings = Settings()
     assert settings.export_format == "wav"
-    assert settings.loop_lengths_bars == (1, 2, 4, 8)
+    assert settings.loop_lengths_bars == (0.5, 1.0)
     assert settings.gpu_mode == "auto"
 
 
@@ -22,7 +22,7 @@ def test_save_then_load_roundtrip(tmp_path):
         library_root="/musique",
         export_dir="/musique/export",
         export_format="flac",
-        loop_lengths_bars=(2, 4),
+        loop_lengths_bars=(0.5, 1.0),
         candidates_per_track=5,
         max_one_shot_seconds=1.5,
         gpu_mode="cpu",
@@ -32,6 +32,26 @@ def test_save_then_load_roundtrip(tmp_path):
     loaded = load_settings(path)
 
     assert loaded == original
+
+
+@pytest.mark.parametrize(
+    "old, expected",
+    [
+        ([2, 4, 8], (0.5, 1.0)),
+        ([1, 2, 4, 8], (1.0,)),
+        ([0.5, 1, 0.5, 8], (0.5, 1.0)),
+        ([True, "1/2", None, -1], (0.5, 1.0)),
+        ([], (0.5, 1.0)),
+        (None, (0.5, 1.0)),
+    ],
+)
+def test_old_lengths_migrate_idempotently(old, expected, tmp_path):
+    settings = Settings.from_dict({"loop_lengths_bars": old})
+    assert settings.loop_lengths_bars == expected
+    path = tmp_path / "settings.toml"
+    save_settings(settings, path)
+    assert load_settings(path).loop_lengths_bars == expected
+    assert Settings.from_dict(settings.to_dict()).to_dict() == settings.to_dict()
 
 
 def test_load_missing_file_returns_defaults(tmp_path):

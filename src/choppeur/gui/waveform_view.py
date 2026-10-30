@@ -26,6 +26,8 @@ class WaveformView(pg.PlotWidget):
         self.setMenuEnabled(False)
         self.setLabel("bottom", "Temps", units="s")
         self.showAxis("left", False)
+        self.setMouseEnabled(x=True, y=False)
+        self.plotItem.hideButtons()
         self._waveform_item: pg.PlotDataItem | None = None
         self._marker_lines: list[pg.InfiniteLine] = []
 
@@ -40,6 +42,7 @@ class WaveformView(pg.PlotWidget):
         duration = len(samples) / sample_rate
         times = np.linspace(0, duration, num=len(downsampled), endpoint=False)
         self._waveform_item = self.plot(times, downsampled, pen=pg.mkPen(width=1))
+        self.autoRange(items=[self._waveform_item])
 
     def set_candidates(self, candidates: list[Candidate]) -> None:
         for line in self._marker_lines:

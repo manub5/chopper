@@ -47,10 +47,12 @@ bouton. Ce choix a été validé pour éviter de casser les références Bitwig.
   la courbe et les traits fins des premiers temps de mesure.
 - Pendant la lecture d'un sample : sa durée est légèrement surlignée sur la
   forme d'onde. Le surlignage disparaît à la fin ou à l'arrêt.
-- Sous la forme d'onde : couloirs fins, dans cet ordre : boucles 8, 4, 2, 1
-  mesures, puis one-shots. Les couloirs vides sont masqués.
+- Sous la forme d'onde : couloirs fins, dans cet ordre : boucles 1 mesure,
+  boucles 1/2 mesure, puis one-shots. Les couloirs vides sont masqués.
 - Forme d'onde et couloirs partagent exactement le même axe du temps, y compris
   lors des changements de zoom et de position de la vue.
+- Zoom et déplacement uniquement horizontaux. L'amplitude est ajustée à pleine
+  hauteur lors du chargement puis figée : aucune interaction verticale ni bouton « A ».
 - Dans chaque couloir, un rectangle par sample ; tout chevauchement crée
   automatiquement autant de sous-lignes fines que nécessaire.
 - Aucun rectangle caché derrière un autre, ni priorité de clic fondée sur sa
@@ -70,9 +72,13 @@ puis fin, puis identité ; réutiliser une sous-ligne dès que son dernier recta
 se termine. Deux intervalles qui se touchent ne se chevauchent pas. Ni la
 sélection ni le marquage ne changent ce placement.
 
-Les boucles de longueurs non standard éventuellement issues d'anciens paramètres
-ne doivent pas disparaître : afficher aussi un couloir libellé
-avec leur longueur, après les quatre catégories standard et avant les shots.
+**Révision utilisateur du 30/10/2026 :** seules les boucles de 1 et 1/2 mesure
+sont autorisées. Les anciennes longueurs 2/4/8 et les longueurs non standard
+sont supprimées du moteur et des réglages, sans couloir de compatibilité.
+Les anciens paramètres sont filtrés ; sans longueur valide restante, rétablir
+les deux longueurs autorisées. Les analyses rythmiques en cache restent réutilisables,
+car les candidats sont recalculés. Noms d'export : `1bars` et `0.5bars`.
+Le tempo s'affiche à une décimale ; durée et position en `mm:ss.mmm`.
 
 ## 4. Sélection, marquage et lecture
 

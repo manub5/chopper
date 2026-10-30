@@ -1,6 +1,7 @@
 import time
 
 import numpy as np
+import pytest
 
 from choppeur.core import candidates
 from choppeur.core.models import CandidateType
@@ -22,14 +23,14 @@ def test_find_loop_candidates_respects_bar_alignment_and_duration():
         SAMPLE_RATE,
         tempo_bpm=120.0,
         downbeat_times=downbeat_times,
-        lengths_bars=(1, 2),
+        lengths_bars=(0.5, 1),
     )
 
     assert len(result) > 0
     duration = len(signal) / SAMPLE_RATE
     for candidate in result:
         assert candidate.type is CandidateType.LOOP
-        assert candidate.bars in (1, 2)
+        assert candidate.bars in (0.5, 1)
         assert candidate.start_seconds in downbeat_times
         assert candidate.end_seconds <= duration + 1e-9
         assert candidate.bpm == 120.0
@@ -91,9 +92,22 @@ def test_find_loop_candidates_stays_fast_on_a_very_long_track():
 
     start = time.monotonic()
     result = candidates.find_loop_candidates(
-        samples, SAMPLE_RATE, 120.0, downbeat_times, lengths_bars=(1, 2, 4, 8)
+        samples, SAMPLE_RATE, 120.0, downbeat_times, lengths_bars=(0.5, 1)
     )
     elapsed = time.monotonic() - start
 
     assert len(result) > 0
     assert elapsed < 10.0, f"trop lent ({elapsed:.1f}s) : régression de performance probable"
+
+
+def test_default_loops_only_half_and_one_bar_with_exact_durations():
+    result = candidates.find_loop_candidates(np.ones(6000, dtype=np.float32), 1000, 120, (0.0, 2.0, 4.0))
+    assert {c.bars for c in result} == {0.5, 1.0}
+    assert {(c.bars, c.duration_seconds) for c in result} == {(0.5, 1.0), (1.0, 2.0)}
+    assert all(c.start_seconds in (0.0, 2.0, 4.0) for c in result)
+
+
+@pytest.mark.parametrize("bars", [2, 4, 8, 3, 0, -0.5, float("nan"), True])
+def test_engine_refuses_unsupported_loop_lengths(bars):
+    with pytest.raises(ValueError):
+        candidates.find_loop_candidates(np.ones(6000), 1000, 120, (0.0, 2.0), lengths_bars=(bars,))

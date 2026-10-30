@@ -7,8 +7,10 @@ from pathlib import Path
 import tomli_w
 from platformdirs import user_cache_dir, user_config_dir
 
+from choppeur.core.models import LOOP_LENGTHS_BARS, is_loop_length
+
 APP_NAME = "choppeur"
-_DEFAULT_LOOP_LENGTHS_BARS = (1, 2, 4, 8)
+_DEFAULT_LOOP_LENGTHS_BARS = LOOP_LENGTHS_BARS
 
 
 @dataclass
@@ -16,12 +18,22 @@ class Settings:
     library_root: str | None = None
     export_dir: str | None = None
     export_format: str = "wav"  # "wav" (24 bits, défaut) ou "flac"
-    loop_lengths_bars: tuple[int, ...] = _DEFAULT_LOOP_LENGTHS_BARS
+    loop_lengths_bars: tuple[float, ...] = _DEFAULT_LOOP_LENGTHS_BARS
     candidates_per_track: int = 8
     max_one_shot_seconds: float = 2.0
     gpu_mode: str = "auto"  # "auto" ou "cpu"
     auto_play: bool = True
     force_dark: bool = False
+
+    def __post_init__(self) -> None:
+        values = self.loop_lengths_bars
+        if isinstance(values, (tuple, list)):
+            valid = {float(value) for value in values if is_loop_length(value)}
+            self.loop_lengths_bars = tuple(value for value in LOOP_LENGTHS_BARS if value in valid)
+        else:
+            self.loop_lengths_bars = ()
+        if not self.loop_lengths_bars:
+            self.loop_lengths_bars = LOOP_LENGTHS_BARS
 
     def to_dict(self) -> dict:
         data = asdict(self)
@@ -31,7 +43,6 @@ class Settings:
     @classmethod
     def from_dict(cls, data: dict) -> Settings:
         merged = {**cls().to_dict(), **data}
-        merged["loop_lengths_bars"] = tuple(merged["loop_lengths_bars"])
         return cls(**merged)
 
 

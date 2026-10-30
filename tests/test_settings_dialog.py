@@ -17,7 +17,7 @@ def test_settings_reads_back_edited_values(qapp):
     dialog._library_root.setText("/musique")
     dialog._export_dir.setText("/musique/export")
     dialog._export_format.setCurrentText("flac")
-    dialog._loop_lengths_bars.setText("2,4")
+    dialog._loop_lengths_bars.setCurrentIndex(1)
     dialog._candidates_per_track.setValue(10)
     dialog._max_one_shot_seconds.setValue(3.5)
     dialog._gpu_mode.setCurrentText("cpu")
@@ -28,7 +28,7 @@ def test_settings_reads_back_edited_values(qapp):
         library_root="/musique",
         export_dir="/musique/export",
         export_format="flac",
-        loop_lengths_bars=(2, 4),
+        loop_lengths_bars=(0.5,),
         candidates_per_track=10,
         max_one_shot_seconds=3.5,
         gpu_mode="cpu",
@@ -45,3 +45,13 @@ def test_dialog_preserves_ui_preferences_when_editing_existing_controls(qapp):
     assert result.export_format == "flac"
     assert result is not original
     assert original.export_format == "wav"
+
+
+def test_loop_lengths_are_closed_choices(qapp):
+    dialog = SettingsDialog(Settings())
+    assert not dialog._loop_lengths_bars.isEditable()
+    assert {dialog._loop_lengths_bars.itemData(i) for i in range(dialog._loop_lengths_bars.count())} == {
+        (0.5, 1.0),
+        (0.5,),
+        (1.0,),
+    }

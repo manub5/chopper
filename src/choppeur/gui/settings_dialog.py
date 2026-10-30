@@ -35,7 +35,11 @@ class SettingsDialog(QDialog):
         self._export_format.addItems(["wav", "flac"])
         self._export_format.setCurrentText(settings.export_format)
 
-        self._loop_lengths_bars = QLineEdit(",".join(str(bars) for bars in settings.loop_lengths_bars))
+        self._loop_lengths_bars = QComboBox()
+        self._loop_lengths_bars.addItem("1/2 mesure et 1 mesure", (0.5, 1.0))
+        self._loop_lengths_bars.addItem("1/2 mesure", (0.5,))
+        self._loop_lengths_bars.addItem("1 mesure", (1.0,))
+        self._loop_lengths_bars.setCurrentIndex(self._loop_lengths_bars.findData(settings.loop_lengths_bars))
 
         self._candidates_per_track = QSpinBox()
         self._candidates_per_track.setRange(1, 50)
@@ -59,7 +63,7 @@ class SettingsDialog(QDialog):
             "Dossier cible d'export", self._row_with_browse(self._export_dir, self._browse_export_dir)
         )
         form.addRow("Format d'export", self._export_format)
-        form.addRow("Longueurs de boucle (mesures, séparées par des virgules)", self._loop_lengths_bars)
+        form.addRow("Longueurs de boucle", self._loop_lengths_bars)
         form.addRow("Nombre de candidats par piste", self._candidates_per_track)
         form.addRow("Durée maximale d'un one-shot (s)", self._max_one_shot_seconds)
         form.addRow("Utilisation du GPU", self._gpu_mode)
@@ -94,7 +98,7 @@ class SettingsDialog(QDialog):
             self._export_dir.setText(directory)
 
     def settings(self) -> Settings:
-        lengths = tuple(int(value) for value in self._loop_lengths_bars.text().split(",") if value.strip())
+        lengths = self._loop_lengths_bars.currentData()
         return replace(
             self._initial_settings,
             library_root=self._library_root.text() or None,

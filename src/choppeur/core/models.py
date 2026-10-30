@@ -4,6 +4,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
+LOOP_LENGTHS_BARS = (0.5, 1.0)
+
+
+def is_loop_length(value: object) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and value in LOOP_LENGTHS_BARS
+
 
 class CandidateType(Enum):
     LOOP = "loop"
@@ -37,7 +43,7 @@ class Candidate:
     end_seconds: float
     score: float
     bpm: float | None = None
-    bars: int | None = None
+    bars: float | None = None
 
     @property
     def duration_seconds(self) -> float:
