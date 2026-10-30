@@ -32,6 +32,8 @@ class WaveformView(pg.PlotWidget):
     def set_waveform(self, samples: np.ndarray, sample_rate: int, *, max_points: int = 20_000) -> None:
         self.clear()
         self._marker_lines = []
+        # A manual zoom disables auto-ranging; reset it before attaching new data.
+        self.enableAutoRange()
 
         display_samples = samples.mean(axis=1) if samples.ndim > 1 else samples
         downsampled = _downsample(display_samples, max_points)

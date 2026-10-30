@@ -6,6 +6,24 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 30/10/2026 — Onde plate après conservation d'une échelle manuelle
+
+- Diagnostic sur le FLAC stéréo de la piste 16 : fréquence et canaux intacts,
+  pic mono d'environ 0,997 ; le chargement multicanal n'aplatit pas les données.
+  Un affichage neuf est correct. Le scénario initial exact reste à confirmer
+  avec l'utilisateur ; le défaut reproductible est la conservation du zoom.
+- Cause reproduite : une modification manuelle des limites désactive le
+  recalage automatique de pyqtgraph. `clear()` ne le réactive pas : une nouvelle
+  piste conserve une plage verticale trop large et apparaît plate (ou hors cadre).
+- Test rouge puis vert : charger une onde après une plage manuelle ±100 et une
+  fenêtre temporelle hors piste ; vérifier le retour aux bornes audio.
+- Correction : réactiver le recalage automatique avant d'attacher la nouvelle
+  courbe. Aucun gain, normalisation ou changement des canaux de lecture/export.
+- Affichage : tempo à une décimale dans titre, statut et table ; durée et position
+  en `mm:ss.mmm`, avec retenue correcte lors de l'arrondi à la minute.
+- Capture Wayland réalisée sur le FLAC réel ; grandes lignes de candidats
+  volontairement conservées jusqu'à l'étape 4. Aucun fichier audio source écrit.
+
 ## 29/10/2026 — Blocage après l'échec de l'analyse d'une piste (état des lieux, bug A)
 
 - Cause : `TrackAnalysisWorker` émettait `failed` en cas d'erreur, mais seul

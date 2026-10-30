@@ -6,6 +6,22 @@ from choppeur.gui.waveform_view import WaveformView
 SAMPLE_RATE = 22050
 
 
+def test_loading_waveform_resets_manual_scale_that_would_flatten_new_audio(qapp):
+    view = WaveformView()
+    view.resize(900, 400)
+    view.show()
+    samples = np.tile(np.array([-0.5, 0.5], dtype=np.float32), 500)
+    view.set_waveform(samples, 1000)
+    view.setRange(xRange=(100, 200), yRange=(-100, 100), padding=0)
+    view.set_waveform(samples, 1000)
+    qapp.processEvents()
+    x_range, y_range = view.viewRange()
+    assert y_range[0] <= -0.5 and 0.5 <= y_range[1] < 1
+    assert y_range[1] - y_range[0] < 2
+    assert x_range[0] <= 0 and 0.999 <= x_range[1] < 2
+    view.close()
+
+
 def test_stereo_waveform_is_only_a_display_projection(qapp):
     view = WaveformView()
     samples = np.column_stack([np.full(1000, 0.25), np.full(1000, -0.5)]).astype(np.float32)

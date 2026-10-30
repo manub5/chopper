@@ -186,10 +186,10 @@ class MainWindow(QMainWindow):
         self.waveform_view.set_waveform(samples, sample_rate)
         self.waveform_view.set_candidates(candidates)
         self.sample_state.load_track(result)
-        self.track_label.setText(f"{analysis.track.title} — {round(analysis.tempo_bpm)} BPM")
+        self.track_label.setText(f"{analysis.track.title} — {analysis.tempo_bpm:.1f} BPM")
 
         self.status_bar.showMessage(
-            f"{analysis.track.title} — {round(analysis.tempo_bpm)} BPM, {len(candidates)} candidats",
+            f"{analysis.track.title} — {analysis.tempo_bpm:.1f} BPM, {len(candidates)} candidats",
             5000,
         )
 

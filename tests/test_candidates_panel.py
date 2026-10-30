@@ -37,6 +37,15 @@ def test_table_has_five_noneditable_columns_and_initial_order(qapp, loaded_track
     panel.close()
 
 
+def test_table_formats_tempo_and_times_with_millisecond_carry(qapp, loaded_track):
+    candidate = replace(loaded_track.candidates[0], bpm=118.557, start_seconds=59.9996, end_seconds=121.2346)
+    panel, _state = make_panel(replace(loaded_track, candidates=(candidate,)))
+    assert panel.table.item(0, 1).text() == "118.6"
+    assert panel.table.item(0, 2).text() == "01:01.235"
+    assert panel.table.item(0, 3).text() == "01:00.000"
+    panel.close()
+
+
 @pytest.mark.parametrize("auto_play", [False, True])
 def test_click_selects_and_optionally_requests_play(qapp, loaded_track, auto_play):
     panel, state = make_panel(loaded_track, auto_play)

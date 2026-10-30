@@ -90,6 +90,16 @@ def test_shared_layout_title_and_auto_persistence(qapp, make_window, monkeypatch
     assert saved == [False]
 
 
+def test_title_and_status_show_tempo_with_one_decimal(qapp, make_window, loaded_track):
+    from dataclasses import replace
+
+    result = replace(loaded_track, analysis=replace(loaded_track.analysis, tempo_bpm=118.557))
+    window = make_window()
+    window._on_track_analyzed(result)
+    assert "118.6 BPM" in window.track_label.text()
+    assert "118.6 BPM" in window.status_bar.currentMessage()
+
+
 @pytest.mark.parametrize("completion", ["finish", "failure", "close", "new_track"])
 def test_shared_player_transitions_stop_output_and_clear_indicator(
     qapp, make_window, monkeypatch, loaded_track, tmp_path, completion

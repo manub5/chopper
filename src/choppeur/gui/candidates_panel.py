@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from choppeur.core.models import CandidateType
+from choppeur.gui.presentation import format_time
 from choppeur.gui.sample_state import SampleState
 
 
@@ -106,12 +107,11 @@ class CandidatesPanel(QWidget):
                 self.table.setRowCount(len(ids))
                 for row, item in enumerate(self.state.items):
                     candidate = item.candidate
-                    minutes, seconds = divmod(candidate.start_seconds, 60)
                     values = (
                         "",
-                        f"{candidate.bpm:g}" if candidate.bpm else "—",
-                        f"{candidate.end_seconds - candidate.start_seconds:.3f} s",
-                        f"{int(minutes):02d}:{seconds:06.3f}",
+                        f"{candidate.bpm:.1f}" if candidate.bpm else "—",
+                        format_time(candidate.end_seconds - candidate.start_seconds),
+                        format_time(candidate.start_seconds),
                         "⠿",
                     )
                     for column, value in enumerate(values):
