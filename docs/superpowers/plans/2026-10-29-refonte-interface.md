@@ -376,7 +376,9 @@ Python par leur contenu). Attendre validation KDE avant l'étape 6.
 **Fichiers :** créer `core/exporting.py`, `gui/sample_drag.py`,
 `tests/test_exporting.py`, `tests/test_sample_drag.py` ; modifier
 `gui/main_window.py`, `gui/candidates_panel.py`, `tests/test_main_window.py`,
-`tests/test_candidates_panel.py`.
+`tests/test_candidates_panel.py`. Ajouter les corrections de collisions nécessaires
+dans `core/naming.py`, `core/audio_io.py` et `tests/test_naming.py` : liens cassés
+et fichier à la place du dossier ne doivent pas provoquer une boucle de réessai.
 
 **Consomme :** `audio_io.export_candidates`, `LoadedTrack`, IDs de l'état et
 `Settings.export_dir/export_format`. Ne pas importer le prototype.
@@ -390,32 +392,40 @@ candidate: Candidate, export_dir: Path) -> Path` écrit dans `export_dir / 'glis
 L'interface extrait ces valeurs de `LoadedTrack` ; le moteur ne dépend d'aucun
 objet GUI et n'importe pas `gui.presentation`.
 
-- [ ] **1. Tests d'abord :** WAV bouton dans `exports/`, WAV glisser dans
+- [x] **1. Tests d'abord :** WAV bouton dans `exports/`, WAV glisser dans
   `exports/glissés/`, FLAC bouton inchangé, sous-dossier Unicode, deux glissers
   distincts et empreinte du premier inchangée, fréquence 44 100 et deux canaux.
   Comparer le segment exporté et celui envoyé au lecteur, à la quantification près.
   Simuler disque plein au deuxième candidat : première réussite gardée et nommée
   dans le rapport, échec visible, fichier partiel nettoyé par le writer existant.
   Tester dossier réseau levant OSError et résultat sans fausse réussite.
-- [ ] **2. Observer le rouge :**
+- [x] **2. Observer le rouge :**
   `uv run pytest -q tests/test_exporting.py tests/test_sample_drag.py`.
-- [ ] **3. Implémenter les exports purs.** Réutiliser la réservation atomique et
+- [x] **3. Implémenter les exports purs.** Réutiliser la réservation atomique et
   le nommage existants, traiter les candidats un par un pour rapporter les succès
   précédant un échec. PCM24/WAV obligatoire pour le glisser, sans supprimer même
   après annulation. Les boutons utilisent le dossier configuré ; sinon dialogue
   de destination, dont l'annulation n'écrit rien et ne change pas les paramètres.
-- [ ] **4. Brancher la poignée seulement.** Seuil `QApplication.startDragDistance()`
+- [x] **4. Brancher la poignée seulement.** Seuil `QApplication.startDragDistance()`
   avec bouton gauche maintenu ; créer le WAV avant `QDrag.exec`, puis
   `QMimeData.setUrls([QUrl.fromLocalFile(...)])` et copie uniquement. Un simple
   clic, clic sur une autre colonne ou l'ouverture de piste ne crée ni WAV ni
   `glissés/`. Sans configuration, poignée désactivée avec explication ; aucun
   dialogue au milieu du geste. Échec d'écriture : message, pas de drag lancé.
   Enregistrer le chemin conservé, jamais « import Bitwig réussi » sur retour Qt.
-- [ ] **5. Vert et porte G ; commit :** `Exporte les WAV glissés dans un sous-dossier permanent`.
+- [x] **5. Vert et porte G ; commit :** `Exporte les WAV glissés dans un sous-dossier permanent`.
   **Validation réelle :** Bitwig et Dolphin, copie, annulation/réessai, absence
   d'écoute au clic de poignée, réouverture du projet Bitwig après fermeture de
   Choppeur. Vérifier que les fichiers restent dans `glissés/` et séparés des
-  exports par bouton. Attendre validation ; ne pas nettoyer les fichiers d'essai.
+   exports par bouton. Attendre validation ; ne pas nettoyer les fichiers d'essai.
+
+**Résultat au 01/11/2026 :** 302 tests réussis, dont 33 nouveaux ; porte G réussie.
+Objets QDrag/QMimeData réels, seul l'appel de transfert à la plateforme est simulé
+dans les tests ; aucune validation de dépôt réel Bitwig/Dolphin annoncée.
+WAV/FLAC réels, stéréo 44,1 kHz, erreur disque/réseau, collisions et conservation
+après annulation/fermeture couverts. Exports non idempotents par choix : chaque
+glisser crée un fichier supplémentaire durable. Attendre les essais utilisateur
+sous Wayland avant l'étape 7.
 
 ## Étape 7 — Actions, menus, aide et touche `M`
 

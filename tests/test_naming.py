@@ -116,3 +116,13 @@ def test_unique_path_avoids_overwrite(tmp_path):
 def test_unique_path_returns_original_when_free(tmp_path):
     result = unique_path(tmp_path, "sample.wav")
     assert result == tmp_path / "sample.wav"
+
+
+def test_unique_path_skips_dangling_symlinks_without_touching_targets(tmp_path):
+    target = tmp_path / "missing-source.wav"
+    (tmp_path / "sample.wav").symlink_to(target)
+    (tmp_path / "sample_2.wav").symlink_to(target)
+    assert unique_path(tmp_path, "sample.wav") == tmp_path / "sample_3.wav"
+    assert (tmp_path / "sample.wav").is_symlink()
+    assert (tmp_path / "sample_2.wav").is_symlink()
+    assert not target.exists()

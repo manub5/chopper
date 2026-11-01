@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 
 from choppeur.core import audio_io
 from choppeur.core.cache import AnalysisCache
+from choppeur.core.exporting import export_batch, export_drag
 from choppeur.core.models import Track
 from choppeur.core.settings import (
     Settings,
@@ -32,6 +33,7 @@ from choppeur.gui.candidates_panel import CandidatesPanel
 from choppeur.gui.library_panel import LibraryPanel
 from choppeur.gui.presentation import LoadedTrack
 from choppeur.gui.preview_player import PreviewPlayer
+from choppeur.gui.sample_drag import start_file_drag
 from choppeur.gui.sample_lanes import SampleLanesView
 from choppeur.gui.sample_state import SampleState
 from choppeur.gui.settings_dialog import SettingsDialog
@@ -136,6 +138,8 @@ class MainWindow(QMainWindow):
         self.library_panel.folder_selected.connect(self._on_folder_selected)
         self.library_panel.load_failed.connect(self._on_library_load_failed)
         self.candidates_panel.export_requested.connect(self._on_export_requested)
+        self.candidates_panel.drag_requested.connect(self._on_drag_requested)
+        self.candidates_panel.set_drag_enabled(bool(self.settings.export_dir))
 
         self.theme_manager = ThemeManager(force_dark=self.settings.force_dark, parent=self)
         self.theme_manager.changed.connect(self._apply_theme)
@@ -269,6 +273,7 @@ class MainWindow(QMainWindow):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.settings = dialog.settings()
             self.auto_play_checkbox.setChecked(self.settings.auto_play)
+            self.candidates_panel.set_drag_enabled(bool(self.settings.export_dir))
             self.theme_manager.set_force_dark(self.settings.force_dark)
             save_settings(self.settings)
 
@@ -308,21 +313,22 @@ class MainWindow(QMainWindow):
         loaded = self.sample_state.loaded_track
         if loaded is None or mode not in {"marked", "all"}:
             return
-        candidates = [
+        candidates = tuple(
             item.candidate
             for item in self.sample_state.items
             if mode == "all" or item.id in self.sample_state.marked_ids
-        ]
+        )
         if not candidates:
             QMessageBox.information(self, "Choppeur", "Aucun candidat coché à exporter.")
             return
 
-        start_dir = self.settings.export_dir or str(Path.home())
-        directory = QFileDialog.getExistingDirectory(self, "Dossier d'export", start_dir)
+        directory = self.settings.export_dir
         if not directory:
-            return
+            directory = QFileDialog.getExistingDirectory(self, "Dossier d'export", str(Path.home()))
+            if not directory:
+                return
 
-        exported = audio_io.export_candidates(
+        report = export_batch(
             loaded.samples,
             loaded.sample_rate,
             loaded.analysis.track,
@@ -330,7 +336,47 @@ class MainWindow(QMainWindow):
             Path(directory),
             file_format=self.settings.export_format,
         )
-        self.status_bar.showMessage(f"{len(exported)} fichier(s) exporté(s)", 5000)
+        if report.error is not None:
+            message = f"Échec d'export : {report.error}"
+            if report.paths:
+                names = ", ".join(path.name for path in report.paths)
+                message = (
+                    f"Export partiel : {len(report.paths)} fichier(s) conservé(s) : {names}. {report.error}"
+                )
+            self.status_bar.setToolTip(message)
+            self.status_bar.showMessage(message, 10000)
+        else:
+            self.status_bar.setToolTip("")
+            self.status_bar.showMessage(f"{len(report.paths)} fichier(s) exporté(s)", 5000)
+
+    def _on_drag_requested(self, item_id: int) -> None:
+        loaded = self.sample_state.loaded_track
+        item = next((item for item in self.sample_state.items if item.id == item_id), None)
+        if loaded is None or item is None:
+            return
+        if not self.settings.export_dir:
+            self.status_bar.showMessage(
+                "Définissez un dossier d'export dans les paramètres pour glisser un sample.", 8000
+            )
+            return
+        try:
+            path = export_drag(
+                loaded.samples,
+                loaded.sample_rate,
+                loaded.analysis.track,
+                item.candidate,
+                Path(self.settings.export_dir),
+            )
+        except Exception as exc:  # noqa: BLE001 - never start a drag after a writer failure
+            self.status_bar.showMessage(f"Échec de création du WAV glissé : {exc}", 10000)
+            return
+        try:
+            start_file_drag(self.candidates_panel.table, path)
+        except Exception as exc:  # noqa: BLE001 - the file must remain even if the platform transfer fails
+            self.status_bar.showMessage(f"WAV conservé : {path} ; glisser impossible : {exc}", 10000)
+        else:
+            # Qt's returned action is not proof that a DAW successfully imported it.
+            self.status_bar.showMessage(f"WAV conservé : {path}", 10000)
 
     # --- infrastructure -------------------------------------------------
 

@@ -6,6 +6,31 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 01/11/2026 — Exports communs et glissers WAV permanents
+
+- Les boutons utilisent le dossier configuré ; sinon, un choix de destination
+  pour cet export seulement, sans modification silencieuse des paramètres.
+- Service d'export commun : chaque réussite précédant un échec est conservée
+  et rapportée. Disque plein ou dossier réseau indisponible : erreur visible,
+  pas de fausse réussite. Le writer nettoie les fichiers partiellement écrits.
+- La poignée seule peut lancer un glisser, après déplacement suffisant avec
+  bouton gauche maintenu. Aucun clic sur la poignée, y compris droit, ne change
+  l'actif, ne marque ni ne joue. Sans dossier configuré, poignée désactivée et
+  explication dans son info-bulle, aucun dialogue au milieu du geste.
+- WAV PCM24 dans `<export_dir>/glissés/`, fréquence et canaux préservés ; URL
+  locale absolue, action copie uniquement. Le chemin est affiché sans prétendre
+  qu'un import Bitwig est réussi sur le seul retour Qt.
+- Fichiers conservés après annulation, échec Qt et fermeture. Chaque nouveau
+  glisser crée un fichier distinct : opération volontairement non idempotente,
+  sans nettoyage automatique, et sans modification des sources.
+- Deux boucles de réessai ont été prévenues, tests rouges puis verts : un lien
+  symbolique cassé doit occuper son nom même si `exists()` est faux ; un fichier
+  à la place du dossier n'est pas une collision de nom de sample. L'anti-écrasement
+  atomique reste inchangé, les liens/fichiers existants ne sont jamais supprimés.
+- Vérifications : 302 tests réussis et porte statique réussie. Le transfert Qt
+  à la plateforme est simulé ; les essais réels Bitwig/Dolphin sous Wayland et
+  la réouverture d'un projet Bitwig après fermeture restent à valider.
+
 ## 30/10/2026 — Catégories indépendantes, quarts de mesure et dézoom borné
 
 - Deux causes à l'absence de demi-mesures : anciens paramètres `[1.0]` encore

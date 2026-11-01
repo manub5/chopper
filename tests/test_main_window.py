@@ -581,3 +581,198 @@ def test_close_event_stops_album_worker_before_closing_the_cache(qapp, make_wind
 
     assert running_worker._stop_requested is True
     assert not any("closed database" in message for message in failures)
+
+
+def test_configured_export_skips_dialog_and_uses_selected_format(
+    qapp, make_window, monkeypatch, loaded_track, tmp_path
+):
+    destination = tmp_path / "exports"
+    window = make_window(export_dir=str(destination), export_format="flac")
+    window._on_track_analyzed(loaded_track)
+    window.sample_state.toggle_mark(window.sample_state.items[1].id)
+
+    def unexpected_dialog(*args, **kwargs):
+        raise AssertionError("Configured export must not ask for another destination")
+
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", unexpected_dialog)
+    assert not destination.exists()
+    window._on_export_requested("marked")
+    paths = list(destination.glob("*.flac"))
+    assert len(paths) == 1
+    assert not (destination / "glissés").exists()
+    data, rate = sf.read(paths[0], dtype="float32")
+    assert rate == 1000
+    np.testing.assert_allclose(data, loaded_track.samples[1000:1200], atol=2 / 2**24)
+
+
+def test_cancelled_export_does_not_write_or_update_settings(
+    qapp, make_window, monkeypatch, loaded_track, tmp_path
+):
+    window = make_window()
+    window._on_track_analyzed(loaded_track)
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args: "")
+    saved = []
+    monkeypatch.setattr(main_window_module, "save_settings", saved.append)
+    window._on_export_requested("all")
+    assert window.settings.export_dir is None
+    assert saved == []
+    assert list(tmp_path.rglob("*.wav")) == []
+    assert list(tmp_path.rglob("glissés")) == []
+
+
+def test_partial_export_names_success_and_error(qapp, make_window, monkeypatch, loaded_track, tmp_path):
+    destination = tmp_path / "exports"
+    window = make_window(export_dir=str(destination))
+    window._on_track_analyzed(loaded_track)
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args: str(destination))
+    real_write = sf.write
+    calls = []
+
+    def disk_full(file, data, rate, **kwargs):
+        calls.append(file)
+        if len(calls) == 2:
+            raise OSError("disque plein")
+        real_write(file, data, rate, **kwargs)
+
+    monkeypatch.setattr(sf, "write", disk_full)
+    window._on_export_requested("all")
+    paths = list(destination.glob("*.wav"))
+    assert len(paths) == 1
+    assert "disque plein" in window.status_bar.currentMessage()
+    assert paths[0].name in window.status_bar.currentMessage()
+
+
+@pytest.mark.parametrize("action_name", ["CopyAction", "IgnoreAction"])
+def test_handle_drag_writes_durable_wav_before_qt_and_never_plays(
+    qapp, make_window, monkeypatch, loaded_track, tmp_path, action_name
+):
+    from pathlib import Path
+
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QDrag
+    from PySide6.QtTest import QTest
+
+    destination = tmp_path / "exports"
+    window = make_window(export_dir=str(destination), export_format="flac")
+    window.show()
+    window._on_track_analyzed(loaded_track)
+    qapp.processEvents()
+    state = window.sample_state
+    plays = []
+    state.play_requested.connect(lambda *args: plays.append(args))
+    received = []
+
+    def platform_exec(drag, supported, default):
+        path = Path(drag.mimeData().urls()[0].toLocalFile())
+        assert path.is_file()
+        assert path.parent == destination / "glissés"
+        assert supported == default == Qt.DropAction.CopyAction
+        received.append(path)
+        return getattr(Qt.DropAction, action_name)
+
+    monkeypatch.setattr(QDrag, "exec", platform_exec)
+    assert not destination.exists()
+    table = window.candidates_panel.table
+    QTest.mouseClick(
+        table.viewport(), Qt.MouseButton.LeftButton, pos=table.visualItemRect(table.item(1, 4)).center()
+    )
+    assert not destination.exists()
+    for _ in range(2):
+        window.candidates_panel.drag_requested.emit(state.items[1].id)
+    assert len(received) == 2 and received[0] != received[1]
+    first_bytes = received[0].read_bytes()
+    assert state.active_id is None and not state.marked_ids and plays == []
+    assert str(received[-1]) in window.status_bar.currentMessage()
+    assert "Bitwig" not in window.status_bar.currentMessage()
+    window.close()
+    assert received[0].read_bytes() == first_bytes
+    data, rate = sf.read(received[1], dtype="float32")
+    assert sf.info(received[1]).subtype == "PCM_24"
+    assert rate == 1000 and data.shape == (200, 2)
+    np.testing.assert_allclose(data, loaded_track.samples[1000:1200], atol=2 / 2**24)
+
+
+def test_missing_export_dir_disables_handles_and_never_opens_dialog_on_drag(
+    qapp, make_window, monkeypatch, loaded_track, tmp_path
+):
+    window = make_window()
+    window._on_track_analyzed(loaded_track)
+
+    def unexpected_dialog(*args, **kwargs):
+        raise AssertionError("No dialog in the middle of a drag")
+
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", unexpected_dialog)
+    from PySide6.QtCore import Qt
+
+    assert not window.candidates_panel.table.item(0, 4).flags() & Qt.ItemFlag.ItemIsEnabled
+    window.candidates_panel.drag_requested.emit(window.sample_state.items[0].id)
+    assert "paramètres" in window.status_bar.currentMessage().lower()
+    assert list(tmp_path.rglob("glissés")) == []
+
+
+def test_failed_wav_write_reports_error_and_never_starts_drag(
+    qapp, make_window, monkeypatch, loaded_track, tmp_path
+):
+    from PySide6.QtGui import QDrag
+
+    destination = tmp_path / "exports"
+    window = make_window(export_dir=str(destination))
+    window._on_track_analyzed(loaded_track)
+    launched = []
+    monkeypatch.setattr(QDrag, "exec", lambda *args: launched.append(True))
+
+    def disk_full(*args, **kwargs):
+        raise OSError("disque plein")
+
+    monkeypatch.setattr(sf, "write", disk_full)
+    window.candidates_panel.drag_requested.emit(window.sample_state.items[0].id)
+    assert launched == []
+    assert "disque plein" in window.status_bar.currentMessage()
+    assert list(destination.rglob("*.wav")) == []
+
+
+def test_export_dir_preference_enables_handles_without_writing(
+    qapp, make_window, monkeypatch, loaded_track, tmp_path
+):
+    from PySide6.QtCore import Qt
+
+    window = make_window()
+    window._on_track_analyzed(loaded_track)
+    destination = tmp_path / "exports"
+    updated = Settings(export_dir=str(destination))
+    monkeypatch.setattr(QDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
+    monkeypatch.setattr("choppeur.gui.settings_dialog.SettingsDialog.settings", lambda self: updated)
+    monkeypatch.setattr(main_window_module, "save_settings", lambda *args: None)
+    window._on_settings_clicked()
+    assert window.candidates_panel.table.item(0, 4).flags() & Qt.ItemFlag.ItemIsEnabled
+    assert not destination.exists()
+
+
+def test_stale_drag_identity_never_exports_another_track(qapp, make_window, loaded_track, tmp_path):
+    destination = tmp_path / "exports"
+    window = make_window(export_dir=str(destination))
+    window._on_track_analyzed(loaded_track)
+    stale_id = window.sample_state.items[0].id
+    window._on_track_analyzed(loaded_track)
+    window.candidates_panel.drag_requested.emit(stale_id)
+    assert not destination.exists()
+
+
+def test_platform_drag_failure_keeps_created_wav_and_reports_path(
+    qapp, make_window, monkeypatch, loaded_track, tmp_path
+):
+    from PySide6.QtGui import QDrag
+
+    destination = tmp_path / "exports"
+    window = make_window(export_dir=str(destination))
+    window._on_track_analyzed(loaded_track)
+
+    def platform_error(*args):
+        raise RuntimeError("transfert indisponible")
+
+    monkeypatch.setattr(QDrag, "exec", platform_error)
+    window.candidates_panel.drag_requested.emit(window.sample_state.items[0].id)
+    paths = list((destination / "glissés").glob("*.wav"))
+    assert len(paths) == 1
+    assert str(paths[0]) in window.status_bar.currentMessage()
+    assert "transfert indisponible" in window.status_bar.currentMessage()

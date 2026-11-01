@@ -46,13 +46,13 @@ def build_filename(track: Track, candidate: Candidate, *, extension: str = "wav"
 
 def unique_path(directory: Path, filename: str) -> Path:
     candidate_path = directory / filename
-    if not candidate_path.exists():
+    if not candidate_path.exists() and not candidate_path.is_symlink():
         return candidate_path
 
     stem, suffix = candidate_path.stem, candidate_path.suffix
     n = 2
     while True:
         alt = directory / f"{stem}_{n}{suffix}"
-        if not alt.exists():
+        if not alt.exists() and not alt.is_symlink():
             return alt
         n += 1

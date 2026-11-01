@@ -161,6 +161,9 @@ def export_candidates(
     for candidate in candidates:
         filename = build_filename(track, candidate, extension=file_format)
         while True:
+            # A file or broken link in place of the folder is not a filename collision.
+            # Keep its FileExistsError outside the retry handler below.
+            destination.mkdir(parents=True, exist_ok=True)
             path = unique_path(destination, filename)
             try:
                 export_segment(

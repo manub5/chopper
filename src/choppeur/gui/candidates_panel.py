@@ -1,9 +1,10 @@
 """Compact sample table, projecting the shared state without owning audio."""
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QHBoxLayout,
     QHeaderView,
     QPushButton,
@@ -20,9 +21,20 @@ from choppeur.gui.theme import LIGHT, ThemePalette
 
 class SampleTable(QTableWidget):
     sample_clicked = Signal(int, bool)
+    handle_drag_requested = Signal(int)
+
+    def __init__(self, rows: int = 0, columns: int = 0, parent: QWidget | None = None) -> None:
+        super().__init__(rows, columns, parent)
+        self.drag_enabled = False
+        self._handle_press: tuple[QPoint, int] | None = None
 
     def mousePressEvent(self, event) -> None:
+        self._handle_press = None
         index = self.indexAt(event.position().toPoint())
+        if index.isValid() and index.column() == 4 and event.button() != Qt.MouseButton.LeftButton:
+            # Handle interactions must never fall through to native row selection.
+            event.accept()
+            return
         if event.button() == Qt.MouseButton.LeftButton and index.isValid():
             event.accept()
             if index.column() != 4:
@@ -33,11 +45,33 @@ class SampleTable(QTableWidget):
                         cell.data(Qt.ItemDataRole.UserRole),
                         bool(event.modifiers() & Qt.KeyboardModifier.ControlModifier),
                     )
+            elif self.drag_enabled:
+                cell = self.item(index.row(), 4)
+                if cell is not None:
+                    self._handle_press = (event.position().toPoint(), cell.data(Qt.ItemDataRole.UserRole))
             return
         super().mousePressEvent(event)
 
     def mouseDoubleClickEvent(self, event) -> None:
         self.mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:
+        if self._handle_press is None or not self.drag_enabled:
+            super().mouseMoveEvent(event)
+            return
+        if not event.buttons() & Qt.MouseButton.LeftButton:
+            return
+        position, item_id = self._handle_press
+        if (event.position().toPoint() - position).manhattanLength() < QApplication.startDragDistance():
+            return
+        # Reset before emitting: QDrag.exec starts a nested event loop.
+        self._handle_press = None
+        self.handle_drag_requested.emit(item_id)
+        event.accept()
+
+    def mouseReleaseEvent(self, event) -> None:
+        self._handle_press = None
+        super().mouseReleaseEvent(event)
 
 
 class CandidatesPanel(QWidget):
@@ -64,6 +98,7 @@ class CandidatesPanel(QWidget):
             if column:
                 self.table.setColumnWidth(column, width)
         self.table.sample_clicked.connect(state.click)
+        self.table.handle_drag_requested.connect(self.drag_requested.emit)
         self.table.currentCellChanged.connect(self._navigate)
         self.export_marked_button = QPushButton()
         self.export_all_button = QPushButton()
@@ -82,6 +117,11 @@ class CandidatesPanel(QWidget):
     def apply_theme(self, palette: ThemePalette) -> None:
         self._theme = palette
         self.setPalette(palette.to_qpalette())
+        self._sync()
+
+    def set_drag_enabled(self, enabled: bool) -> None:
+        self.table.drag_enabled = enabled
+        self.table._handle_press = None
         self._sync()
 
     def _sort(self, column: int) -> None:
@@ -147,6 +187,16 @@ class CandidatesPanel(QWidget):
                     self._theme.sample_color(candidate.type.value, marked=item_id in self.state.marked_ids)
                 )
                 cell.setIcon(QIcon(swatch))
+                handle = self.table.item(row, 4)
+                if handle is not None:
+                    handle.setToolTip(
+                        "Glisser un WAV permanent (copie)"
+                        if self.table.drag_enabled
+                        else "Définissez le dossier d'export dans les paramètres pour glisser un sample."
+                    )
+                    handle.setFlags(
+                        Qt.ItemFlag.ItemIsEnabled if self.table.drag_enabled else Qt.ItemFlag.NoItemFlags
+                    )
                 if item_id == self.state.active_id and self.table.currentRow() != row:
                     self.table.setCurrentCell(row, 0)
             if self.state.active_id is None:
