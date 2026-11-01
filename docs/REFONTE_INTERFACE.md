@@ -104,7 +104,7 @@ Comportements validés sur les rectangles :
 - Espace = lancer/arrêter le sample actif.
 - Pas d'édition des rectangles et de leurs bornes.
 
-**Décisions complémentaires acceptées :**
+**Décisions complémentaires acceptées (actualisées au 01/11/2026) :**
 
 1. La liste suit les mêmes règles de clic et de lecture auto que les rectangles.
    Un clic sur sa poignée prépare seulement le glisser, sans écouter ni marquer.
@@ -174,11 +174,19 @@ de l'étape visuelle, sans ajouter une troisième couleur d'accent.
 **Décisions complémentaires acceptées :**
 
 - Les boutons exportent directement dans le dossier configuré ; s'il manque,
-  demander une destination avant cet export. Ne pas modifier silencieusement
-  les paramètres à cette occasion.
-- Sans dossier d'export configuré, les poignées ne démarrent pas de glisser et
-  indiquent dans leur info-bulle de définir ce dossier dans les paramètres.
-  Ne pas ouvrir un dialogue modal au milieu du geste Wayland.
+  afficher « Choose your sample folder », expliquer les exports permanents et
+  proposer « Choose folder… » / « Cancel », puis un sélecteur. Mémoriser le choix
+  avant tout export, pour les prochaines utilisations. Aucun chemin imposé ni
+  demande au lancement ; modification possible dans les paramètres.
+- Les poignées restent utilisables sans dossier configuré : au premier geste
+  dépassant le seuil, ouvrir cette configuration puis demander de recommencer
+  le glisser. Ne créer aucun WAV et ne lancer aucun transfert natif à cette
+  occasion. Un clic seul ne déclenche rien. Ne jamais reprendre un geste Wayland
+  interrompu par le dialogue.
+- Annuler l'explication ou le sélecteur ne change ni paramètres ni fichiers.
+  Si l'enregistrement échoue, garder l'ancienne configuration et signaler l'erreur,
+  sans créer de WAV. La sauvegarde remplace atomiquement le TOML pour préserver
+  l'ancien fichier en cas d'échec.
 - À chaque glisser, créer un nouveau fichier, suffixé si nécessaire. Ne pas
   réutiliser ni supprimer un export précédent sur la seule base de son nom.
 - Une erreur au milieu d'un export multiple indique les fichiers déjà exportés

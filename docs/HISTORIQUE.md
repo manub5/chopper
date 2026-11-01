@@ -6,6 +6,34 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 01/11/2026 — Choix du dossier mémorisé et longueurs explicites
+
+- Contrat approuvé : aucun chemin d'export imposé, aucune demande au lancement.
+  Une petite explication en anglais puis un sélecteur s'ouvrent au premier export
+  ou geste de glisser sans dossier. Choix mémorisé et modifiable dans les paramètres.
+  Un dossier déjà configuré reste inchangé.
+- Premier glisser : après configuration, demander de recommencer le geste ; aucun
+  WAV ni transfert Qt à cette occasion. Annulation aux deux étapes sans effet.
+  Les poignées ne sont donc plus désactivées faute de dossier. Cela remplace la
+  règle précédente décrite dans l'entrée ci-dessous.
+- Enregistrement des paramètres par fichier temporaire local puis remplacement
+  atomique : un échec préserve l'ancien TOML et la préférence en mémoire ; aucune
+  écriture audio après échec. Aucun effacement des anciens exports.
+- Paramètres réellement observés : `[1.0]`, version 2. Cela explique l'absence
+  des fractions, sans démontrer un défaut du moteur ni établir pourquoi ce choix
+  a été enregistré. Migration version 3 réactivant les trois longueurs une fois,
+  puis préservation des choix sauvegardés. La simple lecture reste sans écriture.
+- Trois cases « 1 bar », « ½ bar », « ¼ bar » remplacent les sept combinaisons ;
+  sélection vide refusée. Quotas indépendants et détecteur inchangés.
+- Sources en lecture seule, WAV PCM24 permanents dans `glissés/`, fréquence et
+  canaux préservés. Les vrais glissers répétés restent non idempotents : fichiers
+  distincts conservés même après annulation ; configuration seule sans audio.
+- Le renommage global Chopper/anglais et la publication GitHub publique sont
+  prévus séparément, pas réalisés par ce correctif.
+- Vérifications avant revue : 357 tests réussis et contrôles statiques réussis.
+  24 tests ciblés passent sous Wayland, mais les interactions modales et le
+  transfert Qt vers une application externe restent simulés dans ces tests.
+
 ## 01/11/2026 — Exports communs et glissers WAV permanents
 
 - Les boutons utilisent le dossier configuré ; sinon, un choix de destination

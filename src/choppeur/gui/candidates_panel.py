@@ -25,7 +25,7 @@ class SampleTable(QTableWidget):
 
     def __init__(self, rows: int = 0, columns: int = 0, parent: QWidget | None = None) -> None:
         super().__init__(rows, columns, parent)
-        self.drag_enabled = False
+        self.drag_enabled = True
         self._handle_press: tuple[QPoint, int] | None = None
 
     def mousePressEvent(self, event) -> None:
@@ -190,9 +190,9 @@ class CandidatesPanel(QWidget):
                 handle = self.table.item(row, 4)
                 if handle is not None:
                     handle.setToolTip(
-                        "Glisser un WAV permanent (copie)"
+                        "Drag a permanent WAV copy. On first use, choose your sample folder, then drag again."
                         if self.table.drag_enabled
-                        else "Définissez le dossier d'export dans les paramètres pour glisser un sample."
+                        else "Dragging is unavailable."
                     )
                     handle.setFlags(
                         Qt.ItemFlag.ItemIsEnabled if self.table.drag_enabled else Qt.ItemFlag.NoItemFlags

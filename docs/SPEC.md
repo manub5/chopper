@@ -14,8 +14,11 @@ mesure, et one-shots propres.
    premiers temps de mesure, et liste de plusieurs samples candidats.
 5. Il préécoute le sample actif en lecture unique et marque indépendamment
    ceux qu'il garde (Ctrl+clic ou M).
-6. Il exporte : vers le dossier cible défini dans les paramètres, ou vers
-   un dossier choisi au moment de l'export.
+6. Il exporte vers son dossier de samples. Si aucun dossier n'est configuré,
+   une courte explication puis un sélecteur permettent de le choisir ; ce choix
+   est mémorisé pour les prochaines utilisations et modifiable dans les paramètres.
+   Aucun dossier imposé ni demande au lancement. Au premier glisser sans dossier,
+   choisir puis recommencer le geste ; aucun WAV n'est créé par cette configuration.
 
 ## Quatre catégories de samples
 ### Boucles
@@ -24,7 +27,9 @@ mesure, et one-shots propres.
 - Les longueurs 2, 4 et 8 mesures ne sont plus proposées ni générées.
 - À la migration des anciens paramètres, réactiver les trois longueurs une fois,
   même si seule 1 mesure était activée. Conserver ensuite les choix explicitement
-  enregistrés dans le nouveau format. Migration idempotente, sauvegarde normale.
+   enregistrés dans le nouveau format (version 3). Les fichiers de version 2
+   sont aussi concernés par cette réactivation demandée. Migration idempotente
+   après sauvegarde normale ; la simple lecture ne réécrit pas le fichier.
 - Jusqu'à 8 candidats **par longueur**, classés par score à l'intérieur de chaque
   catégorie : une longueur ne peut plus évincer les autres par son score.
 - Ne rien inventer si une piste est trop courte ou sans grille rythmique exploitable.
@@ -46,9 +51,10 @@ Caractères interdits nettoyés, pas d'écrasement (suffixe `_2`, `_3`…).
 
 ## Paramètres
 - Dossier racine de la bibliothèque.
-- Dossier cible d'export par défaut.
+- Dossier cible d'export choisi par l'utilisateur, aucun chemin initial imposé.
 - Format d'export : WAV 24 bits (défaut) ou FLAC ; fréquence d'origine conservée.
-- Longueurs de boucle proposées : choix limités à 1/4, 1/2 et 1 mesure.
+- Longueurs de boucle : trois cases indépendantes « 1 bar », « ½ bar », « ¼ bar »
+  sous « Loop lengths ». Au moins une longueur doit rester cochée pour valider.
 - Nombre de candidats **par catégorie** : de 1 à 8, 8 par défaut (même quota pour les one-shots).
 - Durée maximale d'un one-shot.
 - Utilisation du GPU : auto / forcé CPU.
@@ -74,4 +80,6 @@ Caractères interdits nettoyés, pas d'écrasement (suffixe `_2`, `_3`…).
 - Fiche d'analyse « avant » : passages sans voix, boucles stables,
   sections percussives (voir ROADMAP, phase ultérieure).
 - Détection de la tonalité, tri par tonalité.
-- Glisser-déposer d'un candidat directement vers Bitwig.
+- Collecte automatique des samples dans le projet du séquenceur : non garantie.
+  Le glisser actuel fournit un WAV permanent ; dans Bitwig, utiliser « Collect
+  and Save » pour rendre le projet autonome.

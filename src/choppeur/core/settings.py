@@ -3,6 +3,7 @@ from __future__ import annotations
 import tomllib
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import tomli_w
 from platformdirs import user_cache_dir, user_config_dir
@@ -72,6 +73,16 @@ def load_settings(path: Path | None = None) -> Settings:
 
 def save_settings(settings: Settings, path: Path | None = None) -> None:
     path = path or default_settings_path()
+    content = tomli_w.dumps(settings.to_dict())
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("wb") as f:
-        tomli_w.dump(settings.to_dict(), f)
+    temporary: Path | None = None
+    try:
+        with NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", delete=False
+        ) as file:
+            temporary = Path(file.name)
+            file.write(content)
+        temporary.replace(path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)

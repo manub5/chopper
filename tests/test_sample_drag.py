@@ -122,12 +122,11 @@ def test_right_click_on_handle_neither_selects_nor_starts_drag(panel):
     assert not state.marked_ids and requests == []
 
 
-def test_handle_disabled_without_destination_and_explains_why(panel):
+def test_explicitly_disabled_handle_never_requests_drag(panel):
     panel.set_drag_enabled(False)
     table = panel.table
     requests = []
     panel.drag_requested.connect(requests.append)
-    assert "paramètres" in table.item(0, 4).toolTip().lower()
     assert not table.item(0, 4).flags() & Qt.ItemFlag.ItemIsEnabled
     point = table.visualItemRect(table.item(0, 4)).center()
     QTest.mousePress(table.viewport(), Qt.MouseButton.LeftButton, pos=point)
@@ -135,6 +134,18 @@ def test_handle_disabled_without_destination_and_explains_why(panel):
     QTest.mouseRelease(table.viewport(), Qt.MouseButton.LeftButton, pos=point)
     assert requests == []
     assert panel.state.active_id is None
+
+
+def test_handle_available_by_default_explains_first_use(qapp, loaded_track):
+    state = SampleState()
+    state.load_track(loaded_track)
+    panel = CandidatesPanel(state)
+    try:
+        handle = panel.table.item(0, 4)
+        assert handle.flags() & Qt.ItemFlag.ItemIsEnabled
+        assert "choose" in handle.toolTip().lower() and "folder" in handle.toolTip().lower()
+    finally:
+        panel.close()
 
 
 def test_sorted_table_drag_uses_identity_not_row(panel):

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 from PySide6.QtCore import QThread
@@ -30,6 +31,7 @@ from choppeur.core.settings import (
     save_settings,
 )
 from choppeur.gui.candidates_panel import CandidatesPanel
+from choppeur.gui.export_folder_dialog import choose_export_folder
 from choppeur.gui.library_panel import LibraryPanel
 from choppeur.gui.presentation import LoadedTrack
 from choppeur.gui.preview_player import PreviewPlayer
@@ -139,7 +141,6 @@ class MainWindow(QMainWindow):
         self.library_panel.load_failed.connect(self._on_library_load_failed)
         self.candidates_panel.export_requested.connect(self._on_export_requested)
         self.candidates_panel.drag_requested.connect(self._on_drag_requested)
-        self.candidates_panel.set_drag_enabled(bool(self.settings.export_dir))
 
         self.theme_manager = ThemeManager(force_dark=self.settings.force_dark, parent=self)
         self.theme_manager.changed.connect(self._apply_theme)
@@ -273,7 +274,6 @@ class MainWindow(QMainWindow):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.settings = dialog.settings()
             self.auto_play_checkbox.setChecked(self.settings.auto_play)
-            self.candidates_panel.set_drag_enabled(bool(self.settings.export_dir))
             self.theme_manager.set_force_dark(self.settings.force_dark)
             save_settings(self.settings)
 
@@ -309,6 +309,21 @@ class MainWindow(QMainWindow):
 
     # --- export -------------------------------------------------------
 
+    def _ensure_export_directory(self) -> Path | None:
+        if self.settings.export_dir:
+            return Path(self.settings.export_dir)
+        directory = choose_export_folder(self)
+        if directory is None:
+            return None
+        updated = replace(self.settings, export_dir=str(directory))
+        try:
+            save_settings(updated)
+        except Exception as exc:  # noqa: BLE001 - report persistence failures before writing any audio
+            self.status_bar.showMessage(f"Could not save the sample folder: {exc}", 10000)
+            return None
+        self.settings = updated
+        return directory
+
     def _on_export_requested(self, mode: str) -> None:
         loaded = self.sample_state.loaded_track
         if loaded is None or mode not in {"marked", "all"}:
@@ -322,18 +337,16 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Choppeur", "Aucun candidat coché à exporter.")
             return
 
-        directory = self.settings.export_dir
-        if not directory:
-            directory = QFileDialog.getExistingDirectory(self, "Dossier d'export", str(Path.home()))
-            if not directory:
-                return
+        directory = self._ensure_export_directory()
+        if directory is None:
+            return
 
         report = export_batch(
             loaded.samples,
             loaded.sample_rate,
             loaded.analysis.track,
             candidates,
-            Path(directory),
+            directory,
             file_format=self.settings.export_format,
         )
         if report.error is not None:
@@ -354,9 +367,13 @@ class MainWindow(QMainWindow):
         item = next((item for item in self.sample_state.items if item.id == item_id), None)
         if loaded is None or item is None:
             return
-        if not self.settings.export_dir:
+        needed_setup = not self.settings.export_dir
+        directory = self._ensure_export_directory()
+        if directory is None:
+            return
+        if needed_setup:
             self.status_bar.showMessage(
-                "Définissez un dossier d'export dans les paramètres pour glisser un sample.", 8000
+                "Sample folder saved. Drag the sample again to send it to your DAW.", 10000
             )
             return
         try:
@@ -365,7 +382,7 @@ class MainWindow(QMainWindow):
                 loaded.sample_rate,
                 loaded.analysis.track,
                 item.candidate,
-                Path(self.settings.export_dir),
+                directory,
             )
         except Exception as exc:  # noqa: BLE001 - never start a drag after a writer failure
             self.status_bar.showMessage(f"Échec de création du WAV glissé : {exc}", 10000)

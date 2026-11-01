@@ -10,6 +10,17 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-01-chopper-first-export-design.md` (approved).
 
+## Execution status
+
+- [x] Task 1: migration v3 and explicit checkboxes (`b6385ec`); 338 full tests passed.
+- [x] Task 2: first-use setup and safe persistence implemented; 357 full tests passed,
+  24 targeted tests under Wayland passed with modal/native interactions simulated.
+- [ ] Final independent review and any RED→GREEN fixes.
+- [ ] User validation under Wayland/Bitwig, then a separate rename step.
+
+Detailed step checklists below are the original execution brief; RED/GREEN evidence
+and command results are recorded in this plan's execution ledger and final history entry.
+
 ## Global Constraints
 
 - No default export path; no startup prompt or automatic Documents directory.

@@ -3,11 +3,12 @@ import time
 import numpy as np
 import pytest
 import soundfile as sf
-from PySide6.QtWidgets import QDialog, QFileDialog
+from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox
 
+from choppeur.core import settings as settings_module
 from choppeur.core.cache import AnalysisCache
 from choppeur.core.models import Analysis, Candidate, CandidateType
-from choppeur.core.settings import Settings
+from choppeur.core.settings import Settings, load_settings
 from choppeur.gui import main_window as main_window_module
 from choppeur.gui import workers
 from choppeur.gui.main_window import MainWindow
@@ -26,12 +27,20 @@ def _pump_until(condition, timeout_seconds=3.0):
 
 
 @pytest.fixture
-def make_window(tmp_path):
+def make_window(tmp_path, monkeypatch):
     """Fabrique de MainWindow qui ferme proprement chaque fenêtre créée (et
     attend la fin de son éventuel QThread d'analyse) à la fin du test.
     Sans ça, un thread encore en cours à la sortie du process pytest peut
     provoquer un plantage natif au lieu d'une simple erreur Python."""
     created: list[MainWindow] = []
+    monkeypatch.setattr(settings_module, "default_settings_path", lambda: tmp_path / "settings.toml")
+
+    def confirm_folder_setup(box):
+        assert box.windowTitle() == "Choose your sample folder"
+        next(button for button in box.buttons() if button.text() == "Choose folder…").click()
+        return box.result()
+
+    monkeypatch.setattr(QMessageBox, "exec", confirm_folder_setup)
 
     def _factory(**settings_kwargs) -> MainWindow:
         settings = Settings(**settings_kwargs)
@@ -692,21 +701,19 @@ def test_handle_drag_writes_durable_wav_before_qt_and_never_plays(
     np.testing.assert_allclose(data, loaded_track.samples[1000:1200], atol=2 / 2**24)
 
 
-def test_missing_export_dir_disables_handles_and_never_opens_dialog_on_drag(
+def test_missing_export_dir_keeps_handle_available_for_cancelable_setup(
     qapp, make_window, monkeypatch, loaded_track, tmp_path
 ):
     window = make_window()
     window._on_track_analyzed(loaded_track)
 
-    def unexpected_dialog(*args, **kwargs):
-        raise AssertionError("No dialog in the middle of a drag")
-
-    monkeypatch.setattr(QFileDialog, "getExistingDirectory", unexpected_dialog)
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args: "")
     from PySide6.QtCore import Qt
 
-    assert not window.candidates_panel.table.item(0, 4).flags() & Qt.ItemFlag.ItemIsEnabled
+    assert window.candidates_panel.table.item(0, 4).flags() & Qt.ItemFlag.ItemIsEnabled
     window.candidates_panel.drag_requested.emit(window.sample_state.items[0].id)
-    assert "paramètres" in window.status_bar.currentMessage().lower()
+    assert window.settings.export_dir is None
+    assert not (tmp_path / "settings.toml").exists()
     assert list(tmp_path.rglob("glissés")) == []
 
 
@@ -776,3 +783,216 @@ def test_platform_drag_failure_keeps_created_wav_and_reports_path(
     assert len(paths) == 1
     assert str(paths[0]) in window.status_bar.currentMessage()
     assert "transfert indisponible" in window.status_bar.currentMessage()
+
+
+def test_first_button_export_remembers_folder_before_writing_and_reuses_it(
+    qapp, make_window, loaded_track, tmp_path, monkeypatch
+):
+    destination = tmp_path / "Samples été"
+    window = make_window(force_dark=True, auto_play=False)
+    window._on_track_analyzed(loaded_track)
+    picked = []
+    monkeypatch.setattr(
+        QFileDialog, "getExistingDirectory", lambda *args: picked.append(True) or str(destination)
+    )
+    real_write = sf.write
+
+    def write_after_settings(*args, **kwargs):
+        assert load_settings(tmp_path / "settings.toml").export_dir == str(destination)
+        return real_write(*args, **kwargs)
+
+    monkeypatch.setattr(sf, "write", write_after_settings)
+    assert not (tmp_path / "settings.toml").exists()
+    window._on_export_requested("all")
+    assert window.settings.export_dir == str(destination)
+    assert len(list(destination.glob("*.wav"))) == 2
+    reloaded = load_settings(tmp_path / "settings.toml")
+    assert reloaded.force_dark and not reloaded.auto_play
+    window.close()
+    restarted = make_window(**reloaded.to_dict())
+    restarted._on_track_analyzed(loaded_track)
+    restarted._on_export_requested("all")
+    assert len(list(destination.glob("*.wav"))) == 4
+    assert picked == [True]
+
+
+@pytest.mark.parametrize("operation", ["button", "drag"])
+@pytest.mark.parametrize("stage", ["explanation", "picker"])
+def test_first_use_cancel_has_no_persistent_or_audio_side_effects(
+    qapp, make_window, loaded_track, tmp_path, monkeypatch, operation, stage
+):
+    window = make_window()
+    window._on_track_analyzed(loaded_track)
+    state = window.sample_state
+    state.navigate(state.items[0].id)
+    state.toggle_mark(state.items[1].id)
+    original_settings = window.settings
+    if stage == "explanation":
+
+        def cancel(box):
+            next(button for button in box.buttons() if button.text() == "Cancel").click()
+            return box.result()
+
+        monkeypatch.setattr(QMessageBox, "exec", cancel)
+
+        def unexpected_picker(*args):
+            raise AssertionError("Cancel must not open picker")
+
+        monkeypatch.setattr(QFileDialog, "getExistingDirectory", unexpected_picker)
+    else:
+        monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args: "")
+    if operation == "button":
+        window._on_export_requested("marked")
+    else:
+        window._on_drag_requested(state.items[1].id)
+    assert window.settings is original_settings and window.settings.export_dir is None
+    assert state.active_id == state.items[0].id
+    assert state.marked_ids == {state.items[1].id} and state.playing_id is None
+    assert not (tmp_path / "settings.toml").exists()
+    assert list(tmp_path.rglob("*.wav")) == []
+
+
+@pytest.mark.parametrize("operation", ["button", "drag"])
+def test_first_use_failed_save_never_exports_or_starts_transfer(
+    qapp, make_window, loaded_track, tmp_path, monkeypatch, operation
+):
+    from pathlib import Path
+
+    from PySide6.QtGui import QDrag
+
+    path = tmp_path / "settings.toml"
+    settings_module.save_settings(Settings(auto_play=False), path)
+    before = path.read_bytes()
+    window = make_window(auto_play=False)
+    original = window.settings
+    window._on_track_analyzed(loaded_track)
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args: str(tmp_path / "samples"))
+
+    def fail_replace(*args):
+        raise OSError("permission denied")
+
+    monkeypatch.setattr(Path, "replace", fail_replace)
+    transfers = []
+    monkeypatch.setattr(QDrag, "exec", lambda *args: transfers.append(True))
+    if operation == "button":
+        window._on_export_requested("all")
+    else:
+        window._on_drag_requested(window.sample_state.items[0].id)
+    assert window.settings is original and window.settings.export_dir is None
+    assert path.read_bytes() == before
+    assert not (tmp_path / "samples").exists() and transfers == []
+    assert "Could not save the sample folder:" in window.status_bar.currentMessage()
+
+
+def test_first_handle_gesture_sets_up_then_second_gesture_transfers_once(
+    qapp, make_window, loaded_track, tmp_path, monkeypatch
+):
+    from pathlib import Path
+
+    from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
+    from PySide6.QtGui import QDrag, QMouseEvent
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QApplication
+
+    window = make_window()
+    window.show()
+    window._on_track_analyzed(loaded_track)
+    qapp.processEvents()
+    state = window.sample_state
+    state.navigate(state.items[0].id)
+    state.toggle_mark(state.items[1].id)
+    state.play_requested.disconnect(window._play_sample)
+    state.play_requested.connect(lambda item_id, token: state.playback_started(token))
+    state.toggle_playback()
+    assert state.playing_id == state.items[0].id
+    picked = []
+    destination = tmp_path / "samples"
+    monkeypatch.setattr(
+        QFileDialog, "getExistingDirectory", lambda *args: picked.append(True) or str(destination)
+    )
+    transfers = []
+
+    def transfer(drag, supported, default):
+        path = Path(drag.mimeData().urls()[0].toLocalFile())
+        assert path.is_file()
+        transfers.append(path)
+        return Qt.DropAction.CopyAction
+
+    monkeypatch.setattr(QDrag, "exec", transfer)
+    table = window.candidates_panel.table
+    point = table.visualItemRect(table.item(1, 4)).center()
+
+    def move(distance):
+        position = point + QPoint(distance, 0)
+        event = QMouseEvent(
+            QEvent.Type.MouseMove,
+            QPointF(position),
+            QPointF(table.viewport().mapToGlobal(position)),
+            Qt.MouseButton.NoButton,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+        )
+        QApplication.sendEvent(table.viewport(), event)
+
+    QTest.mouseClick(table.viewport(), Qt.MouseButton.LeftButton, pos=point)
+    assert picked == []
+    QTest.mousePress(table.viewport(), Qt.MouseButton.LeftButton, pos=point)
+    move(1)
+    assert picked == []
+    move(QApplication.startDragDistance() + 2)
+    move(QApplication.startDragDistance() + 4)
+    QTest.mouseRelease(table.viewport(), Qt.MouseButton.LeftButton, pos=point)
+    assert load_settings(tmp_path / "settings.toml").export_dir == str(destination)
+    assert not destination.exists() and transfers == [] and picked == [True]
+    assert (
+        window.status_bar.currentMessage()
+        == "Sample folder saved. Drag the sample again to send it to your DAW."
+    )
+    QTest.mousePress(table.viewport(), Qt.MouseButton.LeftButton, pos=point)
+    move(QApplication.startDragDistance() + 2)
+    move(QApplication.startDragDistance() + 4)
+    QTest.mouseRelease(table.viewport(), Qt.MouseButton.LeftButton, pos=point)
+    assert len(transfers) == 1 and len(list(destination.rglob("*.wav"))) == 1
+    assert picked == [True]
+    assert state.active_id == state.items[0].id and state.playing_id == state.items[0].id
+    assert state.marked_ids == {state.items[1].id}
+
+
+@pytest.mark.parametrize("operation", ["button", "drag"])
+def test_invalid_configured_destination_reports_error_without_fallback(
+    qapp, make_window, loaded_track, tmp_path, monkeypatch, operation
+):
+    destination = tmp_path / "not-a-directory"
+    destination.write_bytes(b"keep existing content")
+    window = make_window(export_dir=str(destination))
+    window._on_track_analyzed(loaded_track)
+
+    def unexpected(*args):
+        raise AssertionError("No fallback picker")
+
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", unexpected)
+    if operation == "button":
+        window._on_export_requested("all")
+    else:
+        window._on_drag_requested(window.sample_state.items[0].id)
+    assert destination.read_bytes() == b"keep existing content"
+    assert window.settings.export_dir == str(destination)
+    assert "Échec" in window.status_bar.currentMessage()
+
+
+def test_no_startup_or_invalid_sample_setup(qapp, make_window, loaded_track, tmp_path, monkeypatch):
+    def unexpected(*args):
+        raise AssertionError("Setup must require an actual exportable sample")
+
+    monkeypatch.setattr(QMessageBox, "exec", unexpected)
+    monkeypatch.setattr(QMessageBox, "information", lambda *args: None)
+    window = make_window()
+    window._on_export_requested("all")
+    window._on_drag_requested(0)
+    window._on_track_analyzed(loaded_track)
+    stale_id = window.sample_state.items[0].id
+    window._on_track_analyzed(loaded_track)
+    window._on_drag_requested(stale_id)
+    window._on_export_requested("marked")
+    assert window.settings.export_dir is None
+    assert not (tmp_path / "settings.toml").exists()

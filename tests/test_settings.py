@@ -171,3 +171,35 @@ def test_ui_preferences_roundtrip_including_false_values(tmp_path, auto_play, fo
     assert loaded.auto_play is auto_play
     assert loaded.force_dark is force_dark
     assert loaded == original
+
+
+@pytest.mark.parametrize("stage", ["serialize", "replace"])
+def test_failed_save_preserves_existing_file_and_cleans_temporary(tmp_path, monkeypatch, stage):
+    from pathlib import Path
+
+    import tomli_w
+
+    path = tmp_path / "settings.toml"
+    save_settings(Settings(auto_play=False), path)
+    before = path.read_bytes()
+
+    def fail(*args, **kwargs):
+        raise OSError(f"{stage} unavailable")
+
+    if stage == "serialize":
+        monkeypatch.setattr(tomli_w, "dumps", fail)
+        monkeypatch.setattr(tomli_w, "dump", fail)
+    else:
+        monkeypatch.setattr(Path, "replace", fail)
+    with pytest.raises(OSError, match="unavailable"):
+        save_settings(Settings(export_dir=str(tmp_path / "samples")), path)
+    assert path.read_bytes() == before
+    assert list(tmp_path.iterdir()) == [path]
+
+
+def test_save_creates_parent_but_no_sample_directory(tmp_path):
+    path = tmp_path / "config" / "nested" / "settings.toml"
+    destination = tmp_path / "samples"
+    save_settings(Settings(export_dir=str(destination)), path)
+    assert load_settings(path).export_dir == str(destination)
+    assert not destination.exists()
