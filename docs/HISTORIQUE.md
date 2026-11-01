@@ -33,6 +33,15 @@ dans pre-commit et la préécoute ne joue plus en boucle.
 - Vérifications avant revue : 357 tests réussis et contrôles statiques réussis.
   24 tests ciblés passent sous Wayland, mais les interactions modales et le
   transfert Qt vers une application externe restent simulés dans ces tests.
+- Revue indépendante en lecture seule de `a87e8b4..e8c61c8` : aucune anomalie
+  critique, importante ou mineure démontrée. Annulation modale Qt également
+  contrôlée avec une vraie boucle `exec()` offscreen par le relecteur.
+- Limites conservées après revue : dépôt réel Wayland/Bitwig à valider par
+  l'utilisateur ; résistance à une coupure électrique et conflits multi-instances
+  non garantis par le remplacement atomique seul. Une anomalie préexistante de
+  destruction `ThemeManager.eventFilter` est réapparue pendant certains tests
+  rouges, pas dans les suites vertes ; les autres points de sauvegarde historiques
+  n'ont pas été refondus. Renommage/publication toujours différés.
 
 ## 01/11/2026 — Exports communs et glissers WAV permanents
 
