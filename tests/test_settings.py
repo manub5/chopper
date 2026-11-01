@@ -46,7 +46,7 @@ def test_save_then_load_roundtrip(tmp_path):
     ],
 )
 def test_old_lengths_migrate_idempotently(old, expected, tmp_path):
-    settings = Settings.from_dict({"loop_lengths_bars": old, "loop_lengths_version": 2})
+    settings = Settings.from_dict({"loop_lengths_bars": old, "loop_lengths_version": 3})
     assert settings.loop_lengths_bars == expected
     path = tmp_path / "settings.toml"
     save_settings(settings, path)
@@ -61,13 +61,13 @@ def test_legacy_single_length_reactivates_all_once_without_rewriting(version, tm
         data["loop_lengths_version"] = version
     loaded = Settings.from_dict(data)
     assert loaded.loop_lengths_bars == (0.25, 0.5, 1.0)
-    assert loaded.loop_lengths_version == 2
+    assert loaded.loop_lengths_version == 3
     assert not loaded.auto_play and loaded.force_dark
     loaded.loop_lengths_bars = (1.0,)
     path = tmp_path / "settings.toml"
     save_settings(loaded, path)
     assert load_settings(path).loop_lengths_bars == (1.0,)
-    assert load_settings(path).loop_lengths_version == 2
+    assert load_settings(path).loop_lengths_version == 3
 
 
 def test_loading_legacy_file_is_read_only_and_migration_is_stable(tmp_path):
@@ -79,6 +79,43 @@ def test_loading_legacy_file_is_read_only_and_migration_is_stable(tmp_path):
     assert migrated.loop_lengths_bars == (0.25, 0.5, 1.0)
     assert migrated.candidates_per_track == 8
     assert Settings.from_dict(migrated.to_dict()) == migrated
+
+
+@pytest.mark.parametrize(
+    "lengths",
+    [
+        (0.25,),
+        (0.5,),
+        (1.0,),
+        (0.25, 0.5),
+        (0.25, 1.0),
+        (0.5, 1.0),
+        (0.25, 0.5, 1.0),
+    ],
+)
+@pytest.mark.parametrize("version", [None, 1, 2, "invalid", True])
+def test_v2_lengths_restore_all_once(lengths, version, tmp_path):
+    data = {
+        "loop_lengths_bars": list(lengths),
+        "auto_play": False,
+        "force_dark": True,
+        "export_dir": str(tmp_path / "custom"),
+    }
+    if version is not None:
+        data["loop_lengths_version"] = version
+    migrated = Settings.from_dict(data)
+    assert migrated.loop_lengths_bars == (0.25, 0.5, 1.0)
+    assert migrated.loop_lengths_version == 3
+    assert not migrated.auto_play and migrated.force_dark
+    assert migrated.export_dir == str(tmp_path / "custom")
+    migrated.loop_lengths_bars = lengths
+    path = tmp_path / "settings.toml"
+    save_settings(migrated, path)
+    for _ in range(2):
+        loaded = load_settings(path)
+        assert loaded.loop_lengths_bars == lengths
+        assert loaded.loop_lengths_version == 3
+        save_settings(loaded, path)
 
 
 @pytest.mark.parametrize("value, expected", [(0, 1), (-10, 1), (3, 3), (50, 8)])

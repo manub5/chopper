@@ -19,7 +19,7 @@ class Settings:
     export_dir: str | None = None
     export_format: str = "wav"  # "wav" (24 bits, défaut) ou "flac"
     loop_lengths_bars: tuple[float, ...] = _DEFAULT_LOOP_LENGTHS_BARS
-    loop_lengths_version: int = 2
+    loop_lengths_version: int = 3
     candidates_per_track: int = 8
     max_one_shot_seconds: float = 2.0
     gpu_mode: str = "auto"  # "auto" ou "cpu"
@@ -47,9 +47,9 @@ class Settings:
     def from_dict(cls, data: dict) -> Settings:
         merged = {**cls().to_dict(), **data}
         version = data.get("loop_lengths_version")
-        if type(version) is not int or version < 2:
+        if type(version) is not int or version < 3:
             merged["loop_lengths_bars"] = LOOP_LENGTHS_BARS
-            merged["loop_lengths_version"] = 2
+            merged["loop_lengths_version"] = 3
         return cls(**merged)
 
 

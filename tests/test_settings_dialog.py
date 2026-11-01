@@ -1,4 +1,5 @@
 import pytest
+from PySide6.QtWidgets import QDialog, QMessageBox
 
 from choppeur.core.settings import Settings
 from choppeur.gui.settings_dialog import SettingsDialog
@@ -19,7 +20,8 @@ def test_settings_reads_back_edited_values(qapp):
     dialog._library_root.setText("/musique")
     dialog._export_dir.setText("/musique/export")
     dialog._export_format.setCurrentText("flac")
-    dialog._loop_lengths_bars.setCurrentIndex(1)
+    for length, checkbox in dialog._loop_length_checks.items():
+        checkbox.setChecked(length == 0.5)
     dialog._candidates_per_track.setValue(10)
     dialog._max_one_shot_seconds.setValue(3.5)
     dialog._gpu_mode.setCurrentText("cpu")
@@ -49,18 +51,14 @@ def test_dialog_preserves_ui_preferences_when_editing_existing_controls(qapp):
     assert original.export_format == "wav"
 
 
-def test_loop_lengths_are_closed_choices(qapp):
+def test_loop_lengths_are_explicit_checkboxes(qapp):
     dialog = SettingsDialog(Settings())
-    assert not dialog._loop_lengths_bars.isEditable()
-    assert {dialog._loop_lengths_bars.itemData(i) for i in range(dialog._loop_lengths_bars.count())} == {
-        (0.25, 0.5, 1.0),
-        (0.25,),
-        (0.25, 0.5),
-        (0.25, 1.0),
-        (0.5, 1.0),
-        (0.5,),
-        (1.0,),
+    assert {length: check.text() for length, check in dialog._loop_length_checks.items()} == {
+        1.0: "1 bar",
+        0.5: "½ bar",
+        0.25: "¼ bar",
     }
+    assert all(check.isChecked() for check in dialog._loop_length_checks.values())
     assert dialog._candidates_per_track.maximum() == 8
 
 
@@ -81,4 +79,23 @@ def test_force_dark_control_updates_only_its_preference(qapp):
 )
 def test_all_seven_choices_reopen_without_losing_selection(qapp, lengths):
     dialog = SettingsDialog(Settings(loop_lengths_bars=lengths))
+    assert {length for length, check in dialog._loop_length_checks.items() if check.isChecked()} == set(
+        lengths
+    )
+    dialog._export_format.setCurrentText("flac")
+    dialog.accept()
+    assert dialog.result() == QDialog.DialogCode.Accepted
     assert dialog.settings().loop_lengths_bars == lengths
+    reopened = SettingsDialog(dialog.settings())
+    assert reopened.settings().loop_lengths_bars == lengths
+
+
+def test_empty_loop_selection_cannot_accept(qapp, monkeypatch):
+    dialog = SettingsDialog(Settings())
+    for check in dialog._loop_length_checks.values():
+        check.setChecked(False)
+    warnings = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda parent, title, text: warnings.append(text))
+    dialog.accept()
+    assert dialog.result() != QDialog.DialogCode.Accepted
+    assert warnings == ["Select at least one loop length."]
