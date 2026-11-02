@@ -20,6 +20,11 @@ dans pre-commit et la préécoute ne joue plus en boucle.
   les distributions. Aucun code d'exécution ni fichier audio modifié.
 - Texte juridique personnalisé : relecture professionnelle recommandée, aucune
   garantie d'opposabilité déduite des tests ou des contrôles de packaging.
+- Vérification : texte de 3 077 octets identique à l'approbation et aux copies
+  incluses dans le wheel et le sdist ; licence personnalisée indiquée correctement
+  dans les métadonnées. 382 tests réussis, contrôles Ruff/mypy et hooks réussis,
+  revue indépendante sans anomalie. Aucun effet de bord d'exécution ajouté ;
+  audit juridique exhaustif des dépendances et opposabilité hors de cette revue.
 
 ## 02/11/2026 — Chopper, anglais et migration non destructive
 

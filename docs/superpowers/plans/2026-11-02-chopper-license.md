@@ -16,7 +16,8 @@
 - [x] Real wheel and sdist: full license bundled, custom metadata verified,
   approved text byte-identical (3077 bytes).
 - [x] Full regression suite: 382 passed; Ruff, mypy and diff checks passed.
-- [ ] Commit, independent read-only review and final historical secret scan.
+- [x] Committed as `41f42fd`; independent read-only review found no Critical,
+  Important or Minor issue. Historical secret scan: 46 commits, no leaks detected.
 - [ ] User validation before separate publication checkpoint.
 
 ## Global Constraints
