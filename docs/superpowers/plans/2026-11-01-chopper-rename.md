@@ -10,6 +10,19 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-01-chopper-rename-design.md`.
 
+## Execution status — 2026-11-02
+
+- [x] Task 1: package, entry points, installer and legacy preference fallback (`d89b5a1`).
+- [x] Task 2: English interface and `dragged/` (`f47b7e4`).
+- [x] Task 3: current English documentation and instructions (`d7950a9`).
+- [x] Independent read-only review; broken-settings-symlink finding reproduced
+  with three failing tests, corrected in one RED→GREEN pass.
+- [ ] User validation; no remote changes, merge or publication in this step.
+
+The detailed original checklists below serve as task briefs; per-step evidence
+and commands are in this plan's execution ledger. The pre-existing Semgrep update
+was committed separately (`c95ca2a`) with explicit user authorization.
+
 ## Global Constraints
 
 - Conversation remains in French; new code comments and identifiers are English.

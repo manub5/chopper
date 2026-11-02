@@ -71,7 +71,7 @@ def load_settings(path: Path | None = None) -> Settings:
         path = default_settings_path()
         if not path.exists() and not path.is_symlink():
             path = _legacy_settings_path()
-    if not path.exists():
+    if not path.exists() and not path.is_symlink():
         return Settings()
     with path.open("rb") as f:
         data = tomllib.load(f)

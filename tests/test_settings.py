@@ -280,3 +280,18 @@ def test_no_old_or_new_settings_returns_defaults_without_writing(isolated_xdg):
     legacy, new = isolated_xdg
     assert load_settings() == Settings()
     assert not legacy.exists() and not new.exists()
+
+
+@pytest.mark.parametrize("location", ["new", "legacy", "explicit"])
+def test_broken_settings_symlink_reports_error_instead_of_defaults(isolated_xdg, tmp_path, location):
+    legacy, new = isolated_xdg
+    path = {"new": new, "legacy": legacy, "explicit": tmp_path / "explicit.toml"}[location]
+    if location != "legacy":
+        save_settings(Settings(auto_play=False), legacy)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    target = tmp_path / "offline" / "settings.toml"
+    path.symlink_to(target)
+    with pytest.raises(FileNotFoundError):
+        load_settings(path if location == "explicit" else None)
+    assert path.is_symlink() and path.readlink() == target
+    assert not target.exists()

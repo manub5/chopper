@@ -32,6 +32,16 @@ dans pre-commit et la préécoute ne joue plus en boucle.
   refus d'écraser un fichier/lien étranger. Aucun installateur exécuté sur le système.
 - Mise à jour Semgrep préexistante enregistrée séparément en `c95ca2a`, avec
   autorisation explicite de l'utilisateur, sans retirer ni contourner un hook.
+- Revue indépendante : un lien symbolique cassé pour le TOML était considéré
+  absent et pouvait masquer une configuration devenue temporairement indisponible.
+  Corrigé avec trois tests rouges puis verts : nouveau chemin, ancien chemin et
+  chemin explicite signalent l'erreur, sans modifier le lien ni revenir aux défauts.
+- Vérification finale : 382 tests réussis (25 de plus que la base), 72 tests
+  ciblés sous Wayland réussis avec transfert natif simulé ; construction du wheel,
+  contrôles statiques et hooks réussis. Captures de l'interface anglaise inspectées
+  avec données synthétiques. Dépôt réel Bitwig à valider ; anomalie préexistante du
+  thème au teardown des tests rouges et autres chemins d'erreurs historiques
+  conservés hors de ce renommage. Aucun défaut de sécurité nouveau évident détecté.
 
 ## 01/11/2026 — Choix du dossier mémorisé et longueurs explicites
 
