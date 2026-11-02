@@ -6,6 +6,21 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 02/11/2026 — Licence Chopper validée par M.B
+
+- Application mot pour mot du texte approuvé dans `LICENSE`, copyright 2026 M.B.
+  Licence personnalisée à code accessible, pas une licence open source OSI.
+- Production audio commerciale autorisée, y compris samples, banques de sons,
+  morceaux et prestations rémunérées, pour particuliers et entreprises. Aucun
+  droit sur les sources audio n'est accordé ; licences tierces inchangées.
+- Vente/licence payante de Chopper ou d'un dérivé logiciel, ou intégration dans
+  un produit logiciel payant, soumises à l'accord écrit préalable de M.B.
+- README résumant ces règles ; métadonnées PEP 639 avec identifiant personnalisé
+  `LicenseRef-Chopper-Source-Available-1.0` et inclusion du fichier complet dans
+  les distributions. Aucun code d'exécution ni fichier audio modifié.
+- Texte juridique personnalisé : relecture professionnelle recommandée, aucune
+  garantie d'opposabilité déduite des tests ou des contrôles de packaging.
+
 ## 02/11/2026 — Chopper, anglais et migration non destructive
 
 - Renommage du paquet, des imports, de la distribution et du lanceur en

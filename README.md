@@ -87,6 +87,24 @@ will need analysis again. Existing `glissés/` exports stay where they are; only
 new drags use `dragged/`. The old `choppeur` launch command remains temporarily
 available for generated launchers; new commands and Python imports use `chopper`.
 
+## License
+
+Chopper is **source-available**, not OSI-approved open source. See the full
+[Chopper Source-Available License 1.0](LICENSE), copyright (c) 2026 M.B.
+
+Commercial audio production is allowed, including paid work, sample packs,
+sound libraries and finished music, for individuals and businesses. This
+software license requires no royalty or Chopper credit for audio outputs.
+You remain responsible for the rights to source recordings and samples.
+
+You may study, modify and redistribute the software without charging for it,
+provided that you retain the license and copyright notices, identify changes
+and do not grant rights to commercialize M.B's code beyond the license.
+Selling or licensing Chopper or a software derivative for a fee, or including
+either in a paid software product, requires prior written permission from M.B.
+Third-party components retain their own licenses. This summary does not
+replace the full license; legal review of custom terms is recommended.
+
 ## Development
 
 ```bash

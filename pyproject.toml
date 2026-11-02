@@ -2,6 +2,8 @@
 name = "chopper"
 version = "0.1.0"
 description = "Find, preview and export loops and one-shots from your own music library"
+license = "LicenseRef-Chopper-Source-Available-1.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "PySide6>=6.7",
