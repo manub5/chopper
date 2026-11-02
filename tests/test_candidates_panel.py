@@ -32,7 +32,13 @@ def test_table_has_five_noneditable_columns_and_initial_order(qapp, loaded_track
     assert panel.table.columnCount() == 5
     assert panel.table.rowCount() == 2
     assert panel.table.item(0, 0).data(Qt.ItemDataRole.UserRole) == state.items[0].id
-    assert "Boucle" in panel.table.item(0, 0).text()
+    assert panel.table.item(0, 0).text() == "1-bar loop"
+    assert [panel.table.horizontalHeaderItem(i).text() for i in range(4)] == [
+        "Type",
+        "BPM",
+        "Length",
+        "Position",
+    ]
     assert not panel.table.item(0, 0).flags() & Qt.ItemFlag.ItemIsEditable
     panel.close()
 
@@ -49,7 +55,7 @@ def test_table_formats_tempo_and_times_with_millisecond_carry(qapp, loaded_track
 def test_quarter_bar_label_and_duration(qapp, loaded_track):
     candidate = replace(loaded_track.candidates[0], bars=0.25, end_seconds=0.25)
     panel, _state = make_panel(replace(loaded_track, candidates=(candidate,)))
-    assert panel.table.item(0, 0).text() == "Boucle 1/4 de mesure"
+    assert panel.table.item(0, 0).text() == "¼-bar loop"
     assert panel.table.item(0, 2).text() == "00:00.250"
     panel.close()
 
@@ -134,8 +140,8 @@ def test_external_state_updates_selection_playing_marks_and_counts(qapp, loaded_
     assert "▶" in panel.table.item(0, 0).text()
     assert "✓" not in panel.table.item(0, 0).text()
     assert "✓" in panel.table.item(1, 0).text()
-    assert "(1)" in panel.export_marked_button.text()
-    assert "(2)" in panel.export_all_button.text()
+    assert panel.export_marked_button.text() == "Export marked (1)"
+    assert panel.export_all_button.text() == "Export all (2)"
     state.playback_finished(tokens[0])
     assert "▶" not in panel.table.item(0, 0).text()
     assert panel.table.currentRow() == 0
@@ -155,3 +161,10 @@ def test_export_buttons_request_modes_not_the_active_candidate(qapp, loaded_trac
     panel.export_all_button.click()
     assert requests == ["marked", "all"]
     panel.close()
+
+
+@pytest.mark.parametrize("bars, label", [(1.0, "1-bar loop"), (0.5, "½-bar loop"), (0.25, "¼-bar loop")])
+def test_english_loop_labels(loaded_track, bars, label):
+    from chopper.gui.presentation import sample_type_label
+
+    assert sample_type_label(replace(loaded_track.candidates[0], bars=bars)) == label

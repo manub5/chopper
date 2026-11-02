@@ -22,7 +22,7 @@ class WaveformView(pg.PlotWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setMenuEnabled(False)
-        self.setLabel("bottom", "Temps", units="s")
+        self.setLabel("bottom", "Time", units="s")
         self.showAxis("left", False)
         self.setMouseEnabled(x=True, y=False)
         self.plotItem.hideButtons()
@@ -38,7 +38,7 @@ class WaveformView(pg.PlotWidget):
         axis = self.getAxis("bottom")
         axis.setPen(pg.mkPen(palette.secondary))
         axis.setTextPen(pg.mkPen(palette.secondary))
-        axis.setLabel("Temps", units="s", color=palette.secondary)
+        axis.setLabel("Time", units="s", color=palette.secondary)
         if self._waveform_item is not None:
             self._waveform_item.setPen(pg.mkPen(palette.text, width=1))
         downbeat = QColor(palette.secondary)

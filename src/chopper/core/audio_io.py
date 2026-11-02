@@ -32,7 +32,7 @@ def _read_or_raise(readable_path: Path, *, context: str) -> tuple[np.ndarray, in
     try:
         return sf.read(str(readable_path), always_2d=False, dtype="float32")
     except Exception as exc:
-        raise AudioLoadError(f"Impossible de lire {context} : {exc}") from exc
+        raise AudioLoadError(f"Could not read {context}: {exc}") from exc
 
 
 def load(path: Path, *, mono: bool = True) -> tuple[np.ndarray, int]:
@@ -51,7 +51,7 @@ def load(path: Path, *, mono: bool = True) -> tuple[np.ndarray, int]:
 def _load_via_ffmpeg(path: Path) -> tuple[np.ndarray, int]:
     ffmpeg_path = shutil.which("ffmpeg")
     if ffmpeg_path is None:
-        raise AudioLoadError(f"ffmpeg est requis pour lire {path.suffix} mais n'est pas installé.")
+        raise AudioLoadError(f"ffmpeg is required to read {path.suffix} but is not installed.")
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         wav_path = Path(tmp_dir) / "decoded.wav"
@@ -64,8 +64,8 @@ def _load_via_ffmpeg(path: Path) -> tuple[np.ndarray, int]:
             check=False,
         )
         if result.returncode != 0:
-            raise AudioLoadError(f"Échec du décodage de {path} : {result.stderr.strip()}")
-        return _read_or_raise(wav_path, context=f"{path} après décodage")
+            raise AudioLoadError(f"Could not decode {path}: {result.stderr.strip()}")
+        return _read_or_raise(wav_path, context=f"{path} after decoding")
 
 
 def read_track(path: Path) -> Track:
@@ -100,8 +100,8 @@ def read_track(path: Path) -> Track:
 
     return Track(
         path=path,
-        artist=_tag("artist") or "Inconnu",
-        album=_tag("album") or "Inconnu",
+        artist=_tag("artist") or "Unknown",
+        album=_tag("album") or "Unknown",
         title=_tag("title") or path.stem,
         track_number=track_number,
         duration_seconds=float(audio_info.length) if audio_info is not None else 0.0,

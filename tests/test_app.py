@@ -5,7 +5,7 @@ from chopper.core.settings import Settings
 
 def test_build_window_creates_the_main_window(qapp, tmp_path):
     window = build_window(settings=Settings(), cache=AnalysisCache(tmp_path / "cache.sqlite"))
-    assert window.windowTitle() == "Choppeur"
+    assert window.windowTitle() == "Chopper"
     window.close()
 
 

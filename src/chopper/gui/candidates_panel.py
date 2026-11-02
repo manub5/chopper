@@ -85,7 +85,7 @@ class CandidatesPanel(QWidget):
         self._item_ids: tuple[int, ...] = ()
         self._syncing = False
         self.table = SampleTable(0, 5)
-        self.table.setHorizontalHeaderLabels(["Type", "Tempo", "Durée", "Position", "⠿"])
+        self.table.setHorizontalHeaderLabels(["Type", "BPM", "Length", "Position", "⠿"])
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -203,8 +203,8 @@ class CandidatesPanel(QWidget):
                 self.table.setCurrentCell(-1, -1)
                 self.table.clearSelection()
             marked = len(self.state.marked_ids)
-            self.export_marked_button.setText(f"Exporter la sélection ({marked})")
-            self.export_all_button.setText(f"Tout exporter ({len(ids)})")
+            self.export_marked_button.setText(f"Export marked ({marked})")
+            self.export_all_button.setText(f"Export all ({len(ids)})")
             self.export_marked_button.setEnabled(marked > 0)
             self.export_all_button.setEnabled(bool(ids))
         finally:

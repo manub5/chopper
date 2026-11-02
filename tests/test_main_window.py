@@ -74,7 +74,7 @@ def _fake_analyze_track(track, settings, cache=None):
 
 def test_window_starts_with_album_analysis_disabled(qapp, make_window, tmp_path):
     window = make_window()
-    assert window.windowTitle() == "Choppeur"
+    assert window.windowTitle() == "Chopper"
     assert window.analyze_album_button.isEnabled() is False
 
 
@@ -256,7 +256,7 @@ def test_library_load_failure_is_shown_in_status_bar(qapp, make_window, tmp_path
 
     window.library_panel.set_root(not_a_folder)
 
-    assert "Impossible de lire" in window.status_bar.currentMessage()
+    assert "Could not read" in window.status_bar.currentMessage()
 
 
 def test_selecting_a_track_runs_analysis_and_updates_panels(qapp, make_window, monkeypatch, tmp_path):
@@ -331,7 +331,7 @@ def test_second_load_failure_releases_thread_and_allows_retry(qapp, make_window,
     window = make_window()
     window._on_track_selected(paths[0])
     _pump_until(lambda: window._thread is None)
-    assert "Échec de l'analyse" in window.status_bar.currentMessage()
+    assert "Analysis failed" in window.status_bar.currentMessage()
     assert window.candidates_panel.table.rowCount() == 0
     assert window.library_panel.isEnabled()
     window._on_track_selected(paths[1])
@@ -354,7 +354,7 @@ def test_failed_track_analysis_releases_thread_and_allows_another_track(
     window = make_window()
     window._on_track_selected(paths[0])
 
-    _pump_until(lambda: "Échec de l'analyse" in window.status_bar.currentMessage())
+    _pump_until(lambda: "Analysis failed" in window.status_bar.currentMessage())
     assert str(error) in window.status_bar.currentMessage()
     assert window.candidates_panel.table.rowCount() == 0
     _pump_until(lambda: window._thread is None)
@@ -390,7 +390,7 @@ def test_second_track_selection_while_busy_does_not_replace_running_thread(
     window._on_track_selected(paths[1])  # ne doit pas remplacer le thread en cours
 
     assert window._thread is first_thread
-    assert "en cours" in window.status_bar.currentMessage()
+    assert "already running" in window.status_bar.currentMessage()
 
     _pump_until(lambda: window.candidates_panel.table.rowCount() > 0)
 
@@ -455,7 +455,7 @@ def test_analyze_album_on_empty_folder_reports_no_audio_files(qapp, make_window,
     window._current_folder = empty_album
 
     window._on_analyze_album_clicked()
-    _pump_until(lambda: "Aucun fichier audio" in window.status_bar.currentMessage())
+    _pump_until(lambda: "No audio files" in window.status_bar.currentMessage())
 
 
 def test_analyze_album_reenables_ui_when_folder_becomes_unreachable(qapp, make_window, monkeypatch, tmp_path):
@@ -477,7 +477,7 @@ def test_analyze_album_reenables_ui_when_folder_becomes_unreachable(qapp, make_w
     window._on_analyze_album_clicked()
     _pump_until(window.analyze_album_button.isEnabled)
 
-    assert "inaccessible" in window.status_bar.currentMessage()
+    assert "no longer available" in window.status_bar.currentMessage()
     assert window.library_panel.isEnabled() is True
 
 
@@ -648,6 +648,8 @@ def test_partial_export_names_success_and_error(qapp, make_window, monkeypatch, 
     paths = list(destination.glob("*.wav"))
     assert len(paths) == 1
     assert "disque plein" in window.status_bar.currentMessage()
+    assert "Partial export" in window.status_bar.currentMessage()
+    assert "1 file kept:" in window.status_bar.currentMessage()
     assert paths[0].name in window.status_bar.currentMessage()
 
 
@@ -674,7 +676,7 @@ def test_handle_drag_writes_durable_wav_before_qt_and_never_plays(
     def platform_exec(drag, supported, default):
         path = Path(drag.mimeData().urls()[0].toLocalFile())
         assert path.is_file()
-        assert path.parent == destination / "glissés"
+        assert path.parent == destination / "dragged"
         assert supported == default == Qt.DropAction.CopyAction
         received.append(path)
         return getattr(Qt.DropAction, action_name)
@@ -735,6 +737,7 @@ def test_failed_wav_write_reports_error_and_never_starts_drag(
     window.candidates_panel.drag_requested.emit(window.sample_state.items[0].id)
     assert launched == []
     assert "disque plein" in window.status_bar.currentMessage()
+    assert "Could not create drag WAV" in window.status_bar.currentMessage()
     assert list(destination.rglob("*.wav")) == []
 
 
@@ -779,10 +782,12 @@ def test_platform_drag_failure_keeps_created_wav_and_reports_path(
 
     monkeypatch.setattr(QDrag, "exec", platform_error)
     window.candidates_panel.drag_requested.emit(window.sample_state.items[0].id)
-    paths = list((destination / "glissés").glob("*.wav"))
+    paths = list((destination / "dragged").glob("*.wav"))
     assert len(paths) == 1
     assert str(paths[0]) in window.status_bar.currentMessage()
     assert "transfert indisponible" in window.status_bar.currentMessage()
+    assert "WAV kept:" in window.status_bar.currentMessage()
+    assert "drag failed:" in window.status_bar.currentMessage()
 
 
 def test_first_button_export_remembers_folder_before_writing_and_reuses_it(
@@ -977,7 +982,39 @@ def test_invalid_configured_destination_reports_error_without_fallback(
         window._on_drag_requested(window.sample_state.items[0].id)
     assert destination.read_bytes() == b"keep existing content"
     assert window.settings.export_dir == str(destination)
-    assert "Échec" in window.status_bar.currentMessage()
+    assert (
+        "Export failed" in window.status_bar.currentMessage()
+        or "Could not create drag WAV" in window.status_bar.currentMessage()
+    )
+
+
+def test_english_studio_controls_and_owned_status_messages(qapp, make_window, loaded_track, monkeypatch):
+    from PySide6.QtWidgets import QPushButton
+
+    window = make_window()
+    labels = {button.text() for button in window.findChildren(QPushButton)}
+    assert {"Open library…", "Analyze album", "Settings…"} <= labels
+    assert window.auto_play_checkbox.text() == "Auto-preview"
+    window._on_track_analyzed(loaded_track)
+    assert "2 samples" in window.status_bar.currentMessage()
+    assert window.waveform_view.getAxis("bottom").labelText == "Time"
+    window._on_track_failed("périphérique indisponible")
+    assert window.status_bar.currentMessage() == "Analysis failed: périphérique indisponible"
+    window._on_album_scan_done(0)
+    assert window.status_bar.currentMessage() == "No audio files in this folder."
+    window._on_album_scan_failed("NAS déconnecté")
+    assert window.status_bar.currentMessage() == "Folder is no longer available: NAS déconnecté"
+    window._on_album_scan_done(2)
+    window._on_album_progress(1, 2)
+    assert window.status_bar.currentMessage() == "Analyzing album: 1/2 tracks"
+    window._on_album_finished()
+    assert window.status_bar.currentMessage() == "Album analysis complete"
+    messages = []
+    monkeypatch.setattr(
+        QMessageBox, "information", lambda parent, title, text: messages.append((title, text))
+    )
+    window._on_export_requested("marked")
+    assert messages == [("Chopper", "No samples marked for export.")]
 
 
 def test_no_startup_or_invalid_sample_setup(qapp, make_window, loaded_track, tmp_path, monkeypatch):
@@ -996,3 +1033,16 @@ def test_no_startup_or_invalid_sample_setup(qapp, make_window, loaded_track, tmp
     window._on_export_requested("marked")
     assert window.settings.export_dir is None
     assert not (tmp_path / "settings.toml").exists()
+
+
+@pytest.mark.parametrize("count, sample_word, file_word", [(1, "sample", "file"), (2, "samples", "files")])
+def test_english_analysis_and_export_counts(
+    qapp, make_window, loaded_track, tmp_path, count, sample_word, file_word
+):
+    from dataclasses import replace
+
+    window = make_window(export_dir=str(tmp_path / "exports"))
+    window._on_track_analyzed(replace(loaded_track, candidates=loaded_track.candidates[:count]))
+    assert window.status_bar.currentMessage().endswith(f"{count} {sample_word}")
+    window._on_export_requested("all")
+    assert window.status_bar.currentMessage() == f"Exported {count} {file_word}"

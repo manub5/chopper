@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QWidget
 def start_file_drag(source: QWidget, path: Path) -> Qt.DropAction:
     path = path.resolve(strict=True)
     if not path.is_file():
-        raise OSError(f"Fichier de glisser absent ou illisible : {path}")
+        raise OSError(f"Drag file is missing or unreadable: {path}")
     drag = QDrag(source)
     mime = QMimeData()
     mime.setUrls([QUrl.fromLocalFile(str(path))])

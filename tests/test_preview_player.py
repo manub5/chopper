@@ -173,6 +173,14 @@ def test_get_stream_error_stops_output_that_already_started(audio_host, loaded_t
     assert not any(stream.running for stream in audio_host.streams)
 
 
+def test_missing_output_stream_has_english_error(audio_host, loaded_track, monkeypatch):
+    player, events = make_player(audio_host)
+    monkeypatch.setattr(sd, "get_stream", lambda: None)
+    player.play(loaded_track.samples, 1000, loaded_track.candidates[0], 8)
+    assert events["failed"] == [(8, "Preview failed: Audio output stream unavailable.")]
+    assert events["started"] == []
+
+
 def test_stream_poll_error_is_reported_once_and_stops_output(qapp, audio_host, loaded_track):
     player, events = make_player(audio_host)
     player.play(loaded_track.samples, 1000, loaded_track.candidates[0], 5)

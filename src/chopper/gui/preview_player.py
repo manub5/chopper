@@ -25,7 +25,7 @@ class PreviewPlayer(QObject):
 
     def play(self, samples: np.ndarray, sample_rate: int, candidate: Candidate, token: int) -> None:
         if not self._stop_owned():
-            self.failed.emit(token, "Impossible d'arrêter la préécoute précédente.")
+            self.failed.emit(token, "Could not stop the previous preview.")
             return
         if (
             not math.isfinite(sample_rate)
@@ -36,7 +36,7 @@ class PreviewPlayer(QObject):
             or not math.isfinite(candidate.end_seconds)
             or candidate.end_seconds <= candidate.start_seconds
         ):
-            self.failed.emit(token, "Audio ou bornes de préécoute invalides.")
+            self.failed.emit(token, "Invalid audio or preview boundaries.")
             return
         # Clamp in seconds first: negative slicing and huge products are unsafe.
         duration = len(samples) / sample_rate
@@ -44,10 +44,10 @@ class PreviewPlayer(QObject):
         end = round(min(duration, max(0.0, candidate.end_seconds)) * sample_rate)
         segment = samples[start:end]
         if len(segment) == 0:
-            self.failed.emit(token, "Ce candidat est vide (durée nulle).")
+            self.failed.emit(token, "This sample is empty (zero length).")
             return
         if not np.isfinite(segment).all():
-            self.failed.emit(token, "Ce candidat contient des valeurs audio non finies.")
+            self.failed.emit(token, "This sample contains non-finite audio values.")
             return
 
         # Retain ownership even if starting or retrieving the stream fails midway.
@@ -56,9 +56,9 @@ class PreviewPlayer(QObject):
             sd.play(segment, sample_rate, loop=False, blocking=False)
             self._stream = sd.get_stream()
             if self._stream is None:
-                raise RuntimeError("Flux de sortie indisponible.")
+                raise RuntimeError("Audio output stream unavailable.")
         except Exception as exc:  # noqa: BLE001 - surface all PortAudio errors to Qt consumers
-            self._stop_owned(error=f"Échec de la préécoute : {exc}")
+            self._stop_owned(error=f"Preview failed: {exc}")
             return
         self._timer.start()
         self.started.emit(token)
@@ -74,7 +74,7 @@ class PreviewPlayer(QObject):
         try:
             active = self._stream.active
         except Exception as exc:  # noqa: BLE001 - exceptions from a timer slot must remain visible
-            self._stop_owned(error=f"Échec du suivi de la préécoute : {exc}")
+            self._stop_owned(error=f"Preview monitoring failed: {exc}")
             return
         if not active:
             self._stop_owned()
@@ -87,7 +87,7 @@ class PreviewPlayer(QObject):
         try:
             sd.stop(ignore_errors=False)
         except Exception as exc:  # noqa: BLE001 - keep ownership to retry a failed stop before any new play
-            message = f"Échec de l'arrêt de la préécoute : {exc}"
+            message = f"Could not stop preview: {exc}"
             self.failed.emit(token, f"{error} ; {message}" if error else message)
             return False
         self._token = None

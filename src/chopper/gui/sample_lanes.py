@@ -63,9 +63,7 @@ class SampleLanesView(QAbstractScrollArea):
             label = (
                 "One-shots"
                 if category[0] == "shot"
-                else {1.0: "Boucles 1 mesure", 0.5: "Boucles 1/2 mesure", 0.25: "Boucles 1/4 de mesure"}[
-                    category[1]
-                ]
+                else {1.0: "1-bar loops", 0.5: "½-bar loops", 0.25: "¼-bar loops"}[category[1]]
             )
             self._headers.append((label, y))
             y += _HEADER_HEIGHT
@@ -111,10 +109,10 @@ class SampleLanesView(QAbstractScrollArea):
     def sample_tooltip(self, item_id: int) -> str:
         candidate = next(item.candidate for item in self.state.items if item.id == item_id)
         label = sample_type_label(candidate)
-        tempo = f"{candidate.bpm:.1f} BPM" if candidate.bpm else "Tempo inconnu"
+        tempo = f"{candidate.bpm:.1f} BPM" if candidate.bpm else "Unknown tempo"
         return (
-            f"{label}\n{tempo}\nDurée : {format_time(candidate.duration_seconds)}\n"
-            f"Position : {format_time(candidate.start_seconds)}"
+            f"{label}\n{tempo}\nLength: {format_time(candidate.duration_seconds)}\n"
+            f"Position: {format_time(candidate.start_seconds)}"
         )
 
     def reveal(self, item_id: int) -> None:

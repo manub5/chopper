@@ -9,6 +9,22 @@ import soundfile as sf
 from chopper.core import audio_io
 from chopper.core.models import Candidate, CandidateType, Track
 
+
+def test_audio_load_owned_errors_are_english(tmp_path, monkeypatch):
+    monkeypatch.setattr(audio_io.shutil, "which", lambda name: None)
+    with pytest.raises(
+        audio_io.AudioLoadError, match=r"ffmpeg is required to read \.mp3 but is not installed"
+    ):
+        audio_io.load(tmp_path / "missing.mp3")
+    with pytest.raises(audio_io.AudioLoadError, match="Could not read"):
+        audio_io.load(tmp_path / "missing.wav")
+
+
+def test_missing_metadata_uses_english_fallback(tmp_path):
+    track = audio_io.read_track(tmp_path / "untagged.wav")
+    assert track.artist == track.album == "Unknown"
+
+
 SAMPLE_RATE = 44100
 
 
@@ -152,8 +168,8 @@ def test_read_track_falls_back_to_filename_without_tags(tmp_path):
 
     track = audio_io.read_track(path)
 
-    assert track.artist == "Inconnu"
-    assert track.album == "Inconnu"
+    assert track.artist == "Unknown"
+    assert track.album == "Unknown"
     assert track.title == "untagged"
     assert track.track_number is None
 
@@ -170,7 +186,7 @@ def test_read_track_on_empty_file_falls_back_instead_of_crashing(tmp_path):
 
     track = audio_io.read_track(path)
 
-    assert track.artist == "Inconnu"
+    assert track.artist == "Unknown"
     assert track.title == "empty"
     assert track.duration_seconds == 0.0
     assert track.sample_rate == 0

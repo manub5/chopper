@@ -144,7 +144,8 @@ def test_quarter_bar_rectangle_is_clickable_and_labeled(lane_ui, loaded_track):
         lanes.viewport(), Qt.MouseButton.LeftButton, pos=lanes.sample_rect(item_id).center().toPoint()
     )
     assert state.active_id == item_id
-    assert "Boucle 1/4 de mesure" in lanes.sample_tooltip(item_id)
+    assert "¼-bar loop" in lanes.sample_tooltip(item_id)
+    assert "Length:" in lanes.sample_tooltip(item_id)
 
 
 def test_lane_zoom_out_and_drag_share_track_bounds(lane_ui, qapp):

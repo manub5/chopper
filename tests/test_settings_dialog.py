@@ -1,5 +1,5 @@
 import pytest
-from PySide6.QtWidgets import QDialog, QMessageBox
+from PySide6.QtWidgets import QDialog, QLabel, QMessageBox, QPushButton
 
 from chopper.core.settings import Settings
 from chopper.gui.settings_dialog import SettingsDialog
@@ -11,7 +11,8 @@ def test_dialog_reflects_initial_settings(qapp):
 
     assert dialog._export_format.currentText() == "flac"
     assert dialog._candidates_per_track.value() == 3
-    assert dialog._gpu_mode.currentText() == "cpu"
+    assert dialog._gpu_mode.currentText() == "CPU only"
+    assert dialog._gpu_mode.currentData() == "cpu"
 
 
 def test_settings_reads_back_edited_values(qapp):
@@ -24,7 +25,7 @@ def test_settings_reads_back_edited_values(qapp):
         checkbox.setChecked(length == 0.5)
     dialog._candidates_per_track.setValue(10)
     dialog._max_one_shot_seconds.setValue(3.5)
-    dialog._gpu_mode.setCurrentText("cpu")
+    dialog._gpu_mode.setCurrentIndex(dialog._gpu_mode.findData("cpu"))
 
     result = dialog.settings()
 
@@ -99,3 +100,23 @@ def test_empty_loop_selection_cannot_accept(qapp, monkeypatch):
     dialog.accept()
     assert dialog.result() != QDialog.DialogCode.Accepted
     assert warnings == ["Select at least one loop length."]
+
+
+def test_settings_english_labels_and_automatic_device_roundtrip(qapp):
+    dialog = SettingsDialog(Settings(gpu_mode="auto"))
+    assert dialog.windowTitle() == "Settings"
+    labels = {label.text() for label in dialog.findChildren(QLabel)}
+    assert {
+        "Library folder",
+        "Sample folder",
+        "Export format",
+        "Loop lengths",
+        "Samples per category",
+        "Max. one-shot length (s)",
+        "Processing device",
+        "Appearance",
+    } <= labels
+    assert dialog._force_dark.text() == "Force dark mode"
+    assert [button.text() for button in dialog.findChildren(QPushButton)].count("Browse…") == 2
+    assert dialog._gpu_mode.currentText() == "Automatic"
+    assert dialog.settings().gpu_mode == "auto"

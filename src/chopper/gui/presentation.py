@@ -20,8 +20,8 @@ def sample_type_label(candidate: Candidate) -> str:
         return "One-shot"
     bars = candidate.bars
     if bars is None or not is_loop_length(bars):
-        raise ValueError("Longueur de boucle non autorisée pour l'affichage.")
-    return {1.0: "Boucle 1 mesure", 0.5: "Boucle 1/2 mesure", 0.25: "Boucle 1/4 de mesure"}[bars]
+        raise ValueError("Unsupported loop length for display.")
+    return {1.0: "1-bar loop", 0.5: "½-bar loop", 0.25: "¼-bar loop"}[bars]
 
 
 @dataclass(frozen=True)

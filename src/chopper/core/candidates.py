@@ -74,7 +74,7 @@ def find_loop_candidates(
 ) -> list[Candidate]:
     """Downbeat-aligned loops, ranked by score with an independent quota per length."""
     if any(not is_loop_length(bars) for bars in lengths_bars):
-        raise ValueError("Seules les boucles de 1/4, 1/2 et 1 mesure sont autorisées.")
+        raise ValueError("Only ¼-bar, ½-bar and 1-bar loops are supported.")
     bar_duration = _bar_duration(downbeat_times)
     if bar_duration is None or tempo_bpm <= 0:
         return []

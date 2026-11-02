@@ -61,7 +61,7 @@ class ThemeManager(QObject):
         super().__init__(parent)
         app = QApplication.instance()
         if app is None:
-            raise RuntimeError("ThemeManager nécessite une application Qt.")
+            raise RuntimeError("ThemeManager requires a Qt application.")
         self._force_dark = force_dark
         self._scheme = QApplication.styleHints().colorScheme()
         # Never infer the system appearance from a forced child-widget palette.

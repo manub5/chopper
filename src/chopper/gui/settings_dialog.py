@@ -27,7 +27,7 @@ class SettingsDialog(QDialog):
 
     def __init__(self, settings: Settings, parent: QWidget | None = None):
         super().__init__(parent)
-        self.setWindowTitle("Paramètres")
+        self.setWindowTitle("Settings")
         self._initial_settings = replace(settings)
 
         self._library_root = QLineEdit(settings.library_root or "")
@@ -55,25 +55,24 @@ class SettingsDialog(QDialog):
         self._max_one_shot_seconds.setValue(settings.max_one_shot_seconds)
 
         self._gpu_mode = QComboBox()
-        self._gpu_mode.addItems(["auto", "cpu"])
-        self._gpu_mode.setCurrentText(settings.gpu_mode)
-        self._force_dark = QCheckBox("Forcer sombre")
+        self._gpu_mode.addItem("Automatic", "auto")
+        self._gpu_mode.addItem("CPU only", "cpu")
+        self._gpu_mode.setCurrentIndex(self._gpu_mode.findData(settings.gpu_mode))
+        self._force_dark = QCheckBox("Force dark mode")
         self._force_dark.setChecked(settings.force_dark)
 
         form = QFormLayout()
         form.addRow(
-            "Dossier racine de la bibliothèque",
+            "Library folder",
             self._row_with_browse(self._library_root, self._browse_library_root),
         )
-        form.addRow(
-            "Dossier cible d'export", self._row_with_browse(self._export_dir, self._browse_export_dir)
-        )
-        form.addRow("Format d'export", self._export_format)
+        form.addRow("Sample folder", self._row_with_browse(self._export_dir, self._browse_export_dir))
+        form.addRow("Export format", self._export_format)
         form.addRow("Loop lengths", loop_lengths_row)
-        form.addRow("Nombre de candidats par catégorie", self._candidates_per_track)
-        form.addRow("Durée maximale d'un one-shot (s)", self._max_one_shot_seconds)
-        form.addRow("Utilisation du GPU", self._gpu_mode)
-        form.addRow("Apparence", self._force_dark)
+        form.addRow("Samples per category", self._candidates_per_track)
+        form.addRow("Max. one-shot length (s)", self._max_one_shot_seconds)
+        form.addRow("Processing device", self._gpu_mode)
+        form.addRow("Appearance", self._force_dark)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -89,18 +88,18 @@ class SettingsDialog(QDialog):
     def _row_with_browse(line_edit: QLineEdit, on_browse) -> QHBoxLayout:
         row = QHBoxLayout()
         row.addWidget(line_edit)
-        button = QPushButton("Parcourir…")
+        button = QPushButton("Browse…")
         button.clicked.connect(on_browse)
         row.addWidget(button)
         return row
 
     def _browse_library_root(self) -> None:
-        directory = QFileDialog.getExistingDirectory(self, "Dossier racine de la bibliothèque")
+        directory = QFileDialog.getExistingDirectory(self, "Library folder")
         if directory:
             self._library_root.setText(directory)
 
     def _browse_export_dir(self) -> None:
-        directory = QFileDialog.getExistingDirectory(self, "Dossier cible d'export")
+        directory = QFileDialog.getExistingDirectory(self, "Sample folder")
         if directory:
             self._export_dir.setText(directory)
 
@@ -122,6 +121,6 @@ class SettingsDialog(QDialog):
             loop_lengths_bars=lengths,
             candidates_per_track=self._candidates_per_track.value(),
             max_one_shot_seconds=self._max_one_shot_seconds.value(),
-            gpu_mode=self._gpu_mode.currentText(),
+            gpu_mode=self._gpu_mode.currentData(),
             force_dark=self._force_dark.isChecked(),
         )

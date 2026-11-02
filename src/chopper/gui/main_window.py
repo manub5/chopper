@@ -58,7 +58,7 @@ class MainWindow(QMainWindow):
         parent: QWidget | None = None,
     ):
         super().__init__(parent)
-        self.setWindowTitle("Choppeur")
+        self.setWindowTitle("Chopper")
         self.resize(1100, 700)
 
         self.settings = settings if settings is not None else load_settings()
@@ -96,19 +96,19 @@ class MainWindow(QMainWindow):
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
 
-        open_library_button = QPushButton("Ouvrir une bibliothèque…")
+        open_library_button = QPushButton("Open library…")
         open_library_button.clicked.connect(self._on_open_library_clicked)
 
-        self.analyze_album_button = QPushButton("Analyser l'album entier")
+        self.analyze_album_button = QPushButton("Analyze album")
         self.analyze_album_button.setEnabled(False)
         self.analyze_album_button.clicked.connect(self._on_analyze_album_clicked)
 
-        settings_button = QPushButton("Paramètres…")
+        settings_button = QPushButton("Settings…")
         settings_button.clicked.connect(self._on_settings_clicked)
 
         top_buttons = QHBoxLayout()
         top_buttons.addWidget(open_library_button)
-        self.auto_play_checkbox = QCheckBox("Lecture auto")
+        self.auto_play_checkbox = QCheckBox("Auto-preview")
         self.auto_play_checkbox.setChecked(self.settings.auto_play)
         self.auto_play_checkbox.toggled.connect(self._on_auto_play_toggled)
         top_buttons.addWidget(self.auto_play_checkbox)
@@ -152,7 +152,7 @@ class MainWindow(QMainWindow):
     # --- bibliothèque ---------------------------------------------------
 
     def _on_open_library_clicked(self) -> None:
-        directory = QFileDialog.getExistingDirectory(self, "Dossier racine de la bibliothèque")
+        directory = QFileDialog.getExistingDirectory(self, "Library folder")
         if not directory:
             return
         self.settings.library_root = directory
@@ -164,7 +164,7 @@ class MainWindow(QMainWindow):
         self.analyze_album_button.setEnabled(True)
 
     def _on_library_load_failed(self, folder: Path, message: str) -> None:
-        self.status_bar.showMessage(f"Impossible de lire {folder} : {message}", 8000)
+        self.status_bar.showMessage(f"Could not read {folder}: {message}", 8000)
 
     # --- analyse d'une piste ---------------------------------------------
 
@@ -176,7 +176,7 @@ class MainWindow(QMainWindow):
             # le même MainWindow ont déjà fait planter l'appli en pratique (le
             # second écrase la seule référence Python vers le premier, encore en
             # cours) : on refuse plutôt que de risquer ça.
-            self.status_bar.showMessage("Une analyse est déjà en cours, patiente un instant.", 4000)
+            self.status_bar.showMessage("Analysis is already running. Please wait.", 4000)
             return
 
         track = audio_io.read_track(path)
@@ -184,7 +184,7 @@ class MainWindow(QMainWindow):
         self.track_label.clear()
         self.waveform_view.clear()
         self._current_track = track
-        self.status_bar.showMessage(f"Analyse de {track.title}…")
+        self.status_bar.showMessage(f"Analyzing {track.title}…")
 
         worker = TrackAnalysisWorker(track, self.settings, self.cache)
         worker.finished.connect(self._on_track_analyzed)
@@ -203,24 +203,25 @@ class MainWindow(QMainWindow):
         self.sample_state.load_track(result)
         self.track_label.setText(f"{analysis.track.title} — {analysis.tempo_bpm:.1f} BPM")
 
+        sample_word = "sample" if len(candidates) == 1 else "samples"
         self.status_bar.showMessage(
-            f"{analysis.track.title} — {analysis.tempo_bpm:.1f} BPM, {len(candidates)} candidats",
+            f"{analysis.track.title} — {analysis.tempo_bpm:.1f} BPM, {len(candidates)} {sample_word}",
             5000,
         )
 
     def _on_track_failed(self, message: str) -> None:
         self._set_busy(False)
-        self.status_bar.showMessage(f"Échec de l'analyse : {message}", 8000)
+        self.status_bar.showMessage(f"Analysis failed: {message}", 8000)
 
     # --- analyse d'un album entier ---------------------------------------
 
     def _on_analyze_album_clicked(self) -> None:
         if self._is_analysis_running():
-            self.status_bar.showMessage("Une analyse est déjà en cours, patiente un instant.", 4000)
+            self.status_bar.showMessage("Analysis is already running. Please wait.", 4000)
             return
 
         if self._current_folder is None:
-            QMessageBox.information(self, "Choppeur", "Sélectionnez d'abord un dossier d'album.")
+            QMessageBox.information(self, "Chopper", "Select an album folder first.")
             return
 
         # Le dossier est parcouru dans le worker (voir AlbumAnalysisWorker.run), pas ici :
@@ -230,7 +231,7 @@ class MainWindow(QMainWindow):
         self.progress_bar.setVisible(True)
         self.progress_bar.setRange(0, 0)  # indéterminée tant que le dossier n'est pas encore scanné
         self.progress_bar.setValue(0)
-        self.status_bar.showMessage("Recherche des pistes de l'album…")
+        self.status_bar.showMessage("Finding album tracks…")
 
         worker = AlbumAnalysisWorker(self._current_folder, self.settings, self.cache)
         worker.scan_done.connect(self._on_album_scan_done)
@@ -243,19 +244,19 @@ class MainWindow(QMainWindow):
 
     def _on_album_scan_done(self, total: int) -> None:
         if total == 0:
-            self.status_bar.showMessage("Aucun fichier audio dans ce dossier.", 5000)
+            self.status_bar.showMessage("No audio files in this folder.", 5000)
             return
         self.progress_bar.setRange(0, total)
 
     def _on_album_scan_failed(self, message: str) -> None:
-        self.status_bar.showMessage(f"Dossier devenu inaccessible : {message}", 8000)
+        self.status_bar.showMessage(f"Folder is no longer available: {message}", 8000)
 
     def _on_album_progress(self, done: int, total: int) -> None:
         self.progress_bar.setValue(done)
-        self.status_bar.showMessage(f"Analyse de l'album : {done}/{total} pistes")
+        self.status_bar.showMessage(f"Analyzing album: {done}/{total} tracks")
 
     def _on_album_track_failed(self, track: Track, message: str) -> None:
-        self.status_bar.showMessage(f"{track.title} : échec ({message})", 8000)
+        self.status_bar.showMessage(f"{track.title}: analysis failed ({message})", 8000)
 
     def _on_album_finished(self) -> None:
         # Si le dossier était vide, _on_album_scan_done a déjà affiché un message
@@ -265,7 +266,7 @@ class MainWindow(QMainWindow):
         self._set_busy(False)
         self.progress_bar.setVisible(False)
         if had_tracks:
-            self.status_bar.showMessage("Analyse de l'album terminée", 5000)
+            self.status_bar.showMessage("Album analysis complete", 5000)
 
     # --- paramètres -------------------------------------------------------
 
@@ -334,7 +335,7 @@ class MainWindow(QMainWindow):
             if mode == "all" or item.id in self.sample_state.marked_ids
         )
         if not candidates:
-            QMessageBox.information(self, "Choppeur", "Aucun candidat coché à exporter.")
+            QMessageBox.information(self, "Chopper", "No samples marked for export.")
             return
 
         directory = self._ensure_export_directory()
@@ -349,18 +350,17 @@ class MainWindow(QMainWindow):
             directory,
             file_format=self.settings.export_format,
         )
+        file_word = "file" if len(report.paths) == 1 else "files"
         if report.error is not None:
-            message = f"Échec d'export : {report.error}"
+            message = f"Export failed: {report.error}"
             if report.paths:
                 names = ", ".join(path.name for path in report.paths)
-                message = (
-                    f"Export partiel : {len(report.paths)} fichier(s) conservé(s) : {names}. {report.error}"
-                )
+                message = f"Partial export: {len(report.paths)} {file_word} kept: {names}. {report.error}"
             self.status_bar.setToolTip(message)
             self.status_bar.showMessage(message, 10000)
         else:
             self.status_bar.setToolTip("")
-            self.status_bar.showMessage(f"{len(report.paths)} fichier(s) exporté(s)", 5000)
+            self.status_bar.showMessage(f"Exported {len(report.paths)} {file_word}", 5000)
 
     def _on_drag_requested(self, item_id: int) -> None:
         loaded = self.sample_state.loaded_track
@@ -385,15 +385,15 @@ class MainWindow(QMainWindow):
                 directory,
             )
         except Exception as exc:  # noqa: BLE001 - never start a drag after a writer failure
-            self.status_bar.showMessage(f"Échec de création du WAV glissé : {exc}", 10000)
+            self.status_bar.showMessage(f"Could not create drag WAV: {exc}", 10000)
             return
         try:
             start_file_drag(self.candidates_panel.table, path)
         except Exception as exc:  # noqa: BLE001 - the file must remain even if the platform transfer fails
-            self.status_bar.showMessage(f"WAV conservé : {path} ; glisser impossible : {exc}", 10000)
+            self.status_bar.showMessage(f"WAV kept: {path}; drag failed: {exc}", 10000)
         else:
             # Qt's returned action is not proof that a DAW successfully imported it.
-            self.status_bar.showMessage(f"WAV conservé : {path}", 10000)
+            self.status_bar.showMessage(f"WAV kept: {path}", 10000)
 
     # --- infrastructure -------------------------------------------------
 

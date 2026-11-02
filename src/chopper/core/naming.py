@@ -35,7 +35,7 @@ def build_filename(track: Track, candidate: Candidate, *, extension: str = "wav"
 
     if candidate.type is CandidateType.LOOP:
         if not is_loop_length(candidate.bars):
-            raise ValueError("Longueur de boucle non autorisée pour l'export.")
+            raise ValueError("Unsupported loop length for export.")
         position = _format_position(candidate.start_seconds, with_millis=False)
         bpm = round(candidate.bpm or 0)
         return f"{artist}_{album}_{piste}_loop_{bpm}bpm_{candidate.bars:g}bars_{position}.{extension}"

@@ -53,10 +53,10 @@ def test_repeated_drags_create_distinct_permanent_wavs_in_unicode_subfolder(ster
     before = first.read_bytes()
     second = export_drag(samples, rate, track, candidates[0], destination)
     assert first != second
-    assert first.parent == second.parent == destination / "glissés"
+    assert first.parent == second.parent == destination / "dragged"
     assert first.read_bytes() == before
     assert len(list(destination.glob("*.wav"))) == 0
-    assert len(list((destination / "glissés").glob("*.wav"))) == 2
+    assert len(list((destination / "dragged").glob("*.wav"))) == 2
     info = sf.info(second)
     assert (info.format, info.subtype, info.samplerate, info.channels) == ("WAV", "PCM_24", 44100, 2)
 
@@ -157,7 +157,22 @@ def test_invalid_format_writes_nothing(stereo_source, tmp_path, file_format):
     destination = tmp_path / "exports"
     report = export_batch(samples, rate, track, candidates, destination, file_format)
     assert report.paths == () and report.error
+    assert report.error.startswith("Unsupported export format")
     assert not destination.exists()
+
+
+def test_new_drag_never_moves_or_changes_legacy_wavs(stereo_source, tmp_path):
+    from chopper.core.exporting import export_drag
+
+    samples, rate, track, candidates = stereo_source
+    legacy = tmp_path / "samples" / "glissés" / "old.wav"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_bytes(b"DAW-referenced file must stay here")
+    first = export_drag(samples, rate, track, candidates[0], tmp_path / "samples")
+    second = export_drag(samples, rate, track, candidates[0], tmp_path / "samples")
+    assert first.parent == second.parent == tmp_path / "samples" / "dragged"
+    assert first != second and first.is_file() and second.is_file()
+    assert legacy.read_bytes() == b"DAW-referenced file must stay here"
 
 
 def test_empty_batch_creates_no_directory(stereo_source, tmp_path):

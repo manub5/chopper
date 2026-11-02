@@ -24,7 +24,7 @@ def export_batch(
     file_format: str,
 ) -> ExportReport:
     if file_format not in {"wav", "flac"}:
-        return ExportReport((), "Format d'export non autorisé (WAV ou FLAC uniquement).")
+        return ExportReport((), "Unsupported export format (WAV or FLAC only).")
     paths: list[Path] = []
     for candidate in candidates:
         try:
@@ -39,7 +39,7 @@ def export_batch(
                 )
             )
         except Exception as exc:  # noqa: BLE001 - preserve successes and expose all writer failures
-            return ExportReport(tuple(paths), f"À {candidate.start_seconds:.3f} s : {exc}")
+            return ExportReport(tuple(paths), f"At {candidate.start_seconds:.3f} s: {exc}")
     return ExportReport(tuple(paths))
 
 
@@ -55,7 +55,7 @@ def export_drag(
         sample_rate,
         track,
         [candidate],
-        export_dir / "glissés",
+        export_dir / "dragged",
         file_format="wav",
         subtype="PCM_24",
     )[0]
