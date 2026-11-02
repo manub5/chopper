@@ -6,6 +6,33 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 02/11/2026 — Chopper, anglais et migration non destructive
+
+- Renommage du paquet, des imports, de la distribution et du lanceur en
+  `chopper`. Commande principale `uv run chopper` ; alias temporaire `choppeur`
+  vers le même point d'entrée pour les anciens lanceurs. Le dossier de travail
+  et le remote existant ne sont pas renommés ; aucune publication effectuée.
+- Nouveaux chemins XDG sous `chopper`. En l'absence du nouveau TOML, lecture de
+  l'ancien sous `choppeur` sans le modifier ; les sauvegardes atomiques vont
+  uniquement au nouveau chemin. Le nouveau fichier gagne si les deux existent.
+  Un chemin explicitement fourni ne déclenche jamais ce repli. Les erreurs de
+  lecture du nouveau fichier restent visibles. Préférences et longueurs v3 conservées.
+- Nouveau cache d'analyse vide ; l'ancien SQLite reste intact. Effet de bord :
+  certaines analyses devront être refaites. Aucun déplacement de données privées.
+- Interface, erreurs applicatives, README et guide du prototype en anglais
+  home-studio. Métadonnées utilisateur, chemins et diagnostics externes inchangés.
+  Les sélecteurs natifs peuvent suivre la langue du bureau. Les valeurs internes
+  `auto`/`cpu` restent stables malgré les libellés « Automatic » / « CPU only ».
+- Nouveaux WAV glissés dans `dragged/` : aucun renommage, suppression ou déplacement
+  des anciens fichiers `glissés/` susceptibles d'être référencés par un séquenceur.
+  Fréquence, canaux, PCM24, anti-écrasement et conservation après annulation inchangés.
+  Répéter un glisser reste volontairement non idempotent.
+- Installateur testé uniquement avec des commandes externes simulées dans un
+  dossier temporaire, y compris chemins avec espaces, arguments conservés et
+  refus d'écraser un fichier/lien étranger. Aucun installateur exécuté sur le système.
+- Mise à jour Semgrep préexistante enregistrée séparément en `c95ca2a`, avec
+  autorisation explicite de l'utilisateur, sans retirer ni contourner un hook.
+
 ## 01/11/2026 — Choix du dossier mémorisé et longueurs explicites
 
 - Contrat approuvé : aucun chemin d'export imposé, aucune demande au lancement.

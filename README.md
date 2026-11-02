@@ -1,32 +1,99 @@
-# Choppeur
+# Chopper
 
-Extraction automatique de samples (boucles calées sur la mesure et one-shots)
-depuis sa bibliothèque d'albums, avec préécoute et export nommé.
+Find usable loops and one-shots in your own music library, preview them and
+export automatically named audio files to your DAW. Linux desktop application.
 
-## Prérequis
-- Linux, Python 3.12, `uv`, `ffmpeg` (lecture MP3/AAC), `libportaudio2`.
-- GPU NVIDIA facultatif (accélère l'analyse).
+## Requirements
 
-## Installation facile (personne extérieure au projet)
-Depuis le dossier du projet décompressé :
-    ./install.sh
-    ./choppeur
+- Linux, Python 3.12, [uv](https://docs.astral.sh/uv/), ffmpeg for MP3/AAC decoding,
+  and PortAudio (the `libportaudio2` package on Debian/Ubuntu).
+- No GPU required. The default installation uses CPU PyTorch wheels; GPU
+  acceleration requires a compatible GPU-enabled PyTorch installation.
+- Allow roughly 2 GB for the first environment download. Beat analysis may
+  also download model weights on first use. Analysis works on CPU, more slowly.
 
-`install.sh` installe `uv`, vérifie/installe `ffmpeg` et `libportaudio2`
-(via sudo), prépare l'environnement (`uv sync`, ~2 Go au premier lancement)
-et crée un lanceur `./choppeur`. Linux uniquement.
+## Easy installation
 
-Selon l'outil de décompression, `install.sh` peut arriver sans droit
-d'exécution. Si `./install.sh` répond « Permission denied » :
-    chmod +x install.sh
+From the unpacked project folder:
 
-## Installation manuelle (si vous avez déjà uv)
-    uv sync
-    uv run choppeur
+```bash
+bash install.sh
+./chopper
+```
 
-## Développement
-    uv sync --group dev       # ruff, mypy, bandit, pytest, pre-commit
-    uv run pre-commit install # active les vérifications avant chaque commit
-    uv run pytest
+The installer installs uv if needed, checks ffmpeg and PortAudio, offers missing
+system packages through sudo/apt, prepares the isolated Python environment and
+generates `./chopper`. On systems without apt, install the system packages yourself.
+It does not delete old launchers and refuses to overwrite an unrelated `./chopper`.
 
-Documentation : `docs/SPEC.md`, `docs/DECISIONS.md`, `docs/ROADMAP.md`.
+## Manual installation
+
+With uv and the system audio packages already installed:
+
+```bash
+uv sync
+uv run chopper
+```
+
+## Find and export samples
+
+1. Choose **Open library…** and browse to an album or track, including a mounted NAS.
+2. Select a track to analyze it, or select an album folder and use **Analyze album**.
+3. Look through **1-bar**, **½-bar** and **¼-bar loops**, plus **One-shots**.
+   Chopper offers up to eight samples per category when the track supports them;
+   short tracks or missing rhythmic information may yield fewer.
+4. Click a sample to select it. With **Auto-preview** enabled, it plays once.
+   **Ctrl+click** marks or unmarks a sample without selecting or playing it.
+5. Use **Export marked** or **Export all** for the displayed track, or drag a
+   sample using its `⠿` handle. Source audio is never modified.
+
+On the first export or attempted drag, choose your **sample folder**. There is
+no forced Documents folder or setup prompt at startup. The path is remembered
+and can be changed in **Settings**. After setting it up during the first drag,
+drag the sample again; setup itself creates no audio. Canceling setup writes nothing.
+
+Button exports support 24-bit WAV or FLAC. DAW drags always create permanent
+24-bit WAVs in `<sample folder>/dragged/`, preserving the original sample rate
+and channels. Every drag creates a separate file, even if the drop is canceled;
+Chopper never cleans these files up automatically. Do not move files still
+referenced by a DAW project. In Bitwig, use **File → Collect and Save** to collect
+external audio into the project folder before archiving or sharing the project.
+Qt's reported drop result alone does not prove that a DAW imported the sample.
+
+## KDE and Wayland
+
+The application currently defaults to XWayland on Wayland sessions to avoid
+previously observed Qt painting artifacts. To test native Wayland drag-and-drop:
+
+```bash
+QT_QPA_PLATFORM=wayland uv run chopper
+```
+
+An explicit `QT_QPA_PLATFORM` choice is always respected. KDE native file dialogs
+use the desktop portal when no platform theme was explicitly configured. Native
+dialog language and raw system/audio-driver diagnostics may follow your desktop locale.
+
+## Upgrading from Choppeur
+
+Chopper reads legacy preferences if its new settings file does not exist.
+New settings take precedence when both exist; future saves go only to the new
+location, without changing the old file. The selected sample folder is preserved.
+
+- Settings: `$XDG_CONFIG_HOME/chopper/settings.toml` (default `~/.config/chopper/settings.toml`).
+- Cache: `$XDG_CACHE_HOME/chopper/analyses.sqlite` (default `~/.cache/chopper/analyses.sqlite`).
+
+The old analysis cache is left intact; the new cache starts empty, so some tracks
+will need analysis again. Existing `glissés/` exports stay where they are; only
+new drags use `dragged/`. The old `choppeur` launch command remains temporarily
+available for generated launchers; new commands and Python imports use `chopper`.
+
+## Development
+
+```bash
+uv sync --group dev
+uv run pre-commit install
+uv run pytest
+```
+
+Architecture, decisions and historical plans (some in French):
+`docs/SPEC.md`, `docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/HISTORIQUE.md`.

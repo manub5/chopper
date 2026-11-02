@@ -1,7 +1,7 @@
 [project]
 name = "chopper"
 version = "0.1.0"
-description = "Extraction automatique de samples (boucles et one-shots) depuis une bibliothèque d'albums"
+description = "Find, preview and export loops and one-shots from your own music library"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "PySide6>=6.7",

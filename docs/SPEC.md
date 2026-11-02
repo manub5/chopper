@@ -1,4 +1,9 @@
-# Spécification — Choppeur
+# Spécification — Chopper
+
+Depuis le 02/11/2026, l'interface et la documentation utilisateur sont en anglais.
+Commande : `uv run chopper` ; paquet : `src/chopper/`. Les paramètres anciens sont
+lus sans modification si le nouveau fichier manque ; les nouveaux WAV glissés vont
+dans `dragged/`, sans déplacer les anciens `glissés/`. Voir README pour l'usage courant.
 
 ## Objectif
 Extraire rapidement, depuis ses propres albums, des samples exploitables

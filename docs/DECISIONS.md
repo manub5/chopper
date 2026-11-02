@@ -1,5 +1,9 @@
 # Décisions techniques (et pourquoi)
 
+Note de nommage au 02/11/2026 : les mentions Choppeur/`choppeur` ci-dessous
+conservent le contexte historique. L'application actuelle s'appelle Chopper,
+se lance avec `uv run chopper` et fournit `src/chopper/py.typed`.
+
 ## Détection des temps et du premier temps de mesure : beat_this, pas madmom
 - madmom : dernière version PyPI 0.16.1, qui ne gère que Python < 3.10 et
   numpy < 1.20 ; installation seulement depuis GitHub. Ses modèles sont sous

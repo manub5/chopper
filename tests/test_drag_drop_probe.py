@@ -42,6 +42,8 @@ def test_repeated_drags_never_overwrite_the_previous_export(probe, qapp, tmp_pat
 def test_opening_window_and_clicking_handle_do_not_create_audio(probe, qapp, tmp_path):
     window = probe["ProbeWindow"](tmp_path)
     try:
+        assert window.windowTitle() == "Chopper — disposable drag-and-drop probe"
+        assert window.handle.text() == "⠿  Drag this sample"
         QTest.mouseClick(window.handle, Qt.MouseButton.LeftButton)
         assert list(tmp_path.iterdir()) == []
     finally:
@@ -54,7 +56,7 @@ def test_export_failure_is_visible_without_starting_external_drag(probe, qapp, t
     window = probe["ProbeWindow"](not_a_directory)
     try:
         window.handle.start_drag()
-        assert "Échec" in window.log.toPlainText()
+        assert "Drag-and-drop failed:" in window.log.toPlainText()
         assert not_a_directory.read_text() == "untouched"
     finally:
         window.close()

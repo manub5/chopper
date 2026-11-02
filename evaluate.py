@@ -1,4 +1,4 @@
-"""Reproducible evaluation of Choppeur's real detection pipeline."""
+"""Reproducible evaluation of Chopper's real detection pipeline."""
 
 from __future__ import annotations
 
@@ -175,7 +175,7 @@ def evaluate_real_passages(root: Path, device: str) -> dict:
                 raise ValueError(f"Empty FLAC: {path.name}")
             samples, rate = sf.read(path, start=start, frames=frames, dtype="float32", always_2d=True)
             started = time.monotonic()
-            with tempfile.TemporaryDirectory(prefix="choppeur-eval-") as temporary:
+            with tempfile.TemporaryDirectory(prefix="chopper-eval-") as temporary:
                 excerpt = Path(temporary) / "excerpt.wav"
                 sf.write(excerpt, samples, rate, subtype="FLOAT")
                 detection = detect(excerpt, device)
@@ -233,7 +233,7 @@ def main() -> int:
     if args.threads < 1:
         parser.error("--threads must be positive")
     # Model downloads stay outside the user's home by default.
-    os.environ.setdefault("TORCH_HOME", str(Path(tempfile.gettempdir()) / "choppeur-eval-torch"))
+    os.environ.setdefault("TORCH_HOME", str(Path(tempfile.gettempdir()) / "chopper-eval-torch"))
     import torch
 
     torch.set_num_threads(args.threads)
