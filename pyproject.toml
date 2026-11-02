@@ -1,5 +1,5 @@
 [project]
-name = "choppeur"
+name = "chopper"
 version = "0.1.0"
 description = "Extraction automatique de samples (boucles et one-shots) depuis une bibliothèque d'albums"
 requires-python = ">=3.12,<3.13"
@@ -21,7 +21,8 @@ dependencies = [
 ]
 
 [project.scripts]
-choppeur = "choppeur.app:main"
+chopper = "chopper.app:main"
+choppeur = "chopper.app:main"
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.16", "mypy>=1.14", "bandit>=1.9", "pre-commit>=4"]
@@ -34,7 +35,7 @@ build-backend = "hatchling.build"
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/choppeur"]
+packages = ["src/chopper"]
 
 [tool.uv.sources]
 torch = [{ index = "pytorch-cpu" }]

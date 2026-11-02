@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QFileDialog, QMessageBox, QWidget
 
 @pytest.mark.parametrize("action", ["cancel", "close", "picker-cancel", "choose"])
 def test_folder_setup_returns_only_confirmed_path(qapp, tmp_path, monkeypatch, action):
-    from choppeur.gui.export_folder_dialog import choose_export_folder
+    from chopper.gui.export_folder_dialog import choose_export_folder
 
     destination = tmp_path / "Samples été"
     picker_calls = []

@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from choppeur.core.models import Candidate, CandidateType, Track, is_loop_length
+from chopper.core.models import Candidate, CandidateType, Track, is_loop_length
 
 _FORBIDDEN_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 

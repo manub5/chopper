@@ -4,7 +4,7 @@ from bisect import bisect_left, bisect_right
 
 import numpy as np
 
-from choppeur.core.models import LOOP_LENGTHS_BARS, Candidate, CandidateType, is_loop_length
+from chopper.core.models import LOOP_LENGTHS_BARS, Candidate, CandidateType, is_loop_length
 
 DEFAULT_LOOP_LENGTHS_BARS = LOOP_LENGTHS_BARS
 DEFAULT_MAX_ONE_SHOT_SECONDS = 2.0

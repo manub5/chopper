@@ -6,11 +6,11 @@ from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QAbstractScrollArea, QApplication, QWidget
 
-from choppeur.gui.lane_layout import CATEGORIES, LanePlacement, layout_samples
-from choppeur.gui.presentation import format_time, sample_type_label
-from choppeur.gui.sample_state import SampleState
-from choppeur.gui.theme import LIGHT, ThemePalette
-from choppeur.gui.waveform_view import WaveformView
+from chopper.gui.lane_layout import CATEGORIES, LanePlacement, layout_samples
+from chopper.gui.presentation import format_time, sample_type_label
+from chopper.gui.sample_state import SampleState
+from chopper.gui.theme import LIGHT, ThemePalette
+from chopper.gui.waveform_view import WaveformView
 
 _ROW_HEIGHT = 26
 _HEADER_HEIGHT = 24

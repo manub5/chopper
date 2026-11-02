@@ -13,7 +13,7 @@ from PySide6.QtCore import QMimeData, QPoint, Qt, QUrl, Signal
 from PySide6.QtGui import QDrag, QMouseEvent
 from PySide6.QtWidgets import QApplication, QLabel, QPlainTextEdit, QVBoxLayout, QWidget
 
-from choppeur.core.audio_io import export_segment
+from chopper.core.audio_io import export_segment
 
 
 def create_drag_payload(output_root: Path | None = None) -> tuple[Path, QMimeData]:

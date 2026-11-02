@@ -14,9 +14,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from choppeur.gui.presentation import format_time, sample_type_label
-from choppeur.gui.sample_state import SampleState
-from choppeur.gui.theme import LIGHT, ThemePalette
+from chopper.gui.presentation import format_time, sample_type_label
+from chopper.gui.sample_state import SampleState
+from chopper.gui.theme import LIGHT, ThemePalette
 
 
 class SampleTable(QTableWidget):

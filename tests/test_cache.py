@@ -3,8 +3,8 @@ import threading
 import time
 from pathlib import Path
 
-from choppeur.core.cache import AnalysisCache
-from choppeur.core.models import Analysis, Track
+from chopper.core.cache import AnalysisCache
+from chopper.core.models import Analysis, Track
 
 
 def _track(path: Path) -> Track:

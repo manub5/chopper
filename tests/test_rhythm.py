@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from choppeur.core import rhythm
+from chopper.core import rhythm
 
 
 def test_estimate_tempo_from_regular_beats():

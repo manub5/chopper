@@ -1,6 +1,6 @@
 import numpy as np
 
-from choppeur.core import onsets
+from chopper.core import onsets
 
 SAMPLE_RATE = 22050
 

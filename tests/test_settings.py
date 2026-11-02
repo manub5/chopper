@@ -1,6 +1,6 @@
 import pytest
 
-from choppeur.core.settings import (
+from chopper.core.settings import (
     Settings,
     default_cache_path,
     default_settings_path,
@@ -133,11 +133,11 @@ def test_load_missing_file_returns_defaults(tmp_path):
     assert loaded == Settings()
 
 
-def test_default_paths_point_to_choppeur_directories():
+def test_default_paths_point_to_chopper_directories():
     assert default_settings_path().name == "settings.toml"
     assert default_cache_path().name == "analyses.sqlite"
-    assert "choppeur" in str(default_settings_path())
-    assert "choppeur" in str(default_cache_path())
+    assert default_settings_path().parent.name == "chopper"
+    assert default_cache_path().parent.name == "chopper"
 
 
 def test_load_partial_file_fills_in_defaults(tmp_path):
@@ -203,3 +203,80 @@ def test_save_creates_parent_but_no_sample_directory(tmp_path):
     save_settings(Settings(export_dir=str(destination)), path)
     assert load_settings(path).export_dir == str(destination)
     assert not destination.exists()
+
+
+@pytest.fixture
+def isolated_xdg(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    legacy = tmp_path / "config" / "choppeur" / "settings.toml"
+    legacy.parent.mkdir(parents=True)
+    return legacy, tmp_path / "config" / "chopper" / "settings.toml"
+
+
+def test_implicit_settings_load_legacy_then_save_only_new_path(isolated_xdg, tmp_path):
+    legacy, new = isolated_xdg
+    original = Settings(
+        export_dir=str(tmp_path / "My Samples"),
+        auto_play=False,
+        force_dark=True,
+        loop_lengths_bars=(0.5,),
+        library_root=str(tmp_path / "music"),
+    )
+    save_settings(original, legacy)
+    before = legacy.read_bytes()
+    assert load_settings() == original
+    assert not new.exists()
+    save_settings(load_settings())
+    assert new.is_file() and load_settings(new) == original
+    assert legacy.read_bytes() == before
+
+
+def test_new_settings_win_without_resetting_loop_choices(isolated_xdg):
+    legacy, new = isolated_xdg
+    save_settings(Settings(auto_play=False, loop_lengths_bars=(0.5,)), legacy)
+    preferred = Settings(auto_play=True, loop_lengths_bars=(0.25,))
+    save_settings(preferred, new)
+    assert load_settings() == preferred
+
+
+def test_explicit_missing_settings_never_fall_back(isolated_xdg, tmp_path):
+    legacy, _new = isolated_xdg
+    save_settings(Settings(auto_play=False), legacy)
+    assert load_settings(tmp_path / "missing.toml") == Settings()
+
+
+@pytest.mark.parametrize("error", ["malformed", "unreadable"])
+def test_invalid_new_settings_never_fall_back(isolated_xdg, monkeypatch, error):
+    from pathlib import Path
+
+    legacy, new = isolated_xdg
+    save_settings(Settings(auto_play=False), legacy)
+    new.parent.mkdir(parents=True)
+    new.write_text("invalid = [" if error == "malformed" else "auto_play = true")
+    if error == "unreadable":
+        real_open = Path.open
+
+        def restricted(self, *args, **kwargs):
+            if self == new:
+                raise PermissionError("blocked settings")
+            return real_open(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "open", restricted)
+    with pytest.raises(ValueError if error == "malformed" else PermissionError):
+        load_settings()
+
+
+def test_new_cache_path_leaves_legacy_cache_intact(isolated_xdg, tmp_path):
+    old_cache = tmp_path / "cache" / "choppeur" / "analyses.sqlite"
+    old_cache.parent.mkdir(parents=True)
+    old_cache.write_bytes(b"old cache left alone")
+    assert default_cache_path() == tmp_path / "cache" / "chopper" / "analyses.sqlite"
+    assert old_cache.read_bytes() == b"old cache left alone"
+    assert not default_cache_path().exists()
+
+
+def test_no_old_or_new_settings_returns_defaults_without_writing(isolated_xdg):
+    legacy, new = isolated_xdg
+    assert load_settings() == Settings()
+    assert not legacy.exists() and not new.exists()

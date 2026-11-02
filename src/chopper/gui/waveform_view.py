@@ -5,8 +5,8 @@ import pyqtgraph as pg
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QWidget
 
-from choppeur.core.models import Candidate
-from choppeur.gui.theme import LIGHT, ThemePalette
+from chopper.core.models import Candidate
+from chopper.gui.theme import LIGHT, ThemePalette
 
 
 def _downsample(samples: np.ndarray, max_points: int) -> np.ndarray:

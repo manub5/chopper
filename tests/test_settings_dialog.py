@@ -1,8 +1,8 @@
 import pytest
 from PySide6.QtWidgets import QDialog, QMessageBox
 
-from choppeur.core.settings import Settings
-from choppeur.gui.settings_dialog import SettingsDialog
+from chopper.core.settings import Settings
+from chopper.gui.settings_dialog import SettingsDialog
 
 
 def test_dialog_reflects_initial_settings(qapp):

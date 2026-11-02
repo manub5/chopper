@@ -5,8 +5,8 @@ from pathlib import Path
 
 import numpy as np
 
-from choppeur.core import audio_io
-from choppeur.core.models import Candidate, Track
+from chopper.core import audio_io
+from chopper.core.models import Candidate, Track
 
 
 @dataclass(frozen=True)

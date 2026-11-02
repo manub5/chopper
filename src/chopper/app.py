@@ -4,9 +4,9 @@ from collections.abc import Mapping
 
 from PySide6.QtWidgets import QApplication
 
-from choppeur.core.cache import AnalysisCache
-from choppeur.core.settings import Settings
-from choppeur.gui.main_window import MainWindow
+from chopper.core.cache import AnalysisCache
+from chopper.core.settings import Settings
+from chopper.gui.main_window import MainWindow
 
 
 def build_window(settings: Settings | None = None, cache: AnalysisCache | None = None) -> MainWindow:

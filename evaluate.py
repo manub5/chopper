@@ -103,7 +103,7 @@ def summarize(cases: list[dict]) -> dict:
 
 
 def detect(path: Path, device: str) -> dict:
-    from choppeur.core import audio_io, candidates, onsets, rhythm
+    from chopper.core import audio_io, candidates, onsets, rhythm
 
     samples, rate = audio_io.load(path)
     bpm, beats, downbeats = rhythm.analyze_rhythm(path, device=device)

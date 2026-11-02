@@ -5,8 +5,8 @@ from PySide6.QtGui import QWheelEvent
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
-from choppeur.core.models import Candidate, CandidateType
-from choppeur.gui.waveform_view import WaveformView
+from chopper.core.models import Candidate, CandidateType
+from chopper.gui.waveform_view import WaveformView
 
 SAMPLE_RATE = 22050
 

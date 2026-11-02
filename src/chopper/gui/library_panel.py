@@ -5,7 +5,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem, QWidget
 
-from choppeur.core.audio_io import AUDIO_EXTENSIONS
+from chopper.core.audio_io import AUDIO_EXTENSIONS
 
 _PATH_ROLE = Qt.ItemDataRole.UserRole
 _LOADING_PLACEHOLDER = "…"

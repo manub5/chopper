@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from choppeur.core.models import Analysis, Candidate, CandidateType, is_loop_length
+from chopper.core.models import Analysis, Candidate, CandidateType, is_loop_length
 
 
 def format_time(seconds: float) -> str:

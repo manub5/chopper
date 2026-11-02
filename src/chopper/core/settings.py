@@ -8,9 +8,9 @@ from tempfile import NamedTemporaryFile
 import tomli_w
 from platformdirs import user_cache_dir, user_config_dir
 
-from choppeur.core.models import LOOP_LENGTHS_BARS, is_loop_length
+from chopper.core.models import LOOP_LENGTHS_BARS, is_loop_length
 
-APP_NAME = "choppeur"
+APP_NAME = "chopper"
 _DEFAULT_LOOP_LENGTHS_BARS = LOOP_LENGTHS_BARS
 
 
@@ -62,8 +62,15 @@ def default_cache_path() -> Path:
     return Path(user_cache_dir(APP_NAME)) / "analyses.sqlite"
 
 
+def _legacy_settings_path() -> Path:
+    return Path(user_config_dir("choppeur")) / "settings.toml"
+
+
 def load_settings(path: Path | None = None) -> Settings:
-    path = path or default_settings_path()
+    if path is None:
+        path = default_settings_path()
+        if not path.exists() and not path.is_symlink():
+            path = _legacy_settings_path()
     if not path.exists():
         return Settings()
     with path.open("rb") as f:

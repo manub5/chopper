@@ -5,7 +5,7 @@ import pytest
 import sounddevice as sd
 from PySide6.QtCore import QTimer
 
-from choppeur.core.models import Candidate, CandidateType
+from chopper.core.models import Candidate, CandidateType
 
 
 class HostStream:
@@ -65,7 +65,7 @@ def audio_host(monkeypatch, qapp):
 
 
 def make_player(host):
-    from choppeur.gui.preview_player import PreviewPlayer
+    from chopper.gui.preview_player import PreviewPlayer
 
     player = PreviewPlayer()
     host.players.append(player)
@@ -244,7 +244,7 @@ def test_nonfinite_audio_outside_the_segment_does_not_reject_valid_excerpt(audio
 
 
 def test_state_and_player_keep_stereo_marks_and_ignore_old_finish(qapp, audio_host, loaded_track):
-    from choppeur.gui.sample_state import SampleState
+    from chopper.gui.sample_state import SampleState
 
     state = SampleState()
     state.load_track(loaded_track)

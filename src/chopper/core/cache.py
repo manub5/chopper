@@ -6,7 +6,7 @@ import threading
 from pathlib import Path
 from typing import Self
 
-from choppeur.core.models import Analysis, Track
+from chopper.core.models import Analysis, Track
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS analyses (

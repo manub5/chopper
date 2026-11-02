@@ -6,13 +6,13 @@ from PySide6.QtGui import QWheelEvent
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QVBoxLayout, QWidget
 
-from choppeur.gui.sample_state import SampleState
-from choppeur.gui.waveform_view import WaveformView
+from chopper.gui.sample_state import SampleState
+from chopper.gui.waveform_view import WaveformView
 
 
 @pytest.fixture
 def lane_ui(qapp, loaded_track):
-    from choppeur.gui.sample_lanes import SampleLanesView
+    from chopper.gui.sample_lanes import SampleLanesView
 
     window = QWidget()
     layout = QVBoxLayout(window)

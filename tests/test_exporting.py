@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from choppeur.core import audio_io
-from choppeur.core.models import Candidate, CandidateType
+from chopper.core import audio_io
+from chopper.core.models import Candidate, CandidateType
 
 
 @pytest.fixture
@@ -26,7 +26,7 @@ def stereo_source(tmp_path):
 
 @pytest.mark.parametrize("file_format", ["wav", "flac"])
 def test_buttons_export_stereo_to_root_in_selected_format(stereo_source, tmp_path, file_format):
-    from choppeur.core.exporting import export_batch
+    from chopper.core.exporting import export_batch
 
     samples, rate, track, candidates = stereo_source
     source_hash = sha256(track.path.read_bytes()).hexdigest()
@@ -45,7 +45,7 @@ def test_buttons_export_stereo_to_root_in_selected_format(stereo_source, tmp_pat
 
 
 def test_repeated_drags_create_distinct_permanent_wavs_in_unicode_subfolder(stereo_source, tmp_path):
-    from choppeur.core.exporting import export_drag
+    from chopper.core.exporting import export_drag
 
     samples, rate, track, candidates = stereo_source
     destination = tmp_path / "exports"
@@ -62,8 +62,8 @@ def test_repeated_drags_create_distinct_permanent_wavs_in_unicode_subfolder(ster
 
 
 def test_batch_collision_with_broken_link_does_not_retry_same_name_forever(stereo_source, tmp_path):
-    from choppeur.core.exporting import export_batch
-    from choppeur.core.naming import build_filename
+    from chopper.core.exporting import export_batch
+    from chopper.core.naming import build_filename
 
     samples, rate, track, candidates = stereo_source
     destination = tmp_path / "exports"
@@ -77,7 +77,7 @@ def test_batch_collision_with_broken_link_does_not_retry_same_name_forever(stere
 
 
 def test_disk_full_keeps_first_success_and_cleans_partial_second(stereo_source, tmp_path, monkeypatch):
-    from choppeur.core.exporting import export_batch
+    from chopper.core.exporting import export_batch
 
     samples, rate, track, candidates = stereo_source
     real_write = sf.write
@@ -107,7 +107,7 @@ def test_disk_full_keeps_first_success_and_cleans_partial_second(stereo_source, 
 def test_unavailable_network_folder_reports_failure_without_success(stereo_source, tmp_path, monkeypatch):
     from pathlib import Path
 
-    from choppeur.core.exporting import export_batch
+    from chopper.core.exporting import export_batch
 
     samples, rate, track, candidates = stereo_source
     destination = tmp_path / "nas"
@@ -128,7 +128,7 @@ def test_unavailable_network_folder_reports_failure_without_success(stereo_sourc
 def test_file_in_place_of_destination_reports_error_without_collision_loop(
     stereo_source, tmp_path, monkeypatch
 ):
-    from choppeur.core.exporting import export_batch
+    from chopper.core.exporting import export_batch
 
     samples, rate, track, candidates = stereo_source
     destination = tmp_path / "not-a-directory"
@@ -151,7 +151,7 @@ def test_file_in_place_of_destination_reports_error_without_collision_loop(
 
 @pytest.mark.parametrize("file_format", ["mp3", "wav/../../outside", ""])
 def test_invalid_format_writes_nothing(stereo_source, tmp_path, file_format):
-    from choppeur.core.exporting import export_batch
+    from chopper.core.exporting import export_batch
 
     samples, rate, track, candidates = stereo_source
     destination = tmp_path / "exports"
@@ -161,7 +161,7 @@ def test_invalid_format_writes_nothing(stereo_source, tmp_path, file_format):
 
 
 def test_empty_batch_creates_no_directory(stereo_source, tmp_path):
-    from choppeur.core.exporting import export_batch
+    from chopper.core.exporting import export_batch
 
     samples, rate, track, _candidates = stereo_source
     destination = tmp_path / "exports"
@@ -175,8 +175,8 @@ def test_drag_and_player_receive_identical_stereo_excerpt(qapp, stereo_source, t
 
     import sounddevice as sd
 
-    from choppeur.core.exporting import export_drag
-    from choppeur.gui.preview_player import PreviewPlayer
+    from chopper.core.exporting import export_drag
+    from chopper.gui.preview_player import PreviewPlayer
 
     samples, rate, track, candidates = stereo_source
     received = []

@@ -20,28 +20,28 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from choppeur.core import audio_io
-from choppeur.core.cache import AnalysisCache
-from choppeur.core.exporting import export_batch, export_drag
-from choppeur.core.models import Track
-from choppeur.core.settings import (
+from chopper.core import audio_io
+from chopper.core.cache import AnalysisCache
+from chopper.core.exporting import export_batch, export_drag
+from chopper.core.models import Track
+from chopper.core.settings import (
     Settings,
     default_cache_path,
     load_settings,
     save_settings,
 )
-from choppeur.gui.candidates_panel import CandidatesPanel
-from choppeur.gui.export_folder_dialog import choose_export_folder
-from choppeur.gui.library_panel import LibraryPanel
-from choppeur.gui.presentation import LoadedTrack
-from choppeur.gui.preview_player import PreviewPlayer
-from choppeur.gui.sample_drag import start_file_drag
-from choppeur.gui.sample_lanes import SampleLanesView
-from choppeur.gui.sample_state import SampleState
-from choppeur.gui.settings_dialog import SettingsDialog
-from choppeur.gui.theme import ThemeManager
-from choppeur.gui.waveform_view import WaveformView
-from choppeur.gui.workers import (
+from chopper.gui.candidates_panel import CandidatesPanel
+from chopper.gui.export_folder_dialog import choose_export_folder
+from chopper.gui.library_panel import LibraryPanel
+from chopper.gui.presentation import LoadedTrack
+from chopper.gui.preview_player import PreviewPlayer
+from chopper.gui.sample_drag import start_file_drag
+from chopper.gui.sample_lanes import SampleLanesView
+from chopper.gui.sample_state import SampleState
+from chopper.gui.settings_dialog import SettingsDialog
+from chopper.gui.theme import ThemeManager
+from chopper.gui.waveform_view import WaveformView
+from chopper.gui.workers import (
     AlbumAnalysisWorker,
     TrackAnalysisWorker,
     start_in_thread,

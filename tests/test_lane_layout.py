@@ -2,8 +2,8 @@ from dataclasses import replace
 
 import pytest
 
-from choppeur.core.models import Candidate, CandidateType
-from choppeur.gui.presentation import SampleItem
+from chopper.core.models import Candidate, CandidateType
+from chopper.gui.presentation import SampleItem
 
 
 def item(item_id, start, end, bars=1.0):
@@ -19,7 +19,7 @@ def item(item_id, start, end, bars=1.0):
     ],
 )
 def test_layout_never_occludes_and_is_independent_of_input_order(items, expected):
-    from choppeur.gui.lane_layout import layout_samples
+    from chopper.gui.lane_layout import layout_samples
 
     placed = layout_samples(items)
     assert {p.item_id: p.row for p in placed} == expected
@@ -28,7 +28,7 @@ def test_layout_never_occludes_and_is_independent_of_input_order(items, expected
 
 
 def test_layout_has_only_three_ordered_nonempty_categories():
-    from choppeur.gui.lane_layout import layout_samples
+    from chopper.gui.lane_layout import layout_samples
 
     shot = SampleItem(3, Candidate(CandidateType.ONE_SHOT, 0, 0.2, 1))
     items = (shot, item(2, 0, 1, 0.5), item(1, 0, 2))
@@ -39,7 +39,7 @@ def test_layout_has_only_three_ordered_nonempty_categories():
 
 
 def test_quarter_bar_lane_is_between_half_bars_and_shots():
-    from choppeur.gui.lane_layout import layout_samples
+    from chopper.gui.lane_layout import layout_samples
 
     shot = SampleItem(4, Candidate(CandidateType.ONE_SHOT, 0, 0.2, 1))
     placed = layout_samples((shot, item(3, 0, 0.5, 0.25), item(2, 0, 1, 0.5), item(1, 0, 2)))

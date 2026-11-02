@@ -7,7 +7,7 @@ import numpy as np
 import sounddevice as sd
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
 
-from choppeur.core.models import Candidate
+from chopper.core.models import Candidate
 
 
 class PreviewPlayer(QObject):

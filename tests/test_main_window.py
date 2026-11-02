@@ -5,13 +5,13 @@ import pytest
 import soundfile as sf
 from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox
 
-from choppeur.core import settings as settings_module
-from choppeur.core.cache import AnalysisCache
-from choppeur.core.models import Analysis, Candidate, CandidateType
-from choppeur.core.settings import Settings, load_settings
-from choppeur.gui import main_window as main_window_module
-from choppeur.gui import workers
-from choppeur.gui.main_window import MainWindow
+from chopper.core import settings as settings_module
+from chopper.core.cache import AnalysisCache
+from chopper.core.models import Analysis, Candidate, CandidateType
+from chopper.core.settings import Settings, load_settings
+from chopper.gui import main_window as main_window_module
+from chopper.gui import workers
+from chopper.gui.main_window import MainWindow
 
 SAMPLE_RATE = 1000
 
@@ -486,7 +486,7 @@ def test_settings_dialog_accepted_updates_and_saves_settings(qapp, make_window, 
     new_settings = Settings(export_format="flac")
 
     monkeypatch.setattr(QDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
-    monkeypatch.setattr("choppeur.gui.settings_dialog.SettingsDialog.settings", lambda self: new_settings)
+    monkeypatch.setattr("chopper.gui.settings_dialog.SettingsDialog.settings", lambda self: new_settings)
     saved = []
     monkeypatch.setattr(main_window_module, "save_settings", saved.append)
 
@@ -748,7 +748,7 @@ def test_export_dir_preference_enables_handles_without_writing(
     destination = tmp_path / "exports"
     updated = Settings(export_dir=str(destination))
     monkeypatch.setattr(QDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
-    monkeypatch.setattr("choppeur.gui.settings_dialog.SettingsDialog.settings", lambda self: updated)
+    monkeypatch.setattr("chopper.gui.settings_dialog.SettingsDialog.settings", lambda self: updated)
     monkeypatch.setattr(main_window_module, "save_settings", lambda *args: None)
     window._on_settings_clicked()
     assert window.candidates_panel.table.item(0, 4).flags() & Qt.ItemFlag.ItemIsEnabled

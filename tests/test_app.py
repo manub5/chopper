@@ -1,6 +1,6 @@
-from choppeur.app import build_window, default_platform_for_session, default_platform_theme_for_session
-from choppeur.core.cache import AnalysisCache
-from choppeur.core.settings import Settings
+from chopper.app import build_window, default_platform_for_session, default_platform_theme_for_session
+from chopper.core.cache import AnalysisCache
+from chopper.core.settings import Settings
 
 
 def test_build_window_creates_the_main_window(qapp, tmp_path):

@@ -2,7 +2,7 @@
 
 from PySide6.QtCore import QObject, Signal, Slot
 
-from choppeur.gui.presentation import LoadedTrack, SampleItem
+from chopper.gui.presentation import LoadedTrack, SampleItem
 
 
 class SampleState(QObject):

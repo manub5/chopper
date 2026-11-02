@@ -10,8 +10,8 @@ import numpy as np
 import soundfile as sf
 from mutagen import File as MutagenFile
 
-from choppeur.core.models import Candidate, Track
-from choppeur.core.naming import build_filename, unique_path
+from chopper.core.models import Candidate, Track
+from chopper.core.naming import build_filename, unique_path
 
 _NATIVE_EXTENSIONS = {".wav", ".flac", ".ogg", ".aiff", ".aif"}
 

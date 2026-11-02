@@ -3,11 +3,11 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from choppeur.core.models import Analysis, Candidate, CandidateType, Track
+from chopper.core.models import Analysis, Candidate, CandidateType, Track
 
 
 def test_loaded_track_preserves_original_audio_and_equal_candidates(tmp_path):
-    from choppeur.gui.presentation import LoadedTrack
+    from chopper.gui.presentation import LoadedTrack
 
     samples = np.column_stack([np.full(3000, 0.2), np.full(3000, -0.4)]).astype(np.float32)
     track = Track(tmp_path / "source.wav", "Artist", "Album", "Title", 1, 3.0, 1000)
@@ -21,7 +21,7 @@ def test_loaded_track_preserves_original_audio_and_equal_candidates(tmp_path):
 
 
 def make_state(loaded_track, *, auto_play=True):
-    from choppeur.gui.sample_state import SampleState
+    from chopper.gui.sample_state import SampleState
 
     state = SampleState(auto_play=auto_play)
     state.load_track(loaded_track)

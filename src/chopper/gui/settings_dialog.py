@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from choppeur.core.settings import Settings
+from chopper.core.settings import Settings
 
 
 class SettingsDialog(QDialog):

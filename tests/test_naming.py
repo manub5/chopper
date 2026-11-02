@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from choppeur.core.models import Candidate, CandidateType, Track
-from choppeur.core.naming import build_filename, unique_path
+from chopper.core.models import Candidate, CandidateType, Track
+from chopper.core.naming import build_filename, unique_path
 
 _DEFAULT_TRACK = Track(
     path=Path("/library/Burial/Untrue/03 - Etched Headplate.mp3"),

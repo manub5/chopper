@@ -3,10 +3,10 @@ import pytest
 import soundfile as sf
 from PySide6.QtCore import QEventLoop, QTimer
 
-from choppeur.core.cache import AnalysisCache
-from choppeur.core.models import Analysis, Candidate, CandidateType, Track
-from choppeur.core.settings import Settings
-from choppeur.gui import workers
+from chopper.core.cache import AnalysisCache
+from chopper.core.models import Analysis, Candidate, CandidateType, Track
+from chopper.core.settings import Settings
+from chopper.gui import workers
 
 SAMPLE_RATE = 22050
 

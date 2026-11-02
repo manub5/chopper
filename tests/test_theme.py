@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QWidget
 
 @pytest.fixture
 def manager(qapp):
-    from choppeur.gui.theme import ThemeManager
+    from chopper.gui.theme import ThemeManager
 
     original = QPalette(qapp.palette())
     owner = QWidget()
@@ -98,9 +98,9 @@ def test_repeated_force_choice_does_not_emit_or_loop(manager, qapp):
 def test_window_graphs_and_table_follow_theme_without_losing_state(qapp, tmp_path, loaded_track, monkeypatch):
     import sounddevice as sd
 
-    from choppeur.core.cache import AnalysisCache
-    from choppeur.core.settings import Settings
-    from choppeur.gui.main_window import MainWindow
+    from chopper.core.cache import AnalysisCache
+    from chopper.core.settings import Settings
+    from chopper.gui.main_window import MainWindow
 
     window = MainWindow(Settings(), AnalysisCache(tmp_path / "cache.sqlite"))
 

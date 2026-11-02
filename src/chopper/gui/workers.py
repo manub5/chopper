@@ -4,13 +4,13 @@ from pathlib import Path
 
 from PySide6.QtCore import QObject, QThread, Signal
 
-from choppeur.core import audio_io, onsets, rhythm
-from choppeur.core import candidates as candidates_module
-from choppeur.core.audio_io import AUDIO_EXTENSIONS
-from choppeur.core.cache import AnalysisCache
-from choppeur.core.models import Analysis, Candidate, Track
-from choppeur.core.settings import Settings
-from choppeur.gui.presentation import LoadedTrack
+from chopper.core import audio_io, onsets, rhythm
+from chopper.core import candidates as candidates_module
+from chopper.core.audio_io import AUDIO_EXTENSIONS
+from chopper.core.cache import AnalysisCache
+from chopper.core.models import Analysis, Candidate, Track
+from chopper.core.settings import Settings
+from chopper.gui.presentation import LoadedTrack
 
 
 def tracks_in_folder(folder: Path) -> list[Track]:

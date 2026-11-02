@@ -6,8 +6,8 @@ from PySide6.QtGui import QDrag, QMouseEvent
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QWidget
 
-from choppeur.gui.candidates_panel import CandidatesPanel
-from choppeur.gui.sample_state import SampleState
+from chopper.gui.candidates_panel import CandidatesPanel
+from chopper.gui.sample_state import SampleState
 
 
 def move_held(table, point, *, held=True):
@@ -40,7 +40,7 @@ def panel(qapp, loaded_track):
 def test_native_drag_provides_existing_absolute_url_copy_only_and_keeps_file(
     qapp, tmp_path, monkeypatch, action, relative
 ):
-    from choppeur.gui.sample_drag import start_file_drag
+    from chopper.gui.sample_drag import start_file_drag
 
     path = tmp_path / "glissés" / "sample.wav"
     path.parent.mkdir()
@@ -66,7 +66,7 @@ def test_native_drag_provides_existing_absolute_url_copy_only_and_keeps_file(
 
 
 def test_no_drag_with_nonexistent_file(qapp, tmp_path, monkeypatch):
-    from choppeur.gui.sample_drag import start_file_drag
+    from chopper.gui.sample_drag import start_file_drag
 
     calls = []
     monkeypatch.setattr(QDrag, "exec", lambda *args: calls.append(True))

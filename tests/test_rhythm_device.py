@@ -1,4 +1,4 @@
-from choppeur.core import rhythm
+from chopper.core import rhythm
 
 
 def test_resolve_device_forces_cpu():

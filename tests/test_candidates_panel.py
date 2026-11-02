@@ -4,8 +4,8 @@ import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 
-from choppeur.gui.candidates_panel import CandidatesPanel
-from choppeur.gui.sample_state import SampleState
+from chopper.gui.candidates_panel import CandidatesPanel
+from chopper.gui.sample_state import SampleState
 
 
 def make_panel(loaded_track, auto_play=False):
@@ -56,7 +56,7 @@ def test_quarter_bar_label_and_duration(qapp, loaded_track):
 
 @pytest.mark.parametrize("bars", [None, 2, True])
 def test_invalid_loop_label_fails_explicitly(loaded_track, bars):
-    from choppeur.gui.presentation import sample_type_label
+    from chopper.gui.presentation import sample_type_label
 
     with pytest.raises(ValueError):
         sample_type_label(replace(loaded_track.candidates[0], bars=bars))

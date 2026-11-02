@@ -4,8 +4,8 @@ from collections import Counter
 import numpy as np
 import pytest
 
-from choppeur.core import candidates
-from choppeur.core.models import CandidateType
+from chopper.core import candidates
+from chopper.core.models import CandidateType
 
 SAMPLE_RATE = 22050
 

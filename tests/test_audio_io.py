@@ -6,8 +6,8 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from choppeur.core import audio_io
-from choppeur.core.models import Candidate, CandidateType, Track
+from chopper.core import audio_io
+from chopper.core.models import Candidate, CandidateType, Track
 
 SAMPLE_RATE = 44100
 

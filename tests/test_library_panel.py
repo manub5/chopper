@@ -2,7 +2,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QTreeWidgetItem
 
-from choppeur.gui.library_panel import LibraryPanel
+from chopper.gui.library_panel import LibraryPanel
 
 _LOADING_PLACEHOLDER = "…"
 
