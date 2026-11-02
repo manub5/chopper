@@ -6,7 +6,7 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
   - repo: https://github.com/semgrep/pre-commit
-    rev: v1.181.1
+    rev: v1.183.0
     hooks:
       - id: semgrep
         args: ["--config", "auto", "--error"]
