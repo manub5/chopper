@@ -32,6 +32,10 @@ dans pre-commit et la préécoute ne joue plus en boucle.
   idempotent (WAV distincts permanents), comme avant ; aucun nettoyage automatique.
 - La politique de démarrage reste XCB par défaut sous Wayland jusqu'à l'étape 8.
   Aucun push de cette étape avant validation utilisateur.
+- Revue indépendante de `9998edd..e272e63` sans anomalie critique/importante/mineure ;
+  160 tests ciblés et 31 tests actions/géométrie à 150 % réussis par le relecteur.
+  71 tests actions/fenêtre passent aussi sous Wayland dans la session d'implémentation.
+  Les tests n'attestent pas l'audio matériel, un dépôt réel Bitwig ni un NAS réel.
 
 ## 02/11/2026 — Licence Chopper validée par M.B
 

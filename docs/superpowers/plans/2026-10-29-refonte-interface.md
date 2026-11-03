@@ -468,6 +468,8 @@ réelle de la fenêtre. Menus/aide dérivés du registre, boutons liés aux mêm
 actions, contrôles de saisie et modaux réels ; seule la sortie PortAudio est
 remplacée dans ces tests. Aucun dépôt réel Bitwig ou nouveau défaut Wayland
 revendiqué. Attendre validation utilisateur avant l'étape 8.
+Revue indépendante : aucune anomalie ; 160 tests ciblés et 31 tests à 150 %
+réussis. Commit de l'étape : `e272e63`. Changements non poussés en attente de validation.
 
 ## Étape 8 — Wayland par défaut et recette finale
 
