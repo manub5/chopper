@@ -60,6 +60,31 @@ referenced by a DAW project. In Bitwig, use **File → Collect and Save** to col
 external audio into the project folder before archiving or sharing the project.
 Qt's reported drop result alone does not prove that a DAW imported the sample.
 
+## Keyboard shortcuts
+
+Use **Help → Keyboard shortcuts** (F1) to see the shortcut list generated from
+the same actions as the menus and buttons.
+
+| Action | Shortcut |
+| --- | --- |
+| Open library | Ctrl+O |
+| Settings | Ctrl+, |
+| Preview / stop active sample | Space |
+| Stop preview | Esc |
+| Mark / unmark active sample | M |
+| Mark all samples in the displayed track | Ctrl+A |
+| Clear all marks | Ctrl+Shift+A |
+| Export marked | Ctrl+E |
+| Export all samples in the displayed track | Ctrl+Shift+E |
+| Keyboard shortcuts | F1 |
+| Quit | Ctrl+Q |
+
+Preview and marking shortcuts work in the sample area (waveform, lanes and
+table), not in the library, text fields or modal dialogs. Up/Down in the table
+select a sample without starting playback. Marking does not start playback.
+Unavailable actions are disabled, and holding a shortcut does not repeat it.
+**Analyze album** remains available as both a File menu action and a visible button.
+
 ## KDE and Wayland
 
 The application currently defaults to XWayland on Wayland sessions to avoid

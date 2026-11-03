@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-from PySide6.QtCore import QThread
+from PySide6.QtCore import Qt, QThread
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -30,6 +30,7 @@ from chopper.core.settings import (
     load_settings,
     save_settings,
 )
+from chopper.gui.actions import ActionRegistry
 from chopper.gui.candidates_panel import CandidatesPanel
 from chopper.gui.export_folder_dialog import choose_export_folder
 from chopper.gui.library_panel import LibraryPanel
@@ -67,6 +68,7 @@ class MainWindow(QMainWindow):
         self._current_track: Track | None = None
         self._current_folder: Path | None = None
         self._thread: QThread | None = None
+        self._analysis_busy = False
         # Référence gardée : PySide6 ne garde pas le worker en vie tout seul (voir
         # _run_worker) une fois qu'il n'y a plus de variable Python qui le référence.
         self._worker: TrackAnalysisWorker | AlbumAnalysisWorker | None = None
@@ -97,14 +99,11 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.status_bar)
 
         open_library_button = QPushButton("Open library…")
-        open_library_button.clicked.connect(self._on_open_library_clicked)
 
         self.analyze_album_button = QPushButton("Analyze album")
         self.analyze_album_button.setEnabled(False)
-        self.analyze_album_button.clicked.connect(self._on_analyze_album_clicked)
 
         settings_button = QPushButton("Settings…")
-        settings_button.clicked.connect(self._on_settings_clicked)
 
         top_buttons = QHBoxLayout()
         top_buttons.addWidget(open_library_button)
@@ -117,6 +116,9 @@ class MainWindow(QMainWindow):
         top_buttons.addWidget(settings_button)
 
         right_panel = QWidget()
+        self.candidate_scope = right_panel
+        right_panel.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.sample_lanes.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         right_layout = QVBoxLayout(right_panel)
         right_layout.addWidget(self.track_label)
         right_layout.addWidget(self.waveform_view, 3)
@@ -139,7 +141,31 @@ class MainWindow(QMainWindow):
         self.library_panel.track_selected.connect(self._on_track_selected)
         self.library_panel.folder_selected.connect(self._on_folder_selected)
         self.library_panel.load_failed.connect(self._on_library_load_failed)
-        self.candidates_panel.export_requested.connect(self._on_export_requested)
+        self.action_registry = ActionRegistry(self, right_panel)
+        actions = self.action_registry.actions
+        actions["open_library"].triggered.connect(self._on_open_library_clicked)
+        actions["settings"].triggered.connect(self._on_settings_clicked)
+        actions["analyze_album"].triggered.connect(self._on_analyze_album_clicked)
+        actions["quit"].triggered.connect(self.close)
+        actions["play"].triggered.connect(self.sample_state.toggle_playback)
+        actions["stop"].triggered.connect(self.sample_state.stop)
+        actions["mark"].triggered.connect(self._mark_active_sample)
+        actions["mark_all"].triggered.connect(self.sample_state.mark_all)
+        actions["clear_marks"].triggered.connect(self.sample_state.clear_marks)
+        actions["export_marked"].triggered.connect(lambda: self._on_export_requested("marked"))
+        actions["export_all"].triggered.connect(lambda: self._on_export_requested("all"))
+        self.candidates_panel.export_requested.connect(lambda mode: actions[f"export_{mode}"].trigger())
+        self.action_registry.bind_button(open_library_button, "open_library")
+        self.action_registry.bind_button(settings_button, "settings")
+        self.action_registry.bind_button(self.analyze_album_button, "analyze_album")
+        self.action_registry.bind_button(
+            self.candidates_panel.export_marked_button, "export_marked", connect_click=False
+        )
+        self.action_registry.bind_button(
+            self.candidates_panel.export_all_button, "export_all", connect_click=False
+        )
+        self.sample_state.changed.connect(self._sync_actions)
+        self._sync_actions()
         self.candidates_panel.drag_requested.connect(self._on_drag_requested)
 
         self.theme_manager = ThemeManager(force_dark=self.settings.force_dark, parent=self)
@@ -161,7 +187,7 @@ class MainWindow(QMainWindow):
 
     def _on_folder_selected(self, folder: Path) -> None:
         self._current_folder = folder
-        self.analyze_album_button.setEnabled(True)
+        self._sync_actions()
 
     def _on_library_load_failed(self, folder: Path, message: str) -> None:
         self.status_bar.showMessage(f"Could not read {folder}: {message}", 8000)
@@ -287,6 +313,25 @@ class MainWindow(QMainWindow):
 
     # --- préécoute -------------------------------------------------------
 
+    def _mark_active_sample(self) -> None:
+        if self.sample_state.active_id is not None:
+            self.sample_state.toggle_mark(self.sample_state.active_id)
+
+    def _sync_actions(self) -> None:
+        state = self.sample_state
+        available = {
+            "analyze_album": self._current_folder is not None and not self._analysis_busy,
+            "play": state.active_id is not None,
+            "stop": state.playing_id is not None,
+            "mark": state.active_id is not None,
+            "mark_all": bool(state.items),
+            "clear_marks": bool(state.marked_ids),
+            "export_marked": bool(state.marked_ids),
+            "export_all": bool(state.items),
+        }
+        for name, enabled in available.items():
+            self.action_registry.set_available(name, enabled)
+
     def _on_preview_failed(self, message: str) -> None:
         self.status_bar.showMessage(message, 8000)
 
@@ -404,8 +449,10 @@ class MainWindow(QMainWindow):
         """Empêche de lancer une deuxième analyse pendant qu'une autre tourne déjà :
         deux QThread simultanés sur cette fenêtre se sont déjà marché dessus en
         pratique (voir _run_worker)."""
+        self._analysis_busy = busy
         self.library_panel.setEnabled(not busy)
         self.analyze_album_button.setEnabled(not busy and self._current_folder is not None)
+        self.action_registry.set_available("analyze_album", not busy and self._current_folder is not None)
 
     def _run_worker(self, worker: TrackAnalysisWorker | AlbumAnalysisWorker) -> None:
         self._worker = worker  # évite que Python ne le détruise pendant l'exécution

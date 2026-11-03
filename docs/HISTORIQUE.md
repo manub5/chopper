@@ -6,6 +6,33 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 03/11/2026 — Actions partagées, menus et raccourcis clavier
+
+- Registre unique `gui/actions.py` : actions partagées entre menus, boutons et
+  dialogue « Help → Keyboard shortcuts ». Raccourcis affichés dans les menus,
+  l'aide et les info-bulles ; bouton « Analyze album » conservé.
+- `M` marque/retire le seul actif, Espace joue/arrête, Échap arrête sans retirer
+  les marques. Ctrl+A / Ctrl+Maj+A limités aux samples. Raccourcis de préécoute
+  et marquage limités à la zone onde/couloirs/table, jamais à la bibliothèque ou
+  à une saisie. Pas de Ctrl+Espace ni de répétition automatique.
+- Aucun filtre global de touches : contexte Qt `WidgetWithChildrenShortcut`,
+  détection des champs éditables par focus et désactivation pendant les modaux.
+  Actions indisponibles désactivées ; exports au clavier et aux boutons utilisent
+  la même commande, sans double écriture. Saisie « m m » et sélection du texte intactes.
+- Deux régressions prévenues par tests rouges puis verts : l'état modal de Qt
+  peut survivre momentanément au retour du focus, d'où une resynchronisation
+  différée ; l'action album doit suivre l'état occupé de l'interface et non la
+  seule existence d'un thread, pour ne pas se réactiver à un changement de marque.
+- Tests natifs : le clavier nécessite l'activation asynchrone par le compositeur
+  Wayland. Attendre `qWaitForWindowActive` dans le banc de test, sans contourner
+  le focus ni modifier le routage des touches en production.
+- Vérifications : 398 tests réussis, dont 16 nouveaux ; ces 16 tests passent
+  aussi sous Wayland natif, avec PortAudio seulement simulé et dialogues Qt réels.
+  Sources audio et algorithmes inchangés. Exporter plusieurs fois reste non
+  idempotent (WAV distincts permanents), comme avant ; aucun nettoyage automatique.
+- La politique de démarrage reste XCB par défaut sous Wayland jusqu'à l'étape 8.
+  Aucun push de cette étape avant validation utilisateur.
+
 ## 02/11/2026 — Licence Chopper validée par M.B
 
 - Application mot pour mot du texte approuvé dans `LICENSE`, copyright 2026 M.B.

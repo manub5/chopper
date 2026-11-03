@@ -6,6 +6,12 @@
 > trois longueurs 1/0,5/0,25, quota indépendant et navigation bornée au morceau.
 > Les résultats des étapes déjà commités ci-dessous restent historiques.
 
+> **Reprise au 03/11/2026 :** renommage et licence validés et publiés ; les chemins
+> de travail actuels sont `src/chopper/`, l'interface est en anglais et les nouveaux
+> WAV glissés vont dans `dragged/`. Les anciennes mentions ci-dessous sont historiques.
+> L'étape 7 reprend sur `9998edd` après validation des étapes intermédiaires ;
+> l'étape 8 reste conditionnée à la validation utilisateur de l'étape 7.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans pour réaliser les tâches dans cette session. **Exception impérative à son exécution continue : arrêter après chaque étape et attendre la validation utilisateur**, conformément au design et à AGENTS.md. Ne pas lancer automatiquement l'étape suivante. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Livrer l'interface approuvée, avec tous les samples visibles et
@@ -437,24 +443,31 @@ sous Wayland avant l'étape 7.
 expose ses `QAction` par identifiant ; ces instances alimentent menus, boutons,
 info-bulles et le dialogue « Aide > Raccourcis clavier » sans listes dupliquées.
 
-- [ ] **1. Tests d'abord :** `M` bascule la marque du seul actif, deux appuis la
+- [x] **1. Tests d'abord :** `M` bascule la marque du seul actif, deux appuis la
   retirent ; Espace joue/arrête, Échap arrête sans effacer les marques. Vérifier
   la présence de `M` dans l'action, menu et aide, l'absence de Ctrl+Espace,
   et les info-bulles des boutons pour les raccourcis définis dans le design.
   Dans un QLineEdit puis un dialogue modal, saisir `m m` : texte intact, aucun
   ordre de lecture ni marquage. Ctrl+A dans la bibliothèque ne marque pas les
   candidats. Pas d'actif/liste vide : raccourcis sans effet et actions désactivées.
-- [ ] **2. Observer le rouge :**
+- [x] **2. Observer le rouge :**
   `uv run pytest -q tests/test_actions.py tests/test_main_window.py`.
-- [ ] **3. Implémenter le registre et les menus Fichier, Lecture, Export, Aide.**
+- [x] **3. Implémenter le registre et les menus Fichier, Lecture, Export, Aide.**
   Appliquer exactement la table du design corrigée. Limiter `M`, Espace et les
   sélections multiples au contexte des candidats et neutraliser ces actions lors
   d'une saisie ou d'un dialogue ; ne pas installer un filtre clavier global qui
   consomme tout. Réutiliser l'action album sur le bouton déjà visible ; l'entrée
   de menu est complémentaire. Haut/bas naviguent sans lecture automatique.
-- [ ] **4. Vert et porte G ; commit :** `Centralise les actions et ajoute les raccourcis dont M`.
+- [x] **4. Vert et porte G ; commit :** `Centralise les actions et ajoute les raccourcis dont M`.
   **Validation :** clavier seul, menus/aide/info-bulles cohérents, saisie de texte
   normale et bouton album toujours visible. Attendre validation.
+
+**Résultat automatisé au 03/11/2026 :** 398 tests réussis, dont 16 nouveaux ;
+les 16 tests clavier passent aussi sous Wayland natif après attente de l'activation
+réelle de la fenêtre. Menus/aide dérivés du registre, boutons liés aux mêmes
+actions, contrôles de saisie et modaux réels ; seule la sortie PortAudio est
+remplacée dans ces tests. Aucun dépôt réel Bitwig ou nouveau défaut Wayland
+revendiqué. Attendre validation utilisateur avant l'étape 8.
 
 ## Étape 8 — Wayland par défaut et recette finale
 
