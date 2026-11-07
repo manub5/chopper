@@ -93,7 +93,9 @@ class CandidatesPanel(QWidget):
         self.table.verticalHeader().setDefaultSectionSize(26)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.table.horizontalHeader().setSectionsClickable(True)
-        self.table.horizontalHeader().sectionClicked.connect(self._sort)
+        self.table.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
+        self.table.horizontalHeader().setSortIndicatorShown(True)
+        self.table.horizontalHeader().sortIndicatorChanged.connect(self._sort)
         for column, width in enumerate((0, 90, 90, 100, 36)):
             if column:
                 self.table.setColumnWidth(column, width)
@@ -124,14 +126,10 @@ class CandidatesPanel(QWidget):
         self.table._handle_press = None
         self._sync()
 
-    def _sort(self, column: int) -> None:
-        header = self.table.horizontalHeader()
-        order = (
-            Qt.SortOrder.DescendingOrder
-            if header.sortIndicatorSection() == column
-            and header.sortIndicatorOrder() == Qt.SortOrder.AscendingOrder
-            else Qt.SortOrder.AscendingOrder
-        )
+    def _sort(self, column: int, order: Qt.SortOrder) -> None:
+        if column < 0:
+            return
+        # Qt has already toggled the indicator; apply its order without reversing it again.
         self._syncing = True
         try:
             self.table.sortItems(column, order)

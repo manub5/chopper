@@ -6,6 +6,27 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 07/11/2026 — Rétablit l'alternance du tri des samples
+
+- Bug reproduit sur les quatre colonnes triables par vrais clics d'en-tête :
+  l'ordre restait identique après le premier clic. QHeaderView avait déjà changé
+  son indicateur avant `sectionClicked`, et le handler inversait ce nouvel ordre
+  une seconde fois, annulant à chaque fois l'alternance attendue.
+- Utiliser `sortIndicatorChanged(column, order)` comme source unique de l'ordre,
+  sans seconde inversion. Indicateur initial sans colonne ; aucune activation
+  du tri automatique pendant le remplissage de lignes, aucune modification audio.
+- Quatre tests rouges puis verts : quatre clics alternent les ordres sur chaque
+  colonne, tout en préservant actif, marques et absence de lecture parasite.
+  411 tests réussis ; 32 tests panneau/glisser réussis sous Wayland. Ruff/mypy
+  et revue indépendante sans anomalie ; tris programmatiques et réentrance vérifiés.
+- Le signalement de doublon Dolphin reste en diagnostic séparé. Chopper prépare
+  un WAV permanent dans `dragged/`, puis transmet une seule URL par QDrag copie.
+  Le menu « Copier ici » est une décision du destinataire KIO ; sa présence seule
+  ne démontre pas deux transferts Chopper. Ne supprimer aucun WAV déjà référencé
+  et ne modifier aucune politique de conservation sans préciser la reproduction.
+- Aucun push ; sources et exports existants intacts. Les vrais glissers répétés
+  restent volontairement non idempotents et créent des fichiers distincts.
+
 ## 07/11/2026 — Wayland par défaut et recette finale
 
 - Après validation utilisateur de l'étape 7, changement ciblé de la politique

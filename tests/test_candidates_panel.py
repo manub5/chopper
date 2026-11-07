@@ -1,7 +1,7 @@
 from dataclasses import replace
 
 import pytest
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QPoint, Qt
 from PySide6.QtTest import QTest
 
 from chopper.gui.candidates_panel import CandidatesPanel
@@ -168,3 +168,34 @@ def test_english_loop_labels(loaded_track, bars, label):
     from chopper.gui.presentation import sample_type_label
 
     assert sample_type_label(replace(loaded_track.candidates[0], bars=bars)) == label
+
+
+@pytest.mark.parametrize("column", [0, 1, 2, 3])
+def test_header_clicks_alternate_sort_without_changing_sample_state(qapp, loaded_track, column):
+    candidates = (
+        loaded_track.candidates[1],
+        replace(loaded_track.candidates[0], bars=0.25, bpm=80.0, start_seconds=0.1, end_seconds=0.35),
+        replace(loaded_track.candidates[0], start_seconds=2.0, end_seconds=3.0),
+    )
+    panel, state = make_panel(replace(loaded_track, candidates=candidates), auto_play=True)
+    try:
+        qapp.processEvents()
+        state.navigate(state.items[2].id)
+        state.toggle_mark(state.items[1].id)
+        requests = []
+        state.play_requested.connect(lambda *args: requests.append(args))
+        header = panel.table.horizontalHeader()
+        point = QPoint(
+            header.sectionViewportPosition(column) + header.sectionSize(column) // 2, header.height() // 2
+        )
+        orders = []
+        for _ in range(4):
+            QTest.mouseClick(header.viewport(), Qt.MouseButton.LeftButton, pos=point)
+            orders.append(tuple(panel.table.item(row, 0).data(Qt.ItemDataRole.UserRole) for row in range(3)))
+        assert orders[1] == tuple(reversed(orders[0]))
+        assert orders[2] == orders[0]
+        assert orders[3] == orders[1]
+        assert state.active_id == state.items[2].id and state.marked_ids == {state.items[1].id}
+        assert not requests and state.playing_id is None
+    finally:
+        panel.close()
