@@ -122,7 +122,7 @@ def main() -> int:
     args = parser.parse_args()
     if args.output_root is not None and not args.output_root.is_dir():
         parser.error("--output-root must be an existing folder.")
-    # Do not import app.py: its XCB fallback would bypass a native Wayland test.
+    # Keep this disposable probe independent of the application's startup policy.
     app = QApplication([sys.argv[0]])
     window = ProbeWindow(args.output_root)
     window.show()

@@ -4,6 +4,21 @@ Note de nommage au 02/11/2026 : les mentions Choppeur/`choppeur` ci-dessous
 conservent le contexte historique. L'application actuelle s'appelle Chopper,
 se lance avec `uv run chopper` et fournit `src/chopper/py.typed`.
 
+## 07/11/2026 — Wayland natif par défaut après validation de l'interface
+
+- Dans une session `XDG_SESSION_TYPE=wayland`, sans `QT_QPA_PLATFORM` non vide,
+  sélectionner `wayland` avant de construire QApplication. Préserver toute
+  sélection explicite (`xcb`, `wayland`, plugin de test ou autre) et laisser une
+  session X11 inchangée. Le portail KDE et son choix explicite restent inchangés.
+- XCB était un contournement d'artefacts de peinture observés sur certaines
+  sessions KDE. Après validation des étapes visuelles, glisser et raccourcis,
+  privilégier le protocole natif pour l'intégration Wayland ; conserver la commande
+  `QT_QPA_PLATFORM=xcb uv run chopper` en secours, sans repli silencieux sur erreur.
+- Contrôler le démarrage réel avec Qt natif et XCB sur données synthétiques,
+  sans écrire dans les préférences/cache utilisateur. Une capture ne prouve pas
+  l'absence d'artefacts pour tous pilotes ; lecture matérielle et dépôt Bitwig
+  doivent faire partie de la validation utilisateur finale.
+
 ## Détection des temps et du premier temps de mesure : beat_this, pas madmom
 - madmom : dernière version PyPI 0.16.1, qui ne gère que Python < 3.10 et
   numpy < 1.20 ; installation seulement depuis GitHub. Ses modèles sont sous

@@ -9,9 +9,10 @@ From the project root in a KDE Wayland session:
 QT_QPA_PLATFORM=wayland uv run python prototypes/drag_drop_wayland.py
 ```
 
-The first log line must include `Actual Qt backend: wayland`. Unlike the main
-application, this probe does not default to XWayland. Report launch failures
-rather than silently switching backends.
+The first log line must include `Actual Qt backend: wayland`. The main application
+also defaults to native Wayland in a Wayland session. This probe leaves platform
+selection to the explicit environment and Qt. Report launch failures rather than
+silently switching backends.
 
 ## Required manual test
 

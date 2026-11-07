@@ -6,6 +6,30 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 07/11/2026 — Wayland par défaut et recette finale
+
+- Après validation utilisateur de l'étape 7, changement ciblé de la politique
+  de démarrage : `wayland` dans une session Wayland, au lieu du forçage `xcb`.
+  Tous les choix explicites restent respectés ; X11 et portail KDE inchangés.
+- Ancien test du défaut XCB remplacé par son exigence Wayland, pas supprimé.
+  Cas supplémentaires : XCB explicite, plugin arbitraire, `offscreen`, choix vide,
+  et transmission du choix à Qt avant sa construction. Aucun changement moteur,
+  audio, format d'export ou cycle de vie des workers.
+- Démarrage réel via `app.main`, sans `QT_QPA_PLATFORM` forcé : Qt annonce Wayland.
+  Démarrage réel avec choix XCB : Qt annonce XCB. Fenêtres avec 32 candidats
+  synthétiques et cache temporaire uniquement ; captures inspectées, pas de défaut
+  visible sur ces ouvertures. Cela ne garantit pas tous pilotes/compositeurs.
+- La solution `QT_QPA_PLATFORM=xcb uv run chopper` reste documentée pour les
+  artefacts de peinture ; aucun repli automatique ne masque un plugin défectueux.
+- Sources toujours en lecture seule, WAV permanents distincts à chaque glisser
+  (non-idempotence volontaire inchangée), aucun déplacement d'exports ou paramètres.
+  Validation utilisateur finale attendue : lecture, thèmes KDE, zoom/défilement,
+  Bitwig/Dolphin et réouverture du projet après fermeture de Chopper.
+- Suite complète : 407 tests réussis sans affichage et 407 sous Wayland natif ;
+  31 tests clavier/géométrie à 150 % sous Wayland réussis. Contrôles statiques
+  réussis avec les seules notes mypy/Bandit préexistantes. Checklist manuelle
+  `docs/FINAL_VALIDATION.md` pour distinguer ces preuves des essais matériels.
+
 ## 03/11/2026 — Actions partagées, menus et raccourcis clavier
 
 - Registre unique `gui/actions.py` : actions partagées entre menus, boutons et

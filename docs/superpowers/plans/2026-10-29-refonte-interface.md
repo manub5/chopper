@@ -482,27 +482,35 @@ Indexer uniquement les ajouts de cette étape dans les documents déjà modifié
 **Produit :** politique par défaut Wayland pour une session Wayland, choix
 explicite d'environnement préservé et instructions de secours XCB documentées.
 
-- [ ] **1. Tests d'abord :** sans `QT_QPA_PLATFORM`, une session Wayland choisit
+- [x] **1. Tests d'abord :** sans `QT_QPA_PLATFORM`, une session Wayland choisit
   `wayland` plutôt que `xcb` ; une valeur explicite `xcb` ou `wayland` est
   respectée ; une session X11 reste inchangée. Le portail KDE existant est
   conservé. Remplacer le test imposant l'ancien défaut XCB, pas le supprimer.
-- [ ] **2. Observer le rouge :** `uv run pytest -q tests/test_app.py`.
-- [ ] **3. Modifier uniquement la politique de démarrage concernée.** Ne pas
+- [x] **2. Observer le rouge :** `uv run pytest -q tests/test_app.py`.
+- [x] **3. Modifier uniquement la politique de démarrage concernée.** Ne pas
   masquer un problème de plugin en basculant silencieusement de backend, et ne
   prétendre supprimer la possibilité XCB. Documenter l'ancien contournement des
   zébrures et sa vérification manuelle avec la nouvelle interface.
-- [ ] **4. Recette de non-régression et porte G.** Piste mono/stéréo, piste longue,
+- [x] **4. Recette de non-régression et porte G.** Piste mono/stéréo, piste longue,
   nombreux recouvrements, longueurs héritées, aucun candidat, album vide/illisible,
   analyse en cours, changements de piste/paramètres et erreurs audio/export.
   Contrôler que seul le contenu de la piste affichée est exporté. L'analyse d'album
   et sa progression gardent leur comportement existant ; cette refonte n'invente
   pas une sélection/export multi-pistes ni une nouvelle restitution des albums.
-- [ ] **5. Commit :** `Utilise Wayland par défaut après validation de la nouvelle interface`.
+- [x] **5. Commit :** `Utilise Wayland par défaut après validation de la nouvelle interface`.
   **Validation utilisateur finale :** lancement simple `uv run choppeur`, absence
   de zébrures, thèmes KDE, clic/second clic/Ctrl+clic/M/Espace/fin naturelle/glisser/export,
   Bitwig/Dolphin et essai `QT_QPA_PLATFORM=xcb uv run choppeur` si nécessaire.
   Si la configuration native révèle une régression bloquante, la signaler et
   arrêter : ne pas déclarer la compatibilité acquise sur la base du prototype.
+
+**État automatisé au 07/11/2026 :** 407 tests réussis, y compris la suite complète
+sous Wayland natif ; 31 tests actions/géométrie à 150 % sous Wayland réussis.
+Démarrage réel via `app.main` confirmé sans variable forcée (Wayland) et avec
+choix XCB explicite ; images avec 32 candidats synthétiques inspectées. Portail
+KDE et choix explicites préservés. Contrôles statiques réussis. Recette manuelle
+dans `docs/FINAL_VALIDATION.md` : audio matériel, pilotes, Bitwig/Dolphin et
+réouverture de projet restent à valider par l'utilisateur. Aucun push automatique.
 
 ## Auto-revue et risques résiduels
 

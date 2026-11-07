@@ -87,16 +87,31 @@ Unavailable actions are disabled, and holding a shortcut does not repeat it.
 
 ## KDE and Wayland
 
-The application currently defaults to XWayland on Wayland sessions to avoid
-previously observed Qt painting artifacts. To test native Wayland drag-and-drop:
+In a Wayland session, Chopper uses native Wayland by default:
 
 ```bash
-QT_QPA_PLATFORM=wayland uv run chopper
+uv run chopper
 ```
 
-An explicit `QT_QPA_PLATFORM` choice is always respected. KDE native file dialogs
+If your desktop shows painting artifacts (such as stripes or incomplete redraws),
+try the explicit XWayland/X11 workaround:
+
+```bash
+QT_QPA_PLATFORM=xcb uv run chopper
+```
+
+XCB was the previous default workaround for rendering problems observed on some
+KDE systems. The native default follows the interface's incremental validation;
+it is not a guarantee for every compositor or graphics driver. Report regressions.
+Chopper does not silently switch backends if a platform plugin fails.
+
+An explicit `QT_QPA_PLATFORM` choice is always respected, including `wayland`,
+`xcb` and test platforms such as `offscreen`. X11 sessions are left to Qt's normal
+platform selection. KDE native file dialogs
 use the desktop portal when no platform theme was explicitly configured. Native
 dialog language and raw system/audio-driver diagnostics may follow your desktop locale.
+
+For the final desktop/audio/DAW checks, see [Final manual validation](docs/FINAL_VALIDATION.md).
 
 ## Upgrading from Choppeur
 

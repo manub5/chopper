@@ -14,22 +14,16 @@ def build_window(settings: Settings | None = None, cache: AnalysisCache | None =
 
 
 def default_platform_for_session(env: Mapping[str, str] | None = None) -> str | None:
-    """
-    Certaines sessions Wayland (observé sur KDE Plasma / Kubuntu) provoquent des
-    artefacts d'affichage avec des applications Qt Widgets (zones mal
-    rafraîchies, bandes). Si rien n'est explicitement demandé, on préfère XCB
-    (X11 via XWayland), le chemin le plus éprouvé pour PySide6 côté widgets.
+    """Use native Wayland for Wayland sessions unless a Qt backend was chosen.
 
-    Incertitude : non vérifié sur toutes les configurations (pilote GPU,
-    version de KDE...). Si XCB pose un autre problème, forcer
-    `QT_QPA_PLATFORM=wayland` (ou une autre valeur) avant de lancer l'appli
-    annule cette valeur par défaut.
+    XCB remains an explicit workaround for desktop-specific rendering issues.
+    Never hide a missing or broken platform plugin with an automatic fallback.
     """
     env = os.environ if env is None else env
     if env.get("QT_QPA_PLATFORM"):
-        return None  # déjà choisi explicitement : ne pas interférer
+        return None  # Preserve the user's explicit Qt platform selection.
     if env.get("XDG_SESSION_TYPE") == "wayland":
-        return "xcb"
+        return "wayland"
     return None
 
 
