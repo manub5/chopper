@@ -29,6 +29,9 @@ dans pre-commit et la préécoute ne joue plus en boucle.
   31 tests clavier/géométrie à 150 % sous Wayland réussis. Contrôles statiques
   réussis avec les seules notes mypy/Bandit préexistantes. Checklist manuelle
   `docs/FINAL_VALIDATION.md` pour distinguer ces preuves des essais matériels.
+- Revue finale indépendante de `0ad7581..5af9bcb` sans anomalie critique,
+  importante ou mineure ; 24 tests ciblés réussis sans affichage puis 24 sous
+  Wayland à 150 % par le relecteur. Validation manuelle et publication en attente.
 
 ## 03/11/2026 — Actions partagées, menus et raccourcis clavier
 

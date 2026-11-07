@@ -511,6 +511,9 @@ choix XCB explicite ; images avec 32 candidats synthétiques inspectées. Portai
 KDE et choix explicites préservés. Contrôles statiques réussis. Recette manuelle
 dans `docs/FINAL_VALIDATION.md` : audio matériel, pilotes, Bitwig/Dolphin et
 réouverture de projet restent à valider par l'utilisateur. Aucun push automatique.
+Revue finale indépendante favorable, sans anomalie ; 24 tests ciblés sans
+affichage puis 24 sous Wayland à 150 % réussis par le relecteur. Implémentation
+de l'étape 8 commitée en `5af9bcb`, recette utilisateur finale encore attendue.
 
 ## Auto-revue et risques résiduels
 
