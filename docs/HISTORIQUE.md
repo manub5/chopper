@@ -6,6 +6,36 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 08/11/2026 — Raccourci KDE créé uniquement après accord
+
+- Étape 1 validée par l'utilisateur, étape 2 autorisée. Après installation locale
+  réussie, proposer l'entrée `applications/chopper.desktop` sous le dossier XDG
+  choisi (ou `.local/share` du compte) et afficher son chemin complet avant accord.
+  Refus, réponse vide et EOF : aucun dossier de raccourci créé, lanceur local
+  utilisable. Dossier XDG relatif refusé ; aucune élévation de privilèges.
+- Helper Python standard `scripts/install_desktop.py`, sans Qt ni dépendance
+  supplémentaire. Écriture temporaire puis publication ; conserver l'ancien
+  raccourci si le remplacement échoue. Ne remplacer que les fichiers réguliers
+  avec marqueur Chopper et identité attendue, jamais les liens même cassés.
+- Échappement Desktop Entry distinct du shell. Un test réel GLib a révélé sa
+  vérification d'existence du programme avant expansion de `%%` : le raccourci
+  utilise `env --` pour transmettre le chemin comme argument, sans `sh -c` ni
+  évaluation shell. Source GLib consultée, reproduction réduite puis test vert.
+  Chemins avec `=` ou contrôles refusés explicitement.
+- Régression : 456 tests réussis, dont 48 tests installateur/raccourci. Validation
+  réelle par `desktop-file-validate` et lancement de sondes sans interface via
+  `gio launch` : espaces, apostrophe, dollar, pourcentage, guillemet, backslash,
+  accent et backtick. Refus/EOF, XDG, fichier étranger, liens cassés, réinstallation,
+  erreur d'écriture et propagation de l'erreur dans Bash également couverts.
+- Aucun raccourci installé dans le compte réel pendant les tests ; écritures
+  uniquement dans les bacs à sable. Effet prévu chez le destinataire : un fichier
+  de menu, après accord ; réinstallation actualise seulement cette entrée générée.
+  Aucun changement moteur/audio/source/export/préférences/cache ; aucune copie
+  de samples supplémentaire. Compatibilité réelle KDE/Kubuntu toujours à valider.
+- Guide utilisateur `docs/INSTALL_KUBUNTU.md` ajouté : dossier permanent, reprise,
+  nouvelle extraction après déplacement, retrait manuel prudent et recette cible.
+  Archive finale, revue indépendante et publication restent des étapes séparées.
+
 ## 08/11/2026 — Installation verrouillée et lancement sans synchronisation
 
 - Première étape du plan de distribution Kubuntu 26.04.1, dans un espace Git

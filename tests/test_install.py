@@ -1,6 +1,7 @@
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -29,6 +30,10 @@ def installer_sandbox(tmp_path):
     project = tmp_path / "project with spaces ' $cash %sample"
     project.mkdir()
     shutil.copyfile(Path(__file__).parents[1] / "install.sh", project / "install.sh")
+    helper = Path(__file__).parents[1] / "scripts/install_desktop.py"
+    if helper.exists():
+        (project / "scripts").mkdir()
+        shutil.copyfile(helper, project / "scripts/install_desktop.py")
     tools = tmp_path / "tools"
     tools.mkdir()
     uv_content = """if [[ "${1:-}" == --version ]]; then
@@ -39,6 +44,7 @@ printf '%s\\n' "$@" >> "$UV_CALLS"
 [[ "${UV_STATUS:-0}" == 0 ]] || exit "$UV_STATUS"
 environment="${UV_PROJECT_ENVIRONMENT:-.venv}"
 mkdir -p "$environment/bin"
+ln -sf "$TEST_PYTHON" "$environment/bin/python"
 if [[ "${OMIT_APP:-0}" == 0 ]]; then
     cat > "$environment/bin/chopper" <<'APP'
 #!/usr/bin/env bash
@@ -87,6 +93,8 @@ exit "${CURL_STATUS:-0}"
         "UV_INSTALL_EXECUTED": str(tmp_path / "uv-install-executed"),
         "UV_TEMPLATE": str(tmp_path / "uv-template"),
         "TMPDIR": str(tmp_path),
+        "TEST_PYTHON": sys.executable,
+        "XDG_DATA_HOME": str(tmp_path / "desktop-data"),
     }
     for key in ("UV_CALLS", "APP_CALLS", "EXTERNAL_CALLS"):
         Path(env[key]).touch()
@@ -259,3 +267,32 @@ def test_launcher_reports_missing_environment_without_running_uv(installer_sandb
     assert result.returncode != 0
     assert "install.sh" in result.stderr
     assert Path(env["UV_CALLS"]).read_text() == ""
+
+
+def test_installer_offers_real_desktop_helper_after_success(installer_sandbox):
+    project, env = installer_sandbox
+    result = run_installer(project, env, answers="y\n")
+    assert result.returncode == 0, result.stderr
+    destination = Path(env["XDG_DATA_HOME"]) / "applications/chopper.desktop"
+    assert destination.is_file()
+    assert str(destination) in result.stdout
+    assert "Chopper" in destination.read_text()
+
+
+def test_installer_skips_shortcut_without_consent(installer_sandbox):
+    project, env = installer_sandbox
+    result = run_installer(project, env, answers="n\n")
+    assert result.returncode == 0, result.stderr
+    assert "skipped" in result.stdout.lower()
+    assert not Path(env["XDG_DATA_HOME"]).exists()
+    assert (project / "chopper").is_file()
+
+
+def test_installer_propagates_desktop_error_without_losing_local_launcher(installer_sandbox):
+    project, env = installer_sandbox
+    Path(env["XDG_DATA_HOME"]).write_text("foreign file sentinel")
+    result = run_installer(project, env, answers="y\n")
+    assert result.returncode != 0
+    assert "Done." not in result.stdout
+    assert (project / "chopper").is_file()
+    assert Path(env["XDG_DATA_HOME"]).read_text() == "foreign file sentinel"

@@ -36,6 +36,13 @@ weights. If the environment is missing, the launcher asks you to run
 `bash install.sh` again. The installer does not delete old launchers and refuses
 to overwrite an unrelated `./chopper` before installing anything.
 
+After successful installation it offers a **Chopper** entry in KDE's application
+menu, showing its full destination before asking permission. Skipping this entry
+keeps `./chopper` usable; existing unrelated shortcuts and symbolic links are
+never overwritten. See [Kubuntu installation and first-run checks](docs/INSTALL_KUBUNTU.md)
+for details, retry instructions and shortcut removal. Kubuntu 26.04.1 is the
+initial target, not yet a claim of verified compatibility on a clean machine.
+
 ## Manual installation
 
 With uv and the system audio packages already installed:

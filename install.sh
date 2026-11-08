@@ -8,6 +8,7 @@
 #   3. Offers missing ffmpeg / libportaudio2 packages via apt + sudo.
 #   4. Syncs locked runtime dependencies (creates .venv, incl. CPU PyTorch).
 #   5. Generates a friendly ./chopper launcher at the project root.
+#   6. Offers a user-local KDE menu entry after showing its destination.
 #
 # It is meant to be run from the unpacked project folder:
 #   ./install.sh
@@ -18,6 +19,7 @@
 #   - Downloads roughly 2 GB on the first run (CPU wheels of torch).
 #   - uv may cache downloads and install Python under your account.
 #   - Creates a generated ./chopper launcher next to this script.
+#   - Creates/updates a Chopper menu entry only after confirmation.
 
 set -euo pipefail
 
@@ -148,6 +150,7 @@ main() {
     step_system_packages
     step_uv_sync
     step_launcher
+    "${PROJECT_DIR}/.venv/bin/python" "${PROJECT_DIR}/scripts/install_desktop.py" --launcher "${LAUNCHER}"
 
     printf '\n'
     info "Done. Start the software with:"
