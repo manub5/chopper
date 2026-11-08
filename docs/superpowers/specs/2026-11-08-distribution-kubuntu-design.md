@@ -70,4 +70,5 @@ recette manuelle d'installation, ouverture, première analyse et écoute réelle
 
 ## État
 
-Cadrage proposé, en attente d'approbation avant plan et implémentation.
+Cadrage approuvé par l'utilisateur le 08/11/2026. Plan à valider avant
+implémentation.
