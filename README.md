@@ -21,10 +21,20 @@ bash install.sh
 ./chopper
 ```
 
-The installer installs uv if needed, checks ffmpeg and PortAudio, offers missing
-system packages through sudo/apt, prepares the isolated Python environment and
-generates `./chopper`. On systems without apt, install the system packages yourself.
-It does not delete old launchers and refuses to overwrite an unrelated `./chopper`.
+The installer asks before downloading/installing uv or adding missing system
+packages through sudo/apt. A new uv installation goes in `~/.local/bin` without
+editing shell profiles. It checks ffmpeg and PortAudio, prepares `.venv` inside
+the application folder using the locked runtime dependencies, and generates
+`./chopper`. Existing extra packages (including developer tools) are kept on
+reinstallation. uv may also cache downloads and install Python under your account.
+On systems without apt, install the system audio packages yourself.
+
+Keep the unpacked folder: it contains the application and its Python environment.
+`./chopper` starts this installed environment directly, without running uv or
+downloading/updating dependencies. A first beat analysis may still download model
+weights. If the environment is missing, the launcher asks you to run
+`bash install.sh` again. The installer does not delete old launchers and refuses
+to overwrite an unrelated `./chopper` before installing anything.
 
 ## Manual installation
 

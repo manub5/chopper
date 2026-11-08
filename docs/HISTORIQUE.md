@@ -6,6 +6,34 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 08/11/2026 — Installation verrouillée et lancement sans synchronisation
+
+- Première étape du plan de distribution Kubuntu 26.04.1, dans un espace Git
+  isolé ; aucune publication ni installation système réelle pendant ces travaux.
+- `install.sh` contrôle les collisions de lanceur avant toute installation,
+  demande confirmation avant uv et sudo/apt, et refuse par défaut ou sur EOF.
+  L'installateur officiel uv est téléchargé dans un fichier temporaire nettoyé :
+  un téléchargement en échec n'exécute plus son éventuel contenu partiel.
+- uv installé, si nécessaire et accepté, sous `.local/bin` du compte, sans
+  modification des profils shell. Synchronisation `--locked --no-dev --inexact` :
+  verrou conservé, pas d'outils de développement ajoutés sur installation fraîche,
+  paquets supplémentaires existants non supprimés. L'environnement est fixé au
+  `.venv` du dossier choisi pour ignorer un `UV_PROJECT_ENVIRONMENT` hérité qui
+  pourrait sinon cibler un environnement extérieur, voire le système.
+- `./chopper` exécute directement `.venv/bin/chopper` : plus de synchronisation,
+  résolution ou téléchargement de dépendances au lancement. Un environnement
+  manquant ou incomplet produit une erreur explicite, sans faux succès.
+- Régression : 428 tests réussis, dont 20 tests isolés de l'installateur ; cas
+  limites : chemin avec espaces/apostrophe/dollar/pourcentage, arguments préservés,
+  refus/EOF, erreur de téléchargement, apt et sync, réinstallation, liens cassés,
+  dossier ou fichier étranger, environnement manquant et redirection héritée.
+- Effets de bord annoncés : `.venv`, lanceur généré, téléchargements uv/Python et
+  cache, éventuels paquets système après accord ; réinstallation du lanceur propre
+  autorisée, fichiers étrangers et ancien alias préservés. Sources audio, exports,
+  préférences et caches applicatifs inchangés ; glissers non idempotents inchangés.
+  Les téléchargements du modèle à la première analyse restent possibles.
+- Kubuntu 26.04.1 non déclaré compatible à ce stade : essai réel encore attendu.
+
 ## 07/11/2026 — Rétablit l'alternance du tri des samples
 
 - Bug reproduit sur les quatre colonnes triables par vrais clics d'en-tête :

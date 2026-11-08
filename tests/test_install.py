@@ -6,24 +6,75 @@ from pathlib import Path
 import pytest
 
 
+def write_tool(path, content):
+    path.write_text("#!/usr/bin/env bash\nset -euo pipefail\n" + content)
+    path.chmod(0o755)
+
+
+def run_installer(project, env, *, answers="", cwd=None):
+    return subprocess.run(
+        ["bash", str(project / "install.sh")],
+        env=env,
+        cwd=cwd,
+        input=answers,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+    )
+
+
 @pytest.fixture
 def installer_sandbox(tmp_path):
-    project = tmp_path / "project with spaces"
+    project = tmp_path / "project with spaces ' $cash %sample"
     project.mkdir()
     shutil.copyfile(Path(__file__).parents[1] / "install.sh", project / "install.sh")
     tools = tmp_path / "tools"
     tools.mkdir()
+    uv_content = """if [[ "${1:-}" == --version ]]; then
+    printf 'uv test\n'
+    exit 0
+fi
+printf '%s\\n' "$@" >> "$UV_CALLS"
+[[ "${UV_STATUS:-0}" == 0 ]] || exit "$UV_STATUS"
+environment="${UV_PROJECT_ENVIRONMENT:-.venv}"
+mkdir -p "$environment/bin"
+if [[ "${OMIT_APP:-0}" == 0 ]]; then
+    cat > "$environment/bin/chopper" <<'APP'
+#!/usr/bin/env bash
+printf '%s\\n' "$PWD" "$@" >> "$APP_CALLS"
+APP
+    chmod +x "$environment/bin/chopper"
+fi
+"""
+    write_tool(tmp_path / "uv-template", uv_content)
     for name, content in {
-        "uv": '#!/usr/bin/env bash\nprintf "%s\\n" "$PWD" "$@" >> "$UV_CALLS"\n',
-        "uname": '#!/usr/bin/env bash\nprintf "Linux\\n"\n',
-        "dpkg": "#!/usr/bin/env bash\nexit 0\n",
-        "apt-get": "#!/usr/bin/env bash\nexit 91\n",
-        "sudo": "#!/usr/bin/env bash\nexit 92\n",
-        "curl": "#!/usr/bin/env bash\nexit 93\n",
+        "uv": uv_content,
+        "uname": 'printf "Linux\\n"\n',
+        "dpkg": 'exit "${PACKAGES_MISSING:-0}"\n',
+        "apt-get": 'printf "apt-get %s\\n" "$*" >> "$EXTERNAL_CALLS"\nexit "${APT_STATUS:-0}"\n',
+        "sudo": 'printf "sudo %s\\n" "$*" >> "$EXTERNAL_CALLS"\n"$@"\n',
+        "curl": """printf 'curl\\n' >> "$EXTERNAL_CALLS"
+output=''
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -o|--output) output="$2"; shift 2 ;;
+        *) shift ;;
+    esac
+done
+payload='printf "executed\\n" >> "$UV_INSTALL_EXECUTED"
+mkdir -p "$HOME/.local/bin"
+cp "$UV_TEMPLATE" "$HOME/.local/bin/uv"
+chmod +x "$HOME/.local/bin/uv"'
+if [[ -n "$output" ]]; then
+    printf '%s\\n' "$payload" > "$output"
+else
+    printf '%s\\n' "$payload"
+fi
+exit "${CURL_STATUS:-0}"
+""",
     }.items():
-        script = tools / name
-        script.write_text(content)
-        script.chmod(0o755)
+        write_tool(tools / name, content)
     home = tmp_path / "home"
     home.mkdir()
     env = {
@@ -31,7 +82,15 @@ def installer_sandbox(tmp_path):
         "PATH": f"{tools}:/usr/bin:/bin",
         "HOME": str(home),
         "UV_CALLS": str(tmp_path / "uv-calls"),
+        "APP_CALLS": str(tmp_path / "app-calls"),
+        "EXTERNAL_CALLS": str(tmp_path / "external-calls"),
+        "UV_INSTALL_EXECUTED": str(tmp_path / "uv-install-executed"),
+        "UV_TEMPLATE": str(tmp_path / "uv-template"),
+        "TMPDIR": str(tmp_path),
     }
+    for key in ("UV_CALLS", "APP_CALLS", "EXTERNAL_CALLS"):
+        Path(env[key]).touch()
+    (project / "uv.lock").write_text("locked-dependencies-sentinel")
     old = project / "choppeur"
     old.write_text("old launcher sentinel")
     return project, env
@@ -39,19 +98,13 @@ def installer_sandbox(tmp_path):
 
 def test_installer_generates_chopper_and_launcher_preserves_arguments(installer_sandbox, tmp_path):
     project, env = installer_sandbox
-    result = subprocess.run(
-        ["bash", str(project / "install.sh")],
-        check=False,
-        env=env,
-        cwd=tmp_path,
-        capture_output=True,
-        text=True,
-        timeout=10,
-    )
+    result = run_installer(project, env, cwd=tmp_path)
     assert result.returncode == 0, result.stderr
     launcher = project / "chopper"
     assert launcher.is_file() and os.access(launcher, os.X_OK)
     assert (project / "choppeur").read_text() == "old launcher sentinel"
+    assert Path(env["UV_CALLS"]).read_text().splitlines() == ["sync", "--locked", "--no-dev", "--inexact"]
+    assert (project / "uv.lock").read_text() == "locked-dependencies-sentinel"
     Path(env["UV_CALLS"]).write_text("")
     subprocess.run(
         [str(launcher), "--test", "argument with spaces"],
@@ -61,44 +114,148 @@ def test_installer_generates_chopper_and_launcher_preserves_arguments(installer_
         capture_output=True,
         timeout=10,
     )
-    assert Path(env["UV_CALLS"]).read_text().splitlines() == [
+    assert Path(env["APP_CALLS"]).read_text().splitlines() == [
         str(project),
-        "run",
-        "chopper",
         "--test",
         "argument with spaces",
     ]
+    assert Path(env["UV_CALLS"]).read_text() == ""
     # Re-running an installation must safely update its own generated launcher.
-    subprocess.run(
-        ["bash", str(project / "install.sh")],
-        env=env,
-        cwd=tmp_path,
-        check=True,
-        capture_output=True,
-        timeout=10,
-    )
+    assert run_installer(project, env, cwd=tmp_path).returncode == 0
     assert (project / "choppeur").read_text() == "old launcher sentinel"
 
 
-@pytest.mark.parametrize("kind", ["file", "symlink"])
+@pytest.mark.parametrize("kind", ["file", "symlink", "broken-symlink", "directory"])
 def test_installer_refuses_to_overwrite_unrelated_launcher(installer_sandbox, tmp_path, kind):
     project, env = installer_sandbox
     target = tmp_path / "user-script"
     target.write_text("keep this unrelated file")
     launcher = project / "chopper"
-    if kind == "symlink":
+    if kind == "broken-symlink":
+        launcher.symlink_to(tmp_path / "missing")
+    elif kind == "symlink":
         launcher.symlink_to(target)
+    elif kind == "directory":
+        launcher.mkdir()
     else:
         launcher.write_bytes(target.read_bytes())
-    result = subprocess.run(
-        ["bash", str(project / "install.sh")],
-        check=False,
-        env=env,
-        cwd=tmp_path,
-        capture_output=True,
-        text=True,
-        timeout=10,
-    )
+    result = run_installer(project, env, answers="y\ny\n", cwd=tmp_path)
     assert result.returncode != 0
     assert "refusing" in (result.stderr + result.stdout).lower()
-    assert launcher.read_text() == target.read_text() == "keep this unrelated file"
+    assert target.read_text() == "keep this unrelated file"
+    if kind in {"file", "symlink"}:
+        assert launcher.read_text() == target.read_text()
+    assert Path(env["UV_CALLS"]).read_text() == ""
+    assert Path(env["EXTERNAL_CALLS"]).read_text() == ""
+
+
+@pytest.mark.parametrize("answers", ["n\n", "", "\n"])
+def test_installer_requires_consent_before_installing_uv(installer_sandbox, answers):
+    project, env = installer_sandbox
+    (Path(env["PATH"].split(":")[0]) / "uv").unlink()
+    result = run_installer(project, env, answers=answers)
+    assert result.returncode != 0
+    assert Path(env["EXTERNAL_CALLS"]).read_text() == ""
+    assert not (Path(env["HOME"]) / ".local").exists()
+    assert not (project / "chopper").exists()
+
+
+def test_installer_downloads_uv_only_after_consent(installer_sandbox):
+    project, env = installer_sandbox
+    (Path(env["PATH"].split(":")[0]) / "uv").unlink()
+    result = run_installer(project, env, answers="y\n")
+    assert result.returncode == 0, result.stderr
+    assert str(Path(env["HOME"]) / ".local/bin") in result.stdout
+    assert Path(env["UV_INSTALL_EXECUTED"]).read_text() == "executed\n"
+    assert (project / "chopper").is_file()
+    assert Path(env["EXTERNAL_CALLS"]).read_text() == "curl\n"
+
+
+def test_failed_uv_download_does_not_execute_partial_installer(installer_sandbox):
+    project, env = installer_sandbox
+    (Path(env["PATH"].split(":")[0]) / "uv").unlink()
+    result = run_installer(project, {**env, "CURL_STATUS": "23"}, answers="y\n")
+    assert result.returncode != 0
+    assert not Path(env["UV_INSTALL_EXECUTED"]).exists()
+    assert not (project / "chopper").exists()
+    assert "Done." not in result.stdout
+
+
+@pytest.mark.parametrize("answers", ["n\n", "", "\n"])
+def test_installer_requires_consent_before_sudo(installer_sandbox, answers):
+    project, env = installer_sandbox
+    result = run_installer(project, {**env, "PACKAGES_MISSING": "1"}, answers=answers)
+    assert result.returncode != 0
+    assert Path(env["EXTERNAL_CALLS"]).read_text() == ""
+    assert Path(env["UV_CALLS"]).read_text() == ""
+    assert not (project / "chopper").exists()
+
+
+@pytest.mark.parametrize("status", ["0", "42"])
+def test_installer_handles_consented_system_install_result(installer_sandbox, status):
+    project, env = installer_sandbox
+    result = run_installer(project, {**env, "PACKAGES_MISSING": "1", "APT_STATUS": status}, answers="y\n")
+    calls = Path(env["EXTERNAL_CALLS"]).read_text().splitlines()
+    assert calls[:2] == ["sudo apt-get update", "apt-get update"]
+    if status == "0":
+        assert result.returncode == 0, result.stderr
+        assert calls[2:] == [
+            "sudo apt-get install -y ffmpeg libportaudio2",
+            "apt-get install -y ffmpeg libportaudio2",
+        ]
+        assert (project / "chopper").is_file()
+    else:
+        assert result.returncode != 0
+        assert len(calls) == 2
+        assert not (project / "chopper").exists()
+        assert "Done." not in result.stdout
+
+
+def test_sync_failure_keeps_old_launcher_and_files(installer_sandbox):
+    project, env = installer_sandbox
+    launcher = project / "chopper"
+    previous = "#!/bin/bash\n# Generated by install.sh for Chopper.\nprintf old\n"
+    launcher.write_text(previous)
+    result = run_installer(project, {**env, "UV_STATUS": "37"})
+    assert result.returncode != 0
+    assert launcher.read_text() == previous
+    assert (project / "uv.lock").read_text() == "locked-dependencies-sentinel"
+    assert "Done." not in result.stdout
+
+
+def test_sync_failure_does_not_generate_launcher(installer_sandbox):
+    project, env = installer_sandbox
+    result = run_installer(project, {**env, "UV_STATUS": "37"})
+    assert result.returncode != 0
+    assert not (project / "chopper").exists()
+    assert "Done." not in result.stdout
+
+
+def test_incomplete_environment_does_not_report_success(installer_sandbox):
+    project, env = installer_sandbox
+    result = run_installer(project, {**env, "OMIT_APP": "1"})
+    assert result.returncode != 0
+    assert not (project / "chopper").exists()
+    assert "Done." not in result.stdout
+
+
+def test_installer_keeps_environment_inside_selected_folder(installer_sandbox, tmp_path):
+    project, env = installer_sandbox
+    unrelated_environment = tmp_path / "other-environment"
+    result = run_installer(project, {**env, "UV_PROJECT_ENVIRONMENT": str(unrelated_environment)})
+    assert result.returncode == 0, result.stderr
+    assert (project / ".venv/bin/chopper").is_file()
+    assert not unrelated_environment.exists()
+
+
+def test_launcher_reports_missing_environment_without_running_uv(installer_sandbox):
+    project, env = installer_sandbox
+    assert run_installer(project, env).returncode == 0
+    (project / ".venv/bin/chopper").unlink()
+    Path(env["UV_CALLS"]).write_text("")
+    result = subprocess.run(
+        [str(project / "chopper")], env=env, capture_output=True, text=True, check=False, timeout=10
+    )
+    assert result.returncode != 0
+    assert "install.sh" in result.stderr
+    assert Path(env["UV_CALLS"]).read_text() == ""
