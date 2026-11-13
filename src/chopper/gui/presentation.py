@@ -6,6 +6,8 @@ import numpy as np
 
 from chopper.core.models import Analysis, Candidate, CandidateType, is_loop_length
 
+Window = tuple[float, float]
+
 
 def format_time(seconds: float) -> str:
     """Round once to milliseconds before splitting, including minute carries."""
@@ -21,7 +23,9 @@ def sample_type_label(candidate: Candidate) -> str:
     bars = candidate.bars
     if bars is None or not is_loop_length(bars):
         raise ValueError("Unsupported loop length for display.")
-    return {1.0: "1-bar loop", 0.5: "½-bar loop", 0.25: "¼-bar loop"}[bars]
+    return {4.0: "4-bar loop", 2.0: "2-bar loop", 1.0: "1-bar loop", 0.5: "½-bar loop", 0.25: "¼-bar loop"}[
+        bars
+    ]
 
 
 @dataclass(frozen=True)

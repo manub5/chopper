@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from bisect import bisect_left, bisect_right
+from numbers import Real
 
 import numpy as np
 
-from chopper.core.models import LOOP_LENGTHS_BARS, Candidate, CandidateType, is_loop_length
+from chopper.core.models import AUTO_LOOP_LENGTHS_BARS, Candidate, CandidateType, is_loop_length
 
-DEFAULT_LOOP_LENGTHS_BARS = LOOP_LENGTHS_BARS
+DEFAULT_LOOP_LENGTHS_BARS = AUTO_LOOP_LENGTHS_BARS
 DEFAULT_MAX_ONE_SHOT_SECONDS = 2.0
 DEFAULT_SILENCE_THRESHOLD_RATIO = 0.1
 
@@ -15,6 +16,23 @@ def _rms(samples: np.ndarray) -> float:
     if len(samples) == 0:
         return 0.0
     return float(np.sqrt(np.mean(np.square(samples))))
+
+
+def _search_bounds(
+    samples: np.ndarray, sample_rate: int, window: tuple[float, float] | None
+) -> tuple[float, float, int, int]:
+    duration = len(samples) / sample_rate
+    if window is None:
+        return 0.0, duration, 0, len(samples)
+    if not isinstance(window, (tuple, list)) or len(window) != 2:
+        raise ValueError("Invalid search window: expected (start, end) in seconds.")
+    if any(isinstance(value, bool) or not isinstance(value, Real) for value in window):
+        raise ValueError("Invalid search window: bounds must be finite numbers, not booleans.")
+    start, end = window
+    # This ordering also rejects NaN/infinity without converting huge integers.
+    if not 0 <= start < end <= duration:
+        raise ValueError("Invalid search window: require 0 <= start < end <= audio duration.")
+    return float(start), float(end), round(start * sample_rate), round(end * sample_rate)
 
 
 def _bar_duration(downbeat_times: tuple[float, ...]) -> float | None:
@@ -47,7 +65,7 @@ def _regularity_score(downbeat_times: np.ndarray, start: float, end: float) -> f
 
 
 def _cut_smoothness_score(
-    samples: np.ndarray, sample_rate: int, end_seconds: float, overall_rms: float
+    samples: np.ndarray, sample_rate: int, end_seconds: float, overall_rms: float, *, min_index: int = 0
 ) -> float:
     """Score haut si le niveau juste avant la coupure est faible (pas de coupure brutale).
 
@@ -57,7 +75,7 @@ def _cut_smoothness_score(
     """
     window = int(0.03 * sample_rate)  # 30 ms
     end_index = round(end_seconds * sample_rate)
-    start_index = max(0, end_index - window)
+    start_index = max(min_index, end_index - window)
     tail_rms = _rms(samples[start_index:end_index])
     ratio = tail_rms / overall_rms
     return float(np.clip(1.0 - ratio, 0.0, 1.0))
@@ -71,33 +89,43 @@ def find_loop_candidates(
     *,
     lengths_bars: tuple[float, ...] = DEFAULT_LOOP_LENGTHS_BARS,
     max_candidates: int = 8,
+    window: tuple[float, float] | None = None,
 ) -> list[Candidate]:
-    """Downbeat-aligned loops, ranked by score with an independent quota per length."""
+    """Rank complete loops inside an optional absolute-time search window."""
     if any(not is_loop_length(bars) for bars in lengths_bars):
-        raise ValueError("Only ¼-bar, ½-bar and 1-bar loops are supported.")
+        raise ValueError("Only ¼-bar, ½-bar, 1-bar, 2-bar and 4-bar loops are supported.")
+    if window is None and any(bars not in AUTO_LOOP_LENGTHS_BARS for bars in lengths_bars):
+        raise ValueError("2-bar and 4-bar loops require an explicit search window.")
+    bounds = _search_bounds(samples, sample_rate, window) if window is not None else None
     bar_duration = _bar_duration(downbeat_times)
     if bar_duration is None or tempo_bpm <= 0:
         return []
 
-    duration_seconds = len(samples) / sample_rate
-    overall_rms = _rms(samples) or 1e-9
+    lower, upper, first_index, last_index = bounds or _search_bounds(samples, sample_rate, None)
+    if window is not None and last_index <= first_index:
+        return []
+    overall_rms = _rms(samples[first_index:last_index]) or 1e-9
     downbeat_array = np.asarray(downbeat_times, dtype=np.float64)
     candidates: list[Candidate] = []
 
     for bars in dict.fromkeys(lengths_bars):
         loop_duration = bar_duration * bars
         for start in downbeat_times:
+            if window is not None and not lower <= start < upper:
+                continue
             end = start + loop_duration
-            if end > duration_seconds:
+            if end > upper:
                 continue
 
             start_index = round(start * sample_rate)
             end_index = round(end * sample_rate)
+            if window is not None and end_index <= start_index:
+                continue
             segment = samples[start_index:end_index]
 
             regularity = _regularity_score(downbeat_array, start, end)
             energy_score = float(np.clip(_rms(segment) / overall_rms, 0.0, 1.0))
-            smoothness = _cut_smoothness_score(samples, sample_rate, end, overall_rms)
+            smoothness = _cut_smoothness_score(samples, sample_rate, end, overall_rms, min_index=first_index)
             score = 0.5 * regularity + 0.3 * energy_score + 0.2 * smoothness
 
             candidates.append(
@@ -123,14 +151,21 @@ def find_loop_candidates(
 
 
 def _find_return_to_silence(
-    samples: np.ndarray, sample_rate: int, start: float, limit: float, threshold: float
+    samples: np.ndarray,
+    sample_rate: int,
+    start: float,
+    limit: float,
+    threshold: float,
+    *,
+    clip_to_limit: bool = False,
 ) -> float:
     window = max(1, int(0.01 * sample_rate))  # fenêtres de 10 ms
     start_index = round(start * sample_rate)
     limit_index = round(limit * sample_rate)
     index = start_index + window
     while index < limit_index:
-        if _rms(samples[index : index + window]) <= threshold:
+        block_end = min(index + window, limit_index) if clip_to_limit else index + window
+        if _rms(samples[index:block_end]) <= threshold:
             return index / sample_rate
         index += window
     return limit
@@ -144,22 +179,30 @@ def find_one_shot_candidates(
     max_duration_seconds: float = DEFAULT_MAX_ONE_SHOT_SECONDS,
     silence_threshold_ratio: float = DEFAULT_SILENCE_THRESHOLD_RATIO,
     max_candidates: int = 8,
+    window: tuple[float, float] | None = None,
 ) -> list[Candidate]:
-    """Candidats one-shot : début sur une attaque, fin au retour au silence (ou attaque suivante)."""
-    duration_seconds = len(samples) / sample_rate
-    overall_peak = float(np.max(np.abs(samples))) if len(samples) else 0.0
+    """Rank cached onsets without crossing an optional absolute-time search window."""
+    lower, upper, first_index, last_index = _search_bounds(samples, sample_rate, window)
+    region = samples[first_index:last_index]
+    overall_peak = float(np.max(np.abs(region))) if len(region) else 0.0
     threshold = overall_peak * silence_threshold_ratio
 
     candidates: list[Candidate] = []
     for i, start in enumerate(onset_times):
-        next_onset = onset_times[i + 1] if i + 1 < len(onset_times) else duration_seconds
-        limit = min(start + max_duration_seconds, next_onset, duration_seconds)
-        end = _find_return_to_silence(samples, sample_rate, start, limit, threshold)
+        if window is not None and not lower <= start < upper:
+            continue
+        next_onset = onset_times[i + 1] if i + 1 < len(onset_times) else upper
+        limit = min(start + max_duration_seconds, next_onset, upper)
+        end = _find_return_to_silence(
+            samples, sample_rate, start, limit, threshold, clip_to_limit=window is not None
+        )
         if end <= start:
             continue
 
         start_index = round(start * sample_rate)
         end_index = round(end * sample_rate)
+        if window is not None and end_index <= start_index:
+            continue
         score = _rms(samples[start_index:end_index])
 
         candidates.append(

@@ -6,6 +6,36 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 13/11/2026 — Sélection manuelle, étape 1 : moteur borné et longueurs 2/4
+
+- Plan validé ; première étape uniquement, gestes et boutons manuels encore à
+  implémenter. Ajouter `window=(start,end)` optionnel aux deux recherches core,
+  sans Qt ni accès au fichier source, en gardant les temps absolus de la piste.
+- Valider forme, nombres finis/non booléens, ordre et bornes dans l'audio. Limiter
+  les départs et fins avant classement/quota ; RMS/crête de référence et blocs
+  de silence/coupure bornés au passage. Ignorer les candidats sans échantillon
+  après conversion temps/index ; une boucle ne se raccourcit pas pour tenir.
+- Garder les downbeats globaux comme métadonnées de mesure, même pour une petite
+  région ; trop court pour la boucle demandée donne zéro boucle, sans bloquer
+  la recherche indépendante de one-shots. Le message GUI viendra avec le worker.
+- `LOOP_LENGTHS_BARS` et validation des candidats acceptent 2 et 4 mesures ;
+  `AUTO_LOOP_LENGTHS_BARS` garde les trois valeurs courtes pour le défaut moteur,
+  les Settings et la migration version 3. Une longueur 2/4 exige une fenêtre
+  explicite dans le moteur ; aucun ajout de cases ou réactivation de préférences.
+- Nommage existant étendu via la validation partagée, sans réécrire son format ;
+  liste, libellés et couloirs affichent 2/4 mesures, groupes vides toujours cachés.
+  Les anciennes assertions de rejet 2/4 en affichage/export sont remplacées par
+  des tests positifs ; rejets 3/8/None/booléens conservés ou renforcés.
+- Tests rouges observés puis verts : 548 tests complets, 206 ciblés moteur/
+  paramètres/affichage/export et 39 sous Wayland à 150 %. Cas limites : fenêtre
+  invalide/infime, score local malgré données non finies hors zone, fin exacte,
+  bloc de silence partiel et lissage remontant avant la fenêtre. Compatibilité
+  des scores/défauts et scans de silence sans fenêtre explicitement vérifiée.
+- WAV et FLAC réels sur données synthétiques : stéréo/fréquence et extraits exacts
+  conservés, source inchangée. Aucun audio utilisateur, préférence, cache ou export
+  existant modifié. Recherche sans effet de bord ; exports/glissers répétés restent
+  volontairement à noms distincts. Aucun ZIP reconstruit ni push à cette étape.
+
 ## 13/11/2026 — Revue finale : sélection du projet uv verrouillée
 
 - La revue indépendante a trouvé un défaut important : une variable héritée

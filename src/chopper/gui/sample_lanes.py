@@ -63,7 +63,13 @@ class SampleLanesView(QAbstractScrollArea):
             label = (
                 "One-shots"
                 if category[0] == "shot"
-                else {1.0: "1-bar loops", 0.5: "½-bar loops", 0.25: "¼-bar loops"}[category[1]]
+                else {
+                    4.0: "4-bar loops",
+                    2.0: "2-bar loops",
+                    1.0: "1-bar loops",
+                    0.5: "½-bar loops",
+                    0.25: "¼-bar loops",
+                }[category[1]]
             )
             self._headers.append((label, y))
             y += _HEADER_HEIGHT

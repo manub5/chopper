@@ -1,6 +1,7 @@
 from dataclasses import replace
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from chopper.core.models import Candidate, CandidateType, Track
@@ -44,10 +45,47 @@ def test_quarter_bar_filename():
     assert build_filename(_track(), candidate) == "Burial_Untrue_03_loop_120bpm_0.25bars_01m12s.wav"
 
 
-@pytest.mark.parametrize("bars", [2, 4, 8, None])
-def test_naming_refuses_removed_loop_lengths(bars):
+@pytest.mark.parametrize("bars", [3, 8, None, True, float("nan")])
+def test_naming_refuses_unsupported_loop_lengths(bars):
     with pytest.raises(ValueError):
         build_filename(_track(), Candidate(CandidateType.LOOP, 0, 1, 1, bpm=120, bars=bars))
+
+
+@pytest.mark.parametrize(
+    "bars, end, expected",
+    [
+        (2, 76.0, "Burial_Untrue_03_loop_120bpm_2bars_01m12s.wav"),
+        (4, 80.0, "Burial_Untrue_03_loop_120bpm_4bars_01m12s.wav"),
+    ],
+)
+def test_manual_long_loop_filename(bars, end, expected):
+    candidate = Candidate(CandidateType.LOOP, 72.0, end, 1.0, bpm=120, bars=bars)
+    assert build_filename(_track(), candidate) == expected
+
+
+@pytest.mark.parametrize("bars, end", [(2.0, 6.0), (4.0, 10.0)])
+@pytest.mark.parametrize("file_format", ["wav", "flac"])
+def test_manual_long_loop_export_preserves_original_audio(tmp_path, bars, end, file_format):
+    from chopper.core.audio_io import export_candidates, load
+
+    samples = np.column_stack([np.linspace(-0.5, 0.5, 12000), np.linspace(0.3, -0.3, 12000)]).astype(
+        np.float32
+    )
+    before = samples.copy()
+    candidate = Candidate(CandidateType.LOOP, 2.0, end, 1.0, bpm=120, bars=bars)
+    paths = export_candidates(
+        samples,
+        1000,
+        _track(sample_rate=1000, duration_seconds=12.0),
+        [candidate],
+        tmp_path,
+        file_format=file_format,
+    )
+    assert len(paths) == 1 and f"_{bars:g}bars_" in paths[0].name
+    exported, rate = load(paths[0], mono=False)
+    assert rate == 1000 and exported.shape == (round((end - 2.0) * 1000), 2)
+    np.testing.assert_allclose(exported, samples[2000 : round(end * 1000)], rtol=0, atol=2e-7)
+    np.testing.assert_array_equal(samples, before)
 
 
 def test_one_shot_filename_matches_spec_example():

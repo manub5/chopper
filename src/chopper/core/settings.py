@@ -8,10 +8,10 @@ from tempfile import NamedTemporaryFile
 import tomli_w
 from platformdirs import user_cache_dir, user_config_dir
 
-from chopper.core.models import LOOP_LENGTHS_BARS, is_loop_length
+from chopper.core.models import AUTO_LOOP_LENGTHS_BARS, is_loop_length
 
 APP_NAME = "chopper"
-_DEFAULT_LOOP_LENGTHS_BARS = LOOP_LENGTHS_BARS
+_DEFAULT_LOOP_LENGTHS_BARS = AUTO_LOOP_LENGTHS_BARS
 
 
 @dataclass
@@ -33,11 +33,11 @@ class Settings:
         values = self.loop_lengths_bars
         if isinstance(values, (tuple, list)):
             valid = {float(value) for value in values if is_loop_length(value)}
-            self.loop_lengths_bars = tuple(value for value in LOOP_LENGTHS_BARS if value in valid)
+            self.loop_lengths_bars = tuple(value for value in AUTO_LOOP_LENGTHS_BARS if value in valid)
         else:
             self.loop_lengths_bars = ()
         if not self.loop_lengths_bars:
-            self.loop_lengths_bars = LOOP_LENGTHS_BARS
+            self.loop_lengths_bars = AUTO_LOOP_LENGTHS_BARS
 
     def to_dict(self) -> dict:
         data = asdict(self)
@@ -49,7 +49,7 @@ class Settings:
         merged = {**cls().to_dict(), **data}
         version = data.get("loop_lengths_version")
         if type(version) is not int or version < 3:
-            merged["loop_lengths_bars"] = LOOP_LENGTHS_BARS
+            merged["loop_lengths_bars"] = AUTO_LOOP_LENGTHS_BARS
             merged["loop_lengths_version"] = 3
         return cls(**merged)
 

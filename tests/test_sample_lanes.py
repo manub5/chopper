@@ -1,5 +1,6 @@
 from dataclasses import replace
 
+import numpy as np
 import pytest
 from PySide6.QtCore import QPoint, QPointF, Qt
 from PySide6.QtGui import QWheelEvent
@@ -146,6 +147,25 @@ def test_quarter_bar_rectangle_is_clickable_and_labeled(lane_ui, loaded_track):
     assert state.active_id == item_id
     assert "¼-bar loop" in lanes.sample_tooltip(item_id)
     assert "Length:" in lanes.sample_tooltip(item_id)
+
+
+def test_manual_long_loop_rectangles_headers_and_clicks(lane_ui, qapp, loaded_track):
+    _, waveform, state, lanes = lane_ui
+    audio = np.ones((12000, 2), dtype=np.float32)
+    candidates = (
+        replace(loaded_track.candidates[0], bars=4.0, start_seconds=0.0, end_seconds=8.0),
+        replace(loaded_track.candidates[0], bars=2.0, start_seconds=2.0, end_seconds=6.0),
+    )
+    waveform.set_waveform(audio, 1000)
+    state.load_track(replace(loaded_track, samples=audio, candidates=candidates))
+    qapp.processEvents()
+    assert [text for text, _ in lanes._headers] == ["4-bar loops", "2-bar loops"]
+    for item, label in zip(state.items, ["4-bar loop", "2-bar loop"], strict=True):
+        rect = lanes.sample_rect(item.id)
+        assert rect.width() > 0
+        QTest.mouseClick(lanes.viewport(), Qt.MouseButton.LeftButton, pos=rect.center().toPoint())
+        assert state.active_id == item.id
+        assert label in lanes.sample_tooltip(item.id)
 
 
 def test_lane_zoom_out_and_drag_share_track_bounds(lane_ui, qapp):

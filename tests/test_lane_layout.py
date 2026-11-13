@@ -44,3 +44,18 @@ def test_quarter_bar_lane_is_between_half_bars_and_shots():
     shot = SampleItem(4, Candidate(CandidateType.ONE_SHOT, 0, 0.2, 1))
     placed = layout_samples((shot, item(3, 0, 0.5, 0.25), item(2, 0, 1, 0.5), item(1, 0, 2)))
     assert [p.item_id for p in placed] == [1, 2, 3, 4]
+
+
+def test_manual_long_loops_are_placed_before_existing_categories():
+    from chopper.gui.lane_layout import layout_samples
+
+    shot = SampleItem(6, Candidate(CandidateType.ONE_SHOT, 0, 0.2, 1))
+    items = (
+        shot,
+        item(5, 0, 0.5, 0.25),
+        item(4, 0, 1, 0.5),
+        item(3, 0, 2),
+        item(2, 0, 4, 2.0),
+        item(1, 0, 8, 4.0),
+    )
+    assert [p.item_id for p in layout_samples(items)] == [1, 2, 3, 4, 5, 6]

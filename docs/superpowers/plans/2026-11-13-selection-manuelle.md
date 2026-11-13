@@ -57,7 +57,7 @@ Notation du plan : `Window = tuple[float, float]` dans `gui/presentation.py` pou
 
 **Interfaces:** produire `LOOP_LENGTHS_BARS=(0.25,0.5,1.0,2.0,4.0)` et `AUTO_LOOP_LENGTHS_BARS=(0.25,0.5,1.0)` dans models. Ajouter `window: tuple[float,float] | None = None` comme argument keyword-only aux deux fonctions existantes de candidates, sans autre changement de signature publique. `DEFAULT_LOOP_LENGTHS_BARS` et la validation Settings utilisent l'ensemble automatique, pas la constante élargie.
 
-- [ ] **1. Tests rouges moteur :** utiliser des tableaux réels, notamment cet oracle :
+- [x] **1. Tests rouges moteur :** utiliser des tableaux réels, notamment cet oracle :
 
   ```python
   loops = find_loop_candidates(np.ones(16000), 1000, 120, tuple(float(t) for t in range(0, 17, 2)),
@@ -69,11 +69,17 @@ Notation du plan : `Window = tuple[float, float]` dans `gui/presentation.py` pou
   ```
 
   Ajouter tests nommés `test_window_rejects_invalid_bounds` (NaN, infini, booléens, inversée, hors piste, forme incorrecte), `test_window_quota_is_applied_after_local_search` (global plus fort hors zone, quota 1, résultat local présent), `test_scores_ignore_nonfinite_audio_outside_window` (audio mono et stéréo, hors zone NaN, scores locaux finis), `test_one_shot_silence_blocks_stop_at_window_end` : à 1000 Hz, 20 échantillons à 1, 5 à 0, puis 5 à 100 ; onset 0, fenêtre `(0.,0.025)` doit produire une fin à 0.020, pas être influencée par les 5 échantillons hors zone. Comparer signal avant/après, y compris lecture seule NumPy ; tester boucle finissant exactement à end et attaque à end exclue.
-- [ ] **2. Tests rouges compatibilité :** garder les tests existants window=None et rejets 2/4 sans fenêtre ; conserver tels quels les attentes de Settings, dont `[2,4,8] -> (0.25,0.5,1.0)`. Transformer les anciennes attentes de rejet de 2/4 en export/affichage en tests positifs précis (`2-bar loop`, `4-bar loop`, `2bars`, `4bars`) ; garder/ajouter les rejets 3/8/None. Charger de vrais candidats 2/4 dans liste et couloirs, vérifier placement et identités. Exécuter les fichiers concernés ; attendu : échecs du paramètre absent et des longueurs nouvelles, pas d'erreurs de fixture.
-- [ ] **3. Implémenter :** helper privé de validation/bornage dans candidates ; région audio pour RMS/crête, débuts limités avant classement, fin de boucle complète et fin de one-shot bornée. Utiliser les downbeats globaux uniquement comme métadonnées pour la durée de mesure ; aucune conversion vers une origine locale. Borner aussi les sous-blocs de `_find_return_to_silence` et le lissage de coupure. Préserver le chemin window=None ; aucun appel supplémentaire aux détecteurs.
-- [ ] **4. Intégrer les longueurs :** validation Settings explicitement limitée à AUTO_LOOP_LENGTHS_BARS tout en rejetant les booléens ; pas de version/migration nouvelle. Catégories de couloirs ordonnées 4, 2, 1, ½, ¼, shots, sans afficher de groupe vide ; libellés complets 2/4 et nommage automatique compatibles. Ne pas exposer 2/4 dans Settings.
-- [ ] **5. Vérifier :** `uv run pytest -q tests/test_candidate_window.py tests/test_candidates.py tests/test_settings.py tests/test_naming.py tests/test_candidates_panel.py tests/test_sample_lanes.py tests/test_lane_layout.py` puis `uv run pytest -q`. Attendu : tout vert, aucun import Qt dans core. Documenter résultat/effets dans `docs/HISTORIQUE.md`.
-- [ ] **6. Commit :** `Borne la recherche de samples et ajoute les longueurs manuelles`. Hooks actifs ; montrer tests et attendre validation.
+- [x] **2. Tests rouges compatibilité :** garder les tests existants window=None et rejets 2/4 sans fenêtre ; conserver tels quels les attentes de Settings, dont `[2,4,8] -> (0.25,0.5,1.0)`. Transformer les anciennes attentes de rejet de 2/4 en export/affichage en tests positifs précis (`2-bar loop`, `4-bar loop`, `2bars`, `4bars`) ; garder/ajouter les rejets 3/8/None. Charger de vrais candidats 2/4 dans liste et couloirs, vérifier placement et identités. Exécuter les fichiers concernés ; attendu : échecs du paramètre absent et des longueurs nouvelles, pas d'erreurs de fixture.
+- [x] **3. Implémenter :** helper privé de validation/bornage dans candidates ; région audio pour RMS/crête, débuts limités avant classement, fin de boucle complète et fin de one-shot bornée. Utiliser les downbeats globaux uniquement comme métadonnées pour la durée de mesure ; aucune conversion vers une origine locale. Borner aussi les sous-blocs de `_find_return_to_silence` et le lissage de coupure. Préserver le chemin window=None ; aucun appel supplémentaire aux détecteurs.
+- [x] **4. Intégrer les longueurs :** validation Settings explicitement limitée à AUTO_LOOP_LENGTHS_BARS tout en rejetant les booléens ; pas de version/migration nouvelle. Catégories de couloirs ordonnées 4, 2, 1, ½, ¼, shots, sans afficher de groupe vide ; libellés complets 2/4 et nommage automatique compatibles. Ne pas exposer 2/4 dans Settings.
+- [x] **5. Vérifier :** `uv run pytest -q tests/test_candidate_window.py tests/test_candidates.py tests/test_settings.py tests/test_naming.py tests/test_candidates_panel.py tests/test_sample_lanes.py tests/test_lane_layout.py` puis `uv run pytest -q`. Attendu : tout vert, aucun import Qt dans core. Documenter résultat/effets dans `docs/HISTORIQUE.md`.
+- [x] **6. Commit :** `Borne la recherche de samples et ajoute les longueurs manuelles`. Hooks actifs ; montrer tests et attendre validation.
+
+**Résultat étape 1 :** 548 tests complets réussis, dont 206 ciblés ; 39 tests liste/
+couloirs sous Wayland à 150 % réussis. Contrôles Ruff/mypy/Bandit verts, pas d'import
+Qt dans core. Nommage sans modification de sa fonction : validation partagée
+suffisante, WAV/FLAC réels testés. Aucun changement de réglages ou d'audio utilisateur,
+aucun push/ZIP ; validation attendue avant la tâche 2.
 
 ## Task 2: Région manuelle, aimantation et nouvelle navigation
 
@@ -212,4 +218,6 @@ Documentation Qt vérifiée : https://doc.qt.io/qtforpython-6/PySide6/QtCore/QTh
 Le design est l'autorité ; toute adaptation du plan doit être motivée dans son
 ledger et rester dans le périmètre approuvé, sans élargir les opérations destructives.
 
-**État :** plan rédigé et auto-revu, en attente de validation avant implémentation.
+**État :** plan validé par l'utilisateur le 13/11/2026 ; tâche 1 implémentée,
+validation d'étape attendue avant tâche 2. Les gestes complets ne sont pas encore
+livrés ; pas de publication implicite.

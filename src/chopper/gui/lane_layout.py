@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from chopper.core.models import CandidateType
 from chopper.gui.presentation import SampleItem
 
-CATEGORIES = (("loop", 1.0), ("loop", 0.5), ("loop", 0.25), ("shot", 0.0))
+CATEGORIES = (("loop", 4.0), ("loop", 2.0), ("loop", 1.0), ("loop", 0.5), ("loop", 0.25), ("shot", 0.0))
 
 
 @dataclass(frozen=True)

@@ -60,7 +60,7 @@ def test_quarter_bar_label_and_duration(qapp, loaded_track):
     panel.close()
 
 
-@pytest.mark.parametrize("bars", [None, 2, True])
+@pytest.mark.parametrize("bars", [None, 3, 8, True])
 def test_invalid_loop_label_fails_explicitly(loaded_track, bars):
     from chopper.gui.presentation import sample_type_label
 
@@ -163,11 +163,37 @@ def test_export_buttons_request_modes_not_the_active_candidate(qapp, loaded_trac
     panel.close()
 
 
-@pytest.mark.parametrize("bars, label", [(1.0, "1-bar loop"), (0.5, "½-bar loop"), (0.25, "¼-bar loop")])
+@pytest.mark.parametrize(
+    "bars, label",
+    [
+        (4.0, "4-bar loop"),
+        (2.0, "2-bar loop"),
+        (1.0, "1-bar loop"),
+        (0.5, "½-bar loop"),
+        (0.25, "¼-bar loop"),
+    ],
+)
 def test_english_loop_labels(loaded_track, bars, label):
     from chopper.gui.presentation import sample_type_label
 
     assert sample_type_label(replace(loaded_track.candidates[0], bars=bars)) == label
+
+
+def test_manual_long_loops_are_displayed_and_keep_ids_after_sorting(qapp, loaded_track):
+    candidates = (
+        replace(loaded_track.candidates[0], bars=4.0, end_seconds=8.0),
+        replace(loaded_track.candidates[0], bars=2.0, end_seconds=4.0),
+    )
+    panel, state = make_panel(replace(loaded_track, candidates=candidates))
+    try:
+        panel.table.sortItems(0, Qt.SortOrder.AscendingOrder)
+        assert panel.table.item(0, 0).text() == "2-bar loop"
+        assert panel.table.item(1, 0).text() == "4-bar loop"
+        click(panel, 0)
+        assert state.active_id == state.items[1].id
+        assert not state.marked_ids and state.playing_id is None
+    finally:
+        panel.close()
 
 
 @pytest.mark.parametrize("column", [0, 1, 2, 3])
