@@ -252,8 +252,8 @@ de facteur de zoom/pan restent au constructeur, sous les tests de bornes et de
 non-régression ; pas de dépendance ou persistance supplémentaire à introduire.
 
 **État :** relecture de constructibilité effectuée ; quotas et confirmation même
-sans résultat précisés après cette relecture. Design en attente d'approbation
-utilisateur avant writing-plans. Les propositions complémentaires (protections
-sur les autres remplacements, conservation des résultats pendant les ajustements,
-retour avec réglages actuels, cible Espace et manipulations de région/couloirs)
-doivent être approuvées avec ce document, pas supposées déjà acceptées.
+sans résultat précisés après cette relecture. Design validé par l'utilisateur le
+13/11/2026, y compris les propositions complémentaires : protections sur les autres
+remplacements, conservation des résultats pendant les ajustements, retour avec
+réglages actuels, cible Espace et manipulations de région/couloirs. Plan soumis
+séparément avant implémentation.
