@@ -120,7 +120,7 @@ step_system_packages() {
 step_uv_sync() {
     info "Setting up the Python environment in ${PROJECT_DIR}/.venv (roughly 2 GB on first install)..."
     info "uv may cache downloads and install Python under your account; existing extra packages are kept."
-    ( cd "${PROJECT_DIR}" && UV_PROJECT_ENVIRONMENT="${PROJECT_DIR}/.venv" uv sync --locked --no-dev --inexact )
+    ( cd "${PROJECT_DIR}" && UV_PROJECT_ENVIRONMENT="${PROJECT_DIR}/.venv" uv sync --project "${PROJECT_DIR}" --locked --no-dev --inexact )
     [[ -x "${PROJECT_DIR}/.venv/bin/chopper" ]] || die "Environment incomplete: Chopper executable missing. Run bash install.sh again."
     info "Environment ready."
 }

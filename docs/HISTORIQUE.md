@@ -6,6 +6,25 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 13/11/2026 — Revue finale : sélection du projet uv verrouillée
+
+- La revue indépendante a trouvé un défaut important : une variable héritée
+  `UV_PROJECT` pouvait sélectionner un autre projet malgré le `cd` et la cible
+  `.venv` locale. Avec un ancien exécutable Chopper présent, l'installation pouvait
+  annoncer un succès sans vérifier le verrou de Chopper.
+- Reproduit en test avec le vrai uv hors ligne, un autre projet vide valide et
+  un verrou Chopper invalide : faux succès observé avant correction. L'option
+  CLI absolue `--project` impose désormais le projet en plus de l'environnement.
+  Le même test exige maintenant l'échec sur le vrai verrou Chopper invalide.
+- 486 tests complets réussis après correction ; contrôles statiques verts.
+  Revue : aucune anomalie critique ni mineure, une importante corrigée et testée.
+  Le ZIP initial de 38 fichiers a passé somme/CRC/contenu et licence/verrou exacts,
+  installation réelle depuis le cache hors ligne dans une extraction temporaire
+  et démarrage Qt sans affichage. Aucun sudo ni raccourci du compte réel utilisés.
+- Aucun changement audio, export, préécoute ou poignée. La variable d'environnement
+  n'est pas modifiée dans le compte ; seul cet appel d'installation est borné.
+  Nouvelle archive à construire depuis le commit corrigé, sans supprimer l'ancienne.
+
 ## 13/11/2026 — Archive de prêt Linux traçable
 
 - Étape 2 validée, étape 3 autorisée. Ajout de `scripts/build_release.py` pour

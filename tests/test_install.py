@@ -111,7 +111,14 @@ def test_installer_generates_chopper_and_launcher_preserves_arguments(installer_
     launcher = project / "chopper"
     assert launcher.is_file() and os.access(launcher, os.X_OK)
     assert (project / "choppeur").read_text() == "old launcher sentinel"
-    assert Path(env["UV_CALLS"]).read_text().splitlines() == ["sync", "--locked", "--no-dev", "--inexact"]
+    assert Path(env["UV_CALLS"]).read_text().splitlines() == [
+        "sync",
+        "--project",
+        str(project),
+        "--locked",
+        "--no-dev",
+        "--inexact",
+    ]
     assert (project / "uv.lock").read_text() == "locked-dependencies-sentinel"
     Path(env["UV_CALLS"]).write_text("")
     subprocess.run(
@@ -254,6 +261,42 @@ def test_installer_keeps_environment_inside_selected_folder(installer_sandbox, t
     assert result.returncode == 0, result.stderr
     assert (project / ".venv/bin/chopper").is_file()
     assert not unrelated_environment.exists()
+
+
+def test_inherited_uv_project_cannot_bypass_chopper_lock_validation(installer_sandbox, tmp_path):
+    project, env = installer_sandbox
+    uv = shutil.which("uv")
+    assert uv is not None
+    tools_uv = Path(env["PATH"].split(":")[0]) / "uv"
+    tools_uv.unlink()
+    tools_uv.symlink_to(uv)
+    foreign = tmp_path / "unrelated-project"
+    foreign.mkdir()
+    metadata = '[project]\nname = "unrelated"\nversion = "0.1.0"\nrequires-python = ">=3.12,<3.13"\n'
+    (foreign / "pyproject.toml").write_text(metadata)
+    (project / "pyproject.toml").write_text(metadata.replace('"unrelated"', '"chopper"'))
+    offline_env = {
+        **env,
+        "UV_OFFLINE": "1",
+        "UV_CACHE_DIR": str(tmp_path / "uv-cache"),
+        "UV_PYTHON": sys.executable,
+    }
+    subprocess.run(
+        [uv, "lock", "--project", str(foreign)], env=offline_env, check=True, capture_output=True, timeout=30
+    )
+    subprocess.run(
+        [uv, "venv", "--python", sys.executable, str(project / ".venv")],
+        env=offline_env,
+        check=True,
+        capture_output=True,
+        timeout=30,
+    )
+    write_tool(project / ".venv/bin/chopper", "exit 0\n")
+    result = run_installer(project, {**offline_env, "UV_PROJECT": str(foreign)})
+    assert result.returncode != 0, result.stdout
+    assert "uv.lock" in result.stderr
+    assert "Done." not in result.stdout
+    assert (project / "uv.lock").read_text() == "locked-dependencies-sentinel"
 
 
 def test_launcher_reports_missing_environment_without_running_uv(installer_sandbox):

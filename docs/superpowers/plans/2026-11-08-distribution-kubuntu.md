@@ -85,13 +85,41 @@ attendu. Validation utilisateur avant la tâche 3.
 
 **Interfaces:** `build_release(repo: Path) -> tuple[Path, Path]` ; CLI `python scripts/build_release.py`, sortie uniquement dans `repo / "dist"`. Nom `chopper-{version}-{short_commit}-linux.zip`, racine identique sans `.zip`, somme `.zip.sha256`. Lire version et octets depuis HEAD ; inclure `RELEASE.txt` généré avec SHA complet et version.
 
-- [ ] **1. Tests rouges :** dépôts Git temporaires indépendants, sans réseau ni hooks. Vérifier fichiers obligatoires, contenu exact de LICENSE/uv.lock, commit complet, SHA-256 correcte et racine unique. Refuser index/worktree suivis sales, version avec séparateur de chemin et symlinks suivis dans les chemins livrés. Ignorer les fichiers non suivis : injecter `.env`, audio, `.venv`, `dist`, vérifier leur absence ; une seconde génération ne doit ni inclure le premier ZIP ni écraser une sortie étrangère.
-- [ ] **2. Rouge :** `uv run pytest -q tests/test_release.py` ; échec faute de constructeur.
-- [ ] **3. Implémenter :** standard Python (`subprocess` sans shell, `zipfile`, `hashlib`, `tomllib`). Liste blanche explicite : `src/chopper/`, `scripts/install_desktop.py`, `install.sh`, `pyproject.toml`, `uv.lock`, `LICENSE`, `README.md`, `docs/INSTALL_KUBUNTU.md`, `docs/FINAL_VALIDATION.md`, et `RELEASE.txt` généré. Lire uniquement les blobs Git de HEAD ; refuser les modes non réguliers dans cette liste. Construire archive et somme dans des fichiers temporaires dans dist puis publication sans écraser une sortie différente ; si sortie existante identique, la conserver. Aucun fichier source modifié, aucun accès au contenu personnel. Dates ZIP fixes et ordre des entrées stable pour reproductibilité d'un même commit.
-- [ ] **4. Vert :** `uv run pytest -q tests/test_release.py` puis `uv run pytest -q` ; `uv run ruff check src tests scripts`, `uv run ruff format --check src tests scripts`, `uv run mypy src tests scripts`, `uv run bandit -qc pyproject.toml -r src scripts -ll` et `git diff --check`. Ne pas modifier les hooks pour contourner une alerte.
-- [ ] **5. Documentation :** distinguer les tests simulés de la validation réelle encore attendue. Recette : relever version Kubuntu/architecture, installer depuis une nouvelle extraction, accepter/refuser le raccourci, lancer depuis KDE, analyser un morceau puis préécouter/exporter, fermer/relancer. Ne pas promettre toutes architectures ni tous pilotes. Référence d'installation depuis l'archive : `bash install.sh` dans son dossier.
-- [ ] **6. Commit :** `Prépare une archive Linux traçable pour le prêt`. Exécuter ensuite le constructeur depuis cet état propre, vérifier somme et contenu réels, scanner la plage de commits avec gitleaks. Une revue finale indépendante portera sur les trois tâches ; ne pas réclamer de revue par tâche.
-- [ ] **7. Livraison locale :** donner le chemin du ZIP et le résultat des vérifications, puis attendre l'essai utilisateur sur Kubuntu 26.04.1. Ni push ni release sans autorisation.
+- [x] **1. Tests rouges :** dépôts Git temporaires indépendants, sans réseau ni hooks. Vérifier fichiers obligatoires, contenu exact de LICENSE/uv.lock, commit complet, SHA-256 correcte et racine unique. Refuser index/worktree suivis sales, version avec séparateur de chemin et symlinks suivis dans les chemins livrés. Ignorer les fichiers non suivis : injecter `.env`, audio, `.venv`, `dist`, vérifier leur absence ; une seconde génération ne doit ni inclure le premier ZIP ni écraser une sortie étrangère.
+- [x] **2. Rouge :** `uv run pytest -q tests/test_release.py` ; échec faute de constructeur.
+- [x] **3. Implémenter :** standard Python (`subprocess` sans shell, `zipfile`, `hashlib`, `tomllib`). Liste blanche explicite : `src/chopper/`, `scripts/install_desktop.py`, `install.sh`, `pyproject.toml`, `uv.lock`, `LICENSE`, `README.md`, `docs/INSTALL_KUBUNTU.md`, `docs/FINAL_VALIDATION.md`, et `RELEASE.txt` généré. Lire uniquement les blobs Git de HEAD ; refuser les modes non réguliers dans cette liste. Construire archive et somme dans des fichiers temporaires dans dist puis publication sans écraser une sortie différente ; si sortie existante identique, la conserver. Aucun fichier source modifié, aucun accès au contenu personnel. Dates ZIP fixes et ordre des entrées stable pour reproductibilité d'un même commit.
+- [x] **4. Vert :** `uv run pytest -q tests/test_release.py` puis `uv run pytest -q` ; `uv run ruff check src tests scripts`, `uv run ruff format --check src tests scripts`, `uv run mypy src tests scripts`, `uv run bandit -qc pyproject.toml -r src scripts -ll` et `git diff --check`. Ne pas modifier les hooks pour contourner une alerte.
+- [x] **5. Documentation :** distinguer les tests simulés de la validation réelle encore attendue. Recette : relever version Kubuntu/architecture, installer depuis une nouvelle extraction, accepter/refuser le raccourci, lancer depuis KDE, analyser un morceau puis préécouter/exporter, fermer/relancer. Ne pas promettre toutes architectures ni tous pilotes. Référence d'installation depuis l'archive : `bash install.sh` dans son dossier.
+- [x] **6. Commit :** `Prépare une archive Linux traçable pour le prêt`. Exécuter ensuite le constructeur depuis cet état propre, vérifier somme et contenu réels, scanner la plage de commits avec gitleaks. Une revue finale indépendante portera sur les trois tâches ; ne pas réclamer de revue par tâche.
+- [x] **7. Livraison locale :** donner le chemin du ZIP et le résultat des vérifications, puis attendre l'essai utilisateur sur Kubuntu 26.04.1. Ni push ni release sans autorisation.
+
+**Résultat étape 3 / revue au 13/11/2026 :** constructeur testé rouge puis vert ;
+29 tests archive et 486 tests complets après correction de la revue. Tous les
+contrôles et hooks actifs. L'héritage `GIT_*` est neutralisé pour lire le dépôt
+explicite. Revue indépendante : une anomalie importante (`UV_PROJECT`) reproduite
+avec le vrai uv hors ligne, puis corrigée par `--project` absolu ; test rouge puis
+vert et suite complète verte. Aucun mineur différé. ZIP initial de 38 fichiers,
+licence/verrou/somme vérifiés ; installation réelle en extraction fraîche depuis
+le cache local et démarrage Qt sans affichage réussis. Candidat final reconstruit
+après le correctif, vérification et livraison locale à consigner dans le journal
+de travail. Essai Kubuntu/KDE/matériel attendu ; aucune intégration ni publication.
+
+**Décisions et limites de clôture :**
+- Validation par étape conservée conformément aux règles du projet ; coût :
+  une confirmation utilisateur par étape, plutôt qu'une exécution sans pause.
+- Vrai consommateur Desktop Entry GLib, pas un faux parseur Qt ; coût : le menu
+  KDE natif et son cache restent à tester sur la cible.
+- Environnement et projet uv imposés localement ; coût : les redirections uv
+  personnalisées ne s'appliquent pas à cet installateur, workflow manuel disponible.
+- `env --` nécessaire pour les pourcentages ; coût : nécessite coreutils/PATH
+  du bureau, normal sur Kubuntu. Source Git bornée à `.py`/`py.typed` ; coût :
+  futures ressources à autoriser explicitement après revue.
+- Matériel, modèle, pilotes, authenticité de la chaîne de téléchargement et
+  garanties juridiques non établis par les tests : recette cible, HTTPS officiel
+  et licences conservées, sans audit matériel/sécurité/juridique implicite.
+- Cases de clôture mises à jour après preuves des tâches ; coût : état transitoire
+  du plan incomplet, sans effet sur le logiciel. Espace isolé et livrables conservés
+  pour l'essai utilisateur, pas de nettoyage destructif ou de push automatique.
 
 ## Références vérifiées le 08/11/2026
 
@@ -100,4 +128,4 @@ attendu. Validation utilisateur avant la tâche 3.
 
 ## Auto-revue du plan
 
-Couverture : tâche 1 = dépendances/erreurs/lancement ; tâche 2 = consentement XDG et menu ; tâche 3 = archive/licence/traçabilité/recette cible. Les cinq risques de revue ont chacun des tests attribués. Pas de changement audio ni de publication implicite. L'exécution native dans cette session est proposée ; elle reste à confirmer avec ce plan.
+Couverture : tâche 1 = dépendances/erreurs/lancement ; tâche 2 = consentement XDG et menu ; tâche 3 = archive/licence/traçabilité/recette cible. Les cinq risques de revue ont chacun des tests attribués. Pas de changement audio ni de publication implicite. Exécution native approuvée et effectuée dans l'espace Git isolé autorisé ; acceptation sur la cible en attente.

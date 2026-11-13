@@ -70,5 +70,6 @@ recette manuelle d'installation, ouverture, première analyse et écoute réelle
 
 ## État
 
-Cadrage approuvé par l'utilisateur le 08/11/2026. Plan à valider avant
-implémentation.
+Cadrage et plan approuvés par l'utilisateur le 08/11/2026. Implémentation des
+trois étapes et revue réalisées ; recette sur Kubuntu 26.04.1 et publication
+restent soumises à validation utilisateur.
