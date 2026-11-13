@@ -3,7 +3,22 @@
 Target for the first shared build: **Kubuntu 26.04.1**. Compatibility on a clean
 target machine and its CPU architecture still needs the checks below. Isolated
 installer tests are not proof of desktop, audio-driver or hardware compatibility.
-The shareable ZIP is prepared separately; these instructions describe its install flow.
+The shareable ZIP contains Chopper's sources and installer, not its large runtime
+dependencies. Send the matching `.zip.sha256` alongside it. `RELEASE.txt` inside
+the archive identifies the source commit used to build it.
+
+## Check the download
+
+Keep the ZIP and its matching `.zip.sha256` file together. From a terminal in that
+folder, check their integrity before extracting:
+
+```bash
+sha256sum -c -- chopper-*.zip.sha256
+```
+
+The archive must be reported as `OK`; otherwise do not install it and ask for a
+fresh copy. A checksum detects accidental corruption, not a malicious sender
+who replaces both files: only accept the pair from a trusted source.
 
 ## Install once
 

@@ -6,6 +6,32 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 13/11/2026 — Archive de prêt Linux traçable
+
+- Étape 2 validée, étape 3 autorisée. Ajout de `scripts/build_release.py` pour
+  livrer sources/installateur/guides dans un ZIP versionné avec SHA court dans
+  le nom, SHA complet dans `RELEASE.txt` et somme SHA-256 séparée.
+- Lire uniquement les blobs Git d'un commit propre, avec liste blanche ; exclure
+  fichiers non suivis, historique Git, environnements, caches, paramètres et audio.
+  Refuser liens suivis et données inattendues dans les sources, version dangereuse,
+  fichier requis absent, `dist` redirigé par lien et sorties étrangères.
+- Dates et ordre stables, modes conservés ; reconstruction identique sans réécrire
+  les sorties existantes. Précontrôler archive et somme avant publication ; sur
+  erreur, retirer uniquement les liens partiels créés par cet appel et nettoyer
+  ses temporaires, sans toucher aux fichiers étrangers.
+- 29 tests de construction rouges puis verts, sur dépôts Git temporaires sans
+  réseau ni hooks utilisateur. Cas limites : index
+  sale, source supprimée, version avec séparateurs/contrôles, liens et collisions,
+  checksum incompatible, échec partiel, reconstruction et lancement depuis un
+  autre dossier. Aucun changement moteur/audio ni nettoyage d'exports.
+- Le hook de commit a révélé l'héritage de `GIT_INDEX_FILE` : le constructeur
+  consultait l'index du dépôt appelant au lieu de celui demandé. Trois nouveaux
+  tests rouges (`GIT_INDEX_FILE`, `GIT_DIR`, `GIT_WORK_TREE`) puis isolation des
+  variables Git pour lire uniquement le dépôt explicite. Aucun hook contourné.
+- Guide de vérification de somme et recette Kubuntu explicites : intégrité du ZIP
+  ne prouve ni confiance dans son expéditeur, ni compatibilité matérielle.
+  Vérification du livrable réel et revue finale consignées après construction.
+
 ## 08/11/2026 — Raccourci KDE créé uniquement après accord
 
 - Étape 1 validée par l'utilisateur, étape 2 autorisée. Après installation locale

@@ -116,7 +116,33 @@ se lance avec `uv run chopper` et fournit `src/chopper/py.typed`.
   roues CUDA correspondantes (voir pytorch.org/get-started/locally) pour
   accélérer l'analyse.
 
-## Paquet distribuable (étape 11) : pas encore de paquet autonome
+## 13/11/2026 — Archive de prêt traçable pour Kubuntu 26.04.1
+
+- Format retenu : ZIP de sources et installateur, pas un binaire autonome.
+  Une commande d'installation est acceptée par le destinataire ; Qt/PyTorch
+  restent téléchargés dans un environnement local, poids du modèle au besoin.
+- Construire uniquement depuis un état suivi propre. Lire les blobs du commit,
+  jamais les fichiers audio/environnements/paramètres présents sur le disque.
+  Nom `chopper-{version}-{sha12}-linux.zip`, commit complet dans `RELEASE.txt`,
+  somme SHA-256 séparée ; aucune publication implicite.
+- Liste blanche : sources Python et `py.typed` sous `src/chopper/`, installateur
+  Bash et helper Desktop Entry, métadonnées/verrou/licence/README et deux guides
+  utilisateur. Un fichier suivi inattendu sous les sources provoque un refus,
+  plutôt qu'une inclusion silencieuse de secrets, audio ou caches. Les ressources
+  d'un futur autre type devront être ajoutées explicitement après revue.
+- Reproductibilité sur le même environnement de construction : dates ZIP fixes,
+  ordre stable, modes Git conservés. Pas de garantie bit-à-bit entre versions
+  différentes de zlib/Python. Les fichiers de sortie étrangers ou liens sont
+  refusés, une sortie identique est conservée sans réécriture. Une erreur de
+  publication nettoie seulement les sorties partielles créées par cet appel.
+- Les petits scripts de construction et leurs appels Git lisent le dépôt sans
+  shell ; les signalements Bandit faibles sur subprocess ne justifient pas de
+  désactiver les hooks ou d'élargir les permissions.
+- Test réel sur Kubuntu 26.04.1 toujours requis : architecture, installation
+  fraîche, menu KDE, première analyse et périphérique audio. Aucun conteneur ou
+  serveur ajouté pour contourner ce besoin ; ne pas prétendre ce test exécuté.
+
+## Paquet distribuable (historique, avant l'archive de prêt) : pas de paquet autonome
 - `docs/ROADMAP.md` reporte explicitement ce choix ("à décider à ce
   moment-là"). Ce qui est fait pour l'instant : `pyproject.toml` produit un
   paquet Python standard, validé avec `uv build` (`choppeur-0.1.0.tar.gz` +

@@ -164,11 +164,27 @@ replace the full license; legal review of custom terms is recommended.
 
 ## Development
 
+From a **clean Git checkout** (not the recipient's extracted ZIP), create a
+shareable source archive and its SHA-256 file with:
+
+```bash
+uv run --no-sync python scripts/build_release.py
+```
+
+Both files go in `dist/`, named with the package version and 12 characters of the
+source commit. The ZIP contains only the runtime sources, installer, license and
+user guides; dependencies are downloaded during installation. It does not include
+Git history, tests, developer hooks, your environment, settings or audio. A repeated
+build of the same commit preserves identical outputs and refuses conflicting
+files or symbolic links. The builder does not publish anything to GitHub.
+
+For development, use the full Git repository:
+
 ```bash
 uv sync --group dev
 uv run pre-commit install
 uv run pytest
 ```
 
-Architecture, decisions and historical plans (some in French):
+Architecture, decisions and historical plans in the full repository (some in French):
 `docs/SPEC.md`, `docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/HISTORIQUE.md`.
