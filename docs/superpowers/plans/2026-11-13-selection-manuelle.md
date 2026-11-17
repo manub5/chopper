@@ -114,7 +114,7 @@ du surlignage de lecture. Ruff/mypy/Bandit passent ; recette dans
 
 **Interfaces:** conserver `play_requested(int,int)` pour les samples ; ajouter `range_play_requested = Signal(object,int)` (Window, jeton), `select_range(window: Window, *, auto_preview: bool=True) -> None`, `clear_range() -> None`, propriétés `can_preview: bool`, `has_playback: bool`, `playing_window: Window | None`. Ajouter `replace_candidates(candidates: tuple[Candidate,...]) -> None` préservant les mêmes audio/Analysis dans LoadedTrack. Les jetons passent tous par `_next_token` existant.
 
-- [ ] **1. Tests rouges :** sélection de passage avec auto on émet une demande, avec auto off aucune mais Espace explicite fonctionne via toggle_playback. Tester séquence sample -> passage -> sample avec jetons strictement croissants ; started/finished/failed de l'ancien jeton ne changent pas le nouveau. Cliquer le même ID ancien après une lecture de passage doit cibler le sample, pas arrêter seulement le passage ; Ctrl+clic ne change pas la cible. clear/load/reset retirent la cible manuelle, double clic sample conserve son comportement d'arrêt.
+- [x] **1. Tests rouges :** sélection de passage avec auto on émet une demande, avec auto off aucune mais Espace explicite fonctionne via toggle_playback. Tester séquence sample -> passage -> sample avec jetons strictement croissants ; started/finished/failed de l'ancien jeton ne changent pas le nouveau. Cliquer le même ID ancien après une lecture de passage doit cibler le sample, pas arrêter seulement le passage ; Ctrl+clic ne change pas la cible. clear/load/reset retirent la cible manuelle, double clic sample conserve son comportement d'arrêt.
 
   ```python
   def test_manual_range_waits_for_explicit_play_when_auto_is_off(qapp, loaded_track):
@@ -128,11 +128,16 @@ du surlignage de lecture. Ruff/mypy/Bandit passent ; recette dans
       assert len(requests) == 1 and requests[0][0] == (0.2, 0.8)
       assert state.has_playback
   ```
-- [ ] **2. Tests rouges remplacement :** même audio et Analysis par identité (`is`), nouveaux IDs monotones, marques/actif périmés effacés, ancien callback ignoré ; aucune demande de lecture à la seule réception de nouveaux candidats. Signal d'arrêt émis une fois pour une lecture active/pending. `can_preview` vrai pour un passage sans sample actif ; `has_playback` vrai avant started pour permettre l'arrêt d'une demande en attente.
-- [ ] **3. Rouge :** `uv run pytest -q tests/test_sample_state.py tests/test_preview_player.py` ; attendu : contrats absents, régressions anciennes toujours exercées.
-- [ ] **4. Implémenter :** une cible courante candidate ou passage et un jeton propriétaire commun. `navigate` bascule aussi vers la cible sample si son ID est déjà actif mais que la cible précédente était un passage ; Ctrl+clic reste uniquement marquage. `replace_candidates` utilise dataclasses.replace sur LoadedTrack, pas une remise à zéro des données audio ; `load_track` remet à zéro la cible de passage mais ne recycle pas les compteurs de jetons/IDs.
-- [ ] **5. Vert :** mêmes tests puis suite complète. PreviewPlayer conserve ses contrôles audio ; l'adaptateur de tâche 5 lui transmettra un candidat éphémère de bornes pour le passage, jamais ajouté aux listes/exportations. Documenter absence de lecture automatique au remplacement.
-- [ ] **6. Commit :** `Unifie la préécoute des passages et des samples`. Montrer les tests puis attendre validation.
+- [x] **2. Tests rouges remplacement :** même audio et Analysis par identité (`is`), nouveaux IDs monotones, marques/actif périmés effacés, ancien callback ignoré ; aucune demande de lecture à la seule réception de nouveaux candidats. Signal d'arrêt émis une fois pour une lecture active/pending. `can_preview` vrai pour un passage sans sample actif ; `has_playback` vrai avant started pour permettre l'arrêt d'une demande en attente.
+- [x] **3. Rouge :** `uv run pytest -q tests/test_sample_state.py tests/test_preview_player.py` ; attendu : contrats absents, régressions anciennes toujours exercées.
+- [x] **4. Implémenter :** une cible courante candidate ou passage et un jeton propriétaire commun. `navigate` bascule aussi vers la cible sample si son ID est déjà actif mais que la cible précédente était un passage ; Ctrl+clic reste uniquement marquage. `replace_candidates` utilise dataclasses.replace sur LoadedTrack, pas une remise à zéro des données audio ; `load_track` remet à zéro la cible de passage mais ne recycle pas les compteurs de jetons/IDs.
+- [x] **5. Vert :** mêmes tests puis suite complète. PreviewPlayer conserve ses contrôles audio ; l'adaptateur de tâche 5 lui transmettra un candidat éphémère de bornes pour le passage, jamais ajouté aux listes/exportations. Documenter absence de lecture automatique au remplacement.
+- [x] **6. Commit :** `Unifie la préécoute des passages et des samples`. Montrer les tests puis attendre validation.
+
+**Résultat étape 3 :** 34 nouveaux tests rouges observés puis 78 tests ciblés et
+621 complets réussis ; Ruff/mypy/Bandit verts. PreviewPlayer inchangé et ses tests
+rejoués. Remplacement sans nouvelle lecture, même audio/Analysis en mémoire,
+aucune écriture persistante. Validation attendue avant tâche 4.
 
 ## Task 4: Reclassement en mémoire et worker identifié
 
@@ -224,6 +229,6 @@ Documentation Qt vérifiée : https://doc.qt.io/qtforpython-6/PySide6/QtCore/QTh
 Le design est l'autorité ; toute adaptation du plan doit être motivée dans son
 ledger et rester dans le périmètre approuvé, sans élargir les opérations destructives.
 
-**État :** plan validé par l'utilisateur le 13/11/2026 ; tâche 1 validée,
-tâche 2 implémentée, validation attendue avant tâche 3. Lecture de passage,
-reclassement et confirmations restent à implémenter ; pas de publication implicite.
+**État :** plan validé par l'utilisateur le 13/11/2026 ; tâches 1 et 2 validées,
+tâche 3 implémentée, validation attendue avant tâche 4. Reclassement et intégration
+lecture/confirmations restent à implémenter ; pas de publication implicite.

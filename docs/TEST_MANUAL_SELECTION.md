@@ -4,6 +4,14 @@ Stage 2 implements the waveform widget only. Passage playback, Chop selection,
 Whole track and confirmation dialogs are not connected yet. This checklist is
 not a claim of a completed end-to-end feature or a hands-on KDE test.
 
+Stage 3 adds the shared preview state, not the MainWindow/player connection.
+Run `uv run pytest -q tests/test_sample_state.py tests/test_preview_player.py`
+to check sample/passage token ownership, stale callbacks, explicit playback with
+Auto-preview off, and candidate replacement without copying audio or starting
+playback. The last selected passage remains the Space target after candidate
+replacement; clicking/navigating to a sample selects that sample as the target.
+Clearing the passage restores any still-active sample target without playing it.
+
 ## Automated widget checks
 
 Run from the project directory:

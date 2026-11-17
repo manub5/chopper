@@ -285,3 +285,265 @@ def test_no_active_item_or_stale_id_never_requests_audio(qapp, loaded_track):
     assert state.active_id is state.playing_id is None
     assert state.marked_ids == frozenset()
     assert events == {"play": [], "stop": [], "error": []}
+
+
+def record_ranges(state):
+    events = record(state)
+    events["range"] = []
+    state.range_play_requested.connect(lambda window, token: events["range"].append((window, token)))
+    return events
+
+
+@pytest.mark.parametrize("auto_play,auto_preview", [(True, True), (False, True), (True, False)])
+def test_manual_range_obeys_auto_but_always_allows_explicit_play(qapp, loaded_track, auto_play, auto_preview):
+    state = make_state(loaded_track, auto_play=auto_play)
+    events = record_ranges(state)
+    state.select_range((0.2, 0.8), auto_preview=auto_preview)
+    assert state.can_preview and state.active_id is None
+    assert state.playing_id is state.playing_window is None
+    if auto_play and auto_preview:
+        assert len(events["range"]) == 1 and state.has_playback
+    else:
+        assert events["range"] == [] and not state.has_playback
+        state.toggle_playback()
+    assert events["range"][0][0] == (0.2, 0.8)
+    token = events["range"][0][1]
+    state.playback_started(token)
+    assert state.playing_window == (0.2, 0.8) and state.playing_id is None
+    state.toggle_playback()
+    assert not state.has_playback and state.playing_window is None
+    assert events["stop"] == [True] and events["play"] == []
+
+
+@pytest.mark.parametrize("callback", ["playback_started", "playback_finished", "playback_failed"])
+@pytest.mark.parametrize("started", [False, True])
+def test_sample_range_sample_share_tokens_and_ignore_stale_callbacks(qapp, loaded_track, callback, started):
+    state = make_state(loaded_track)
+    events = record_ranges(state)
+    item_id = state.items[0].id
+    state.click(item_id)
+    first_token = events["play"][-1][1]
+    if started:
+        state.playback_started(first_token)
+    state.select_range((0.2, 0.8))
+    range_token = events["range"][-1][1]
+    if started:
+        state.playback_started(range_token)
+    args = (first_token, "old sample error") if callback == "playback_failed" else (first_token,)
+    getattr(state, callback)(*args)
+    assert state.has_playback and state.playing_id is None
+    assert state.playing_window == ((0.2, 0.8) if started else None)
+    # The old active ID must select the sample again, not merely stop the range.
+    state.click(item_id)
+    sample_token = events["play"][-1][1]
+    assert first_token < range_token < sample_token
+    if started:
+        state.playback_started(sample_token)
+    args = (range_token, "old range error") if callback == "playback_failed" else (range_token,)
+    getattr(state, callback)(*args)
+    assert state.has_playback and state.playing_window is None
+    assert state.playing_id == (item_id if started else None)
+    assert len(events["play"]) == 2 and len(events["range"]) == 1
+    assert events["stop"] == [True, True] and events["error"] == []
+
+
+def test_ctrl_click_preserves_range_as_space_target(qapp, loaded_track):
+    state = make_state(loaded_track)
+    events = record_ranges(state)
+    state.select_range((0.2, 0.8))
+    token = events["range"][-1][1]
+    state.playback_started(token)
+    state.click(state.items[1].id, control=True)
+    assert state.playing_window == (0.2, 0.8) and state.active_id is None
+    assert state.marked_ids == {state.items[1].id}
+    assert not events["stop"] and not events["play"]
+    state.toggle_playback()
+    state.toggle_playback()
+    assert len(events["range"]) == 2 and events["range"][-1][1] > token
+
+
+def test_navigation_to_same_active_id_returns_from_range_without_autoplay(qapp, loaded_track):
+    state = make_state(loaded_track, auto_play=False)
+    events = record_ranges(state)
+    item_id = state.items[0].id
+    state.navigate(item_id)
+    state.select_range((0.2, 0.8))
+    state.toggle_playback()
+    state.navigate(item_id)
+    assert not state.has_playback and state.playing_window is None
+    assert events["stop"] == [True] and not events["play"]
+    state.toggle_playback()
+    assert events["play"][-1][0] == item_id and len(events["range"]) == 1
+
+
+@pytest.mark.parametrize("reset", ["clear", "clear_range", "load_track"])
+def test_reset_removes_range_target_and_ignores_its_callbacks(qapp, loaded_track, reset):
+    state = make_state(loaded_track)
+    events = record_ranges(state)
+    state.select_range((0.2, 0.8))
+    token = events["range"][-1][1]
+    if reset == "load_track":
+        state.load_track(loaded_track)
+    else:
+        getattr(state, reset)()
+        getattr(state, reset)()
+    state.playback_started(token)
+    state.playback_finished(token)
+    state.playback_failed(token, "stale")
+    state.toggle_playback()
+    assert not state.can_preview and not state.has_playback
+    assert state.playing_id is state.playing_window is None
+    assert events["stop"] == [True] and events["error"] == []
+    assert len(events["range"]) == 1 and not events["play"]
+    if reset != "clear":
+        state.click(state.items[0].id)
+        assert events["play"][-1][1] > token
+
+
+def test_current_range_finish_or_error_retains_target_for_retry(qapp, loaded_track):
+    state = make_state(loaded_track)
+    events = record_ranges(state)
+    state.select_range((0.2, 0.8))
+    first = events["range"][-1][1]
+    state.playback_started(first)
+    state.playback_finished(first)
+    assert state.can_preview and not state.has_playback and state.playing_window is None
+    state.toggle_playback()
+    second = events["range"][-1][1]
+    state.playback_failed(second, "No output device")
+    assert events["error"] == ["No output device"]
+    assert state.can_preview and not state.has_playback and state.playing_window is None
+    state.toggle_playback()
+    assert first < second < events["range"][-1][1]
+
+
+@pytest.mark.parametrize("kind", ["sample", "range"])
+@pytest.mark.parametrize("started", [False, True])
+def test_replacement_keeps_audio_analysis_and_invalidates_old_sample_generation(
+    qapp, loaded_track, kind, started
+):
+    state = make_state(loaded_track)
+    events = record_ranges(state)
+    old_ids = {item.id for item in state.items}
+    if kind == "sample":
+        state.click(state.items[0].id)
+        token = events["play"][-1][1]
+    else:
+        state.select_range((0.2, 0.8))
+        token = events["range"][-1][1]
+    if started:
+        state.playback_started(token)
+    state.mark_all()
+    candidates = (replace(loaded_track.candidates[0], start_seconds=0.3, end_seconds=0.9),)
+    state.replace_candidates(candidates)
+    loaded = state.loaded_track
+    assert loaded is not loaded_track
+    assert loaded.samples is loaded_track.samples and loaded.analysis is loaded_track.analysis
+    assert loaded.sample_rate == loaded_track.sample_rate and loaded.candidates == candidates
+    assert loaded_track.candidates != candidates
+    assert state.active_id is state.playing_id is None and state.playing_window is None
+    assert not state.marked_ids and not state.has_playback
+    assert min(item.id for item in state.items) > max(old_ids)
+    for old_id in old_ids:
+        state.click(old_id)
+        state.toggle_mark(old_id)
+    state.playback_started(token)
+    state.playback_finished(token)
+    state.playback_failed(token, "obsolete")
+    assert not state.has_playback and not state.marked_ids and events["error"] == []
+    assert events["stop"] == [True]
+    assert len(events["play"]) + len(events["range"]) == 1
+    if kind == "range":
+        assert state.can_preview
+        state.toggle_playback()
+        assert events["range"][-1][0] == (0.2, 0.8) and events["range"][-1][1] > token
+    else:
+        assert not state.can_preview
+        state.click(state.items[0].id)
+        assert events["play"][-1][1] > token
+
+
+def test_empty_candidate_replacement_keeps_range_without_creating_fake_sample(qapp, loaded_track):
+    state = make_state(loaded_track, auto_play=False)
+    events = record_ranges(state)
+    state.select_range((0.2, 0.8))
+    state.replace_candidates(())
+    assert state.items == () and state.loaded_track.candidates == ()
+    assert state.can_preview and not state.has_playback
+    assert not events["range"] and not events["stop"]
+    state.toggle_playback()
+    assert events["range"][-1][0] == (0.2, 0.8) and not events["play"]
+
+
+def test_clear_range_does_not_interrupt_a_sample_target(qapp, loaded_track):
+    state = make_state(loaded_track)
+    events = record_ranges(state)
+    token = begin_playback(state, events, state.items[0].id)
+    state.clear_range()
+    assert state.playing_id == state.items[0].id and state.has_playback
+    assert not events["stop"]
+    state.playback_finished(token)
+
+
+def test_range_change_stops_old_preview_even_when_auto_is_disabled(qapp, loaded_track):
+    state = make_state(loaded_track)
+    events = record_ranges(state)
+    first = begin_playback(state, events, state.items[0].id)
+    state.set_auto_play(False)
+    state.select_range((0.2, 0.8))
+    assert events["stop"] == [True] and not events["range"]
+    assert state.can_preview and not state.has_playback
+    state.toggle_playback()
+    assert events["range"][-1][1] > first
+    state.clear_range()
+    state.toggle_playback()
+    assert events["play"][-1][0] == state.items[0].id
+
+
+def test_repeated_range_selection_restarts_instead_of_toggling_off(qapp, loaded_track):
+    state = make_state(loaded_track)
+    events = record_ranges(state)
+    state.select_range((0.2, 0.8))
+    first = events["range"][-1][1]
+    state.select_range((0.2, 0.8))
+    assert state.has_playback and len(events["range"]) == 2
+    assert events["range"][-1][1] > first and events["stop"] == [True]
+
+
+@pytest.mark.parametrize(
+    "window",
+    [
+        (0.0, 0.0),
+        (0.8, 0.2),
+        (-1.0, 0.5),
+        (0.0, 4.0),
+        (float("nan"), 1.0),
+        (0.0, float("inf")),
+        (True, 2.0),
+        (0.0,),
+        "01",
+        ("0", 1.0),
+    ],
+)
+def test_invalid_range_does_not_stop_or_replace_valid_target(qapp, loaded_track, window):
+    state = make_state(loaded_track)
+    events = record_ranges(state)
+    state.select_range((0.2, 0.8))
+    token = events["range"][-1][1]
+    state.playback_started(token)
+    with pytest.raises(ValueError, match="range"):
+        state.select_range(window)
+    assert state.has_playback and state.playing_window == (0.2, 0.8)
+    assert len(events["range"]) == 1 and not events["stop"]
+
+
+def test_range_and_replacement_without_loaded_audio_are_noops(qapp, loaded_track):
+    state = make_state(loaded_track)
+    state.clear()
+    events = record_ranges(state)
+    state.select_range((0.2, 0.8))
+    state.replace_candidates(loaded_track.candidates)
+    state.toggle_playback()
+    assert state.loaded_track is None and state.items == ()
+    assert not state.can_preview and not state.has_playback
+    assert events == {"play": [], "stop": [], "error": [], "range": []}

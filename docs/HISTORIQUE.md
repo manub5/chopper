@@ -6,6 +6,37 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 17/11/2026 — Sélection manuelle, étape 3 : cible et identité de préécoute communes
+
+- SampleState gère une cible de sample ou de passage, avec un compteur de jetons
+  commun et croissant. Les fins/démarrages/erreurs d'anciennes lectures ne peuvent
+  plus modifier une préécoute de l'autre type. `has_playback` inclut les demandes
+  en attente ; `playing_window` décrit le passage effectivement démarré.
+- Un geste de passage validé demande une seule lecture selon Auto-preview ; la
+  lecture explicite reste disponible si Auto-preview est désactivé. Un clic ou
+  une navigation vers un sample rétablit cette cible, même si son ID était déjà
+  actif avant le passage ; Ctrl+clic ne change que les marques. Le double clic
+  sur le même sample garde l'arrêt existant.
+- `replace_candidates` remplace seulement les candidats via dataclasses.replace,
+  conserve audio et Analysis par identité et la fréquence d'origine, attribue de
+  nouveaux IDs, retire actif/marques périmés et arrête une lecture active ou en
+  attente une seule fois. Aucun démarrage automatique des nouveaux résultats.
+  La cible passage reste disponible tant que la région n'est pas retirée ;
+  `clear_range` retire cette cible, sans interrompre un sample déjà ciblé.
+- Les fenêtres de passage invalides sont refusées avant de couper la lecture ou
+  de changer la cible ; absence de piste chargée = aucune demande. Effacer ou
+  recharger retire la cible manuelle, sans recycler les jetons ni les IDs.
+- Rouge observé : 34 nouveaux échecs, 44 tests historiques réussis. Vert : 78 tests
+  ciblés et 621 complets ; Ruff lint/format, mypy et Bandit passent. Régressions :
+  clics/navigation/marques, arrêt synchrone, préécoute stéréo et contrôles du lecteur.
+  Cas limites : demande en attente, ancien retour started/finished/failed, liste
+  vide, absence de piste, fenêtre inversée/hors piste/NaN/infini/booléen/mal formée.
+- Aucun nouveau flux ni type de sample persisté, aucune écriture audio/source,
+  paramètre, cache ou export. Stop/clear_range répétés sont sans nouvel effet ;
+  une nouvelle sélection physique relance volontairement la préécoute autorisée.
+  Le raccordement au lecteur et à MainWindow reste prévu en tâche 5 ; cette étape
+  ne constitue pas une validation d'écoute réelle. Aucun push/ZIP.
+
 ## 17/11/2026 — Sélection manuelle, étape 2 : rectangle et navigation
 
 - Région manuelle ajustable, distincte du surlignage passif de lecture ; glisser
