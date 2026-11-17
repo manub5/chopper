@@ -254,3 +254,23 @@ def test_global_open_and_settings_shortcuts_work_from_library(window, monkeypatc
     )
     key(window.library_panel, Qt.Key.Key_Comma, Qt.KeyboardModifier.ControlModifier)
     assert settings == [True]
+
+
+def test_pending_action_refresh_is_cancelled_when_owner_is_deleted(qapp, monkeypatch):
+    import sys
+
+    from PySide6.QtCore import QCoreApplication, QEvent
+    from PySide6.QtWidgets import QMainWindow, QWidget
+
+    from chopper.gui.actions import ActionRegistry
+
+    errors = []
+    monkeypatch.setattr(sys, "excepthook", lambda kind, value, tb: errors.append(value))
+    parent = QMainWindow()
+    scope = QWidget(parent)
+    registry = ActionRegistry(parent, scope)
+    registry._focus_changed()
+    parent.deleteLater()
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    qapp.processEvents()
+    assert not errors

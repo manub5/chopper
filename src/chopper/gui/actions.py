@@ -26,7 +26,9 @@ _SPECS = (
     ("settings", "Settings…", "Ctrl+,", "File", False),
     ("quit", "Quit", "Ctrl+Q", "File", False),
     ("play", "Preview / stop", "Space", "Playback", True),
-    ("stop", "Stop preview", "Esc", "Playback", True),
+    ("stop", "Stop preview / leave selection", "Esc", "Playback", False),
+    ("chop_selection", "Chop selection", "C", "Playback", True),
+    ("whole_track", "Whole track", "", "Playback", True),
     ("mark", "Mark / unmark active sample", "M", "Playback", True),
     ("mark_all", "Mark all samples", "Ctrl+A", "Playback", True),
     ("clear_marks", "Clear all marks", "Ctrl+Shift+A", "Playback", True),
@@ -54,6 +56,9 @@ class ActionRegistry(QObject):
         self._available: dict[str, bool] = {}
         self._candidate_ids: set[str] = set()
         self._buttons: dict[str, list[QPushButton]] = {}
+        self._refresh_timer = QTimer(self)
+        self._refresh_timer.setSingleShot(True)
+        self._refresh_timer.timeout.connect(self._refresh)
         menus = {}
         for name, label, shortcut, menu_name, scoped in _SPECS:
             if menu_name not in menus:
@@ -69,7 +74,7 @@ class ActionRegistry(QObject):
             menus[menu_name].addAction(action)
             self.actions[name] = action
             self._available[name] = True
-            if scoped:
+            if scoped or name == "stop":
                 self._candidate_ids.add(name)
         self.actions["shortcuts"].triggered.connect(self.show_shortcuts)
         app = QApplication.instance()
@@ -80,7 +85,7 @@ class ActionRegistry(QObject):
     def _focus_changed(self) -> None:
         self._refresh()
         # Modal teardown updates activeModalWidget after restoring focus.
-        QTimer.singleShot(0, self._refresh)
+        self._refresh_timer.start(0)
 
     def set_available(self, name: str, enabled: bool) -> None:
         self._available[name] = enabled
@@ -121,7 +126,13 @@ class ActionRegistry(QObject):
         dialog.setWindowTitle("Keyboard shortcuts")
         layout = QVBoxLayout(dialog)
         layout.addWidget(QLabel(self.help_text()))
-        note = QLabel("Preview and marking shortcuts work in the sample area, not in text fields or dialogs.")
+        note = QLabel(
+            "Preview, chop and marking shortcuts work in the sample area. "
+            "Esc stops preview and asks before leaving a selection. "
+            "Shortcuts do not affect text fields or dialogs. "
+            "Left-drag the waveform to select; drag edges or inside to adjust. "
+            "Hold Alt for free selection. Middle-drag or Shift+wheel pans; wheel zooms."
+        )
         note.setWordWrap(True)
         layout.addWidget(note)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)

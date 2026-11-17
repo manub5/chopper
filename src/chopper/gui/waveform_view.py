@@ -26,6 +26,7 @@ class WaveformView(pg.PlotWidget):
     """Waveform, manual region and passive playback highlight on a fixed y axis."""
 
     selection_finished = Signal(object)
+    selection_invalidated = Signal()
     selection_clear_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -235,6 +236,8 @@ class WaveformView(pg.PlotWidget):
             self._dragging = False
             if selection is not None:
                 self.selection_finished.emit(selection)
+            else:
+                self.selection_invalidated.emit()
         else:
             seconds = self._press_time if self._click_time is None else self._click_time
             outside = (

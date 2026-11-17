@@ -77,6 +77,41 @@ referenced by a DAW project. In Bitwig, use **File → Collect and Save** to col
 external audio into the project folder before archiving or sharing the project.
 Qt's reported drop result alone does not prove that a DAW imported the sample.
 
+## Chop a selected passage
+
+Left-drag on the waveform to select a passage. Drag either edge to trim it, or
+drag inside to move it. Edges snap to the nearest downbeat; hold **Alt** for free
+selection. Without usable downbeats, selection is free. A collapsed range does
+not create a loop or start preview.
+
+Choose **Length** (¼, ½, 1, 2 or 4 bars), then **Chop selection** (**C**).
+The selected passage is previewed once at mouse release when **Auto-preview**
+is on; chopping itself does not start playback. **Space** previews/stops the last
+target you chose: the passage or a clicked/navigated sample, even with auto off.
+
+Only the chosen loop length and one-shots inside the passage are searched, with
+the current per-category quota and one-shot duration settings. Loops must fit in
+full. A short passage can still yield one-shots; a missing downbeat grid does not
+invent loop positions. Searches reuse the loaded audio and analysis.
+
+Changing the passage or Length keeps the previous samples until you chop again.
+**Samples from** shows their original bounds; exports always use those bounds,
+not a subsequently adjusted rectangle. Length is remembered for this session only;
+automatic analysis keeps its existing ¼-, ½- and 1-bar settings.
+
+Use **Whole track**, **Esc**, or click outside the passage to return to automatic
+samples. Chopper asks before leaving a selection or replacing manual results:
+export all manual samples and continue, continue without exporting, or cancel.
+Cancel is the safe default; it preserves the passage, samples and keep marks.
+The same protection applies before opening another track, analyzing an album or
+closing. Export cancellation/failure blocks the transition; partial exports stay
+on disk and are named in the error message. Retrying can create additional files.
+Esc stops preview before asking; canceling does not restart it.
+
+Use **middle-drag** or **Shift+wheel** to pan horizontally on the waveform and
+sample lanes; the wheel alone zooms. The view stays within the track and the
+vertical axis stays fixed. Samples in lanes are not editable by left-dragging.
+
 ## Keyboard shortcuts
 
 Use **Help → Keyboard shortcuts** (F1) to see the shortcut list generated from
@@ -86,8 +121,9 @@ the same actions as the menus and buttons.
 | --- | --- |
 | Open library | Ctrl+O |
 | Settings | Ctrl+, |
-| Preview / stop active sample | Space |
-| Stop preview | Esc |
+| Preview / stop last sample or passage target | Space |
+| Stop preview / leave selection | Esc |
+| Chop selection | C |
 | Mark / unmark active sample | M |
 | Mark all samples in the displayed track | Ctrl+A |
 | Clear all marks | Ctrl+Shift+A |
@@ -96,8 +132,9 @@ the same actions as the menus and buttons.
 | Keyboard shortcuts | F1 |
 | Quit | Ctrl+Q |
 
-Preview and marking shortcuts work in the sample area (waveform, lanes and
-table), not in the library, text fields or modal dialogs. Up/Down in the table
+Preview, chop and marking shortcuts work in the sample area (waveform, lanes and
+table), not in the library. Esc also works outside the sample area. Sample
+shortcuts and Esc do not affect text fields or modal dialogs. Up/Down in the table
 select a sample without starting playback. Marking does not start playback.
 Unavailable actions are disabled, and holding a shortcut does not repeat it.
 **Analyze album** remains available as both a File menu action and a visible button.

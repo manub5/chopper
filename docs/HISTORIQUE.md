@@ -6,6 +6,45 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 18/11/2026 — Sélection manuelle, étape 5 : parcours complet et protections
+
+- Barre Length ¼/½/1/2/4 (1 par défaut, session seulement), Chop selection/C et
+  Whole track partagés entre boutons et registre ; F1 et infobulles dérivés des
+  actions. Esc arrête puis demande la sortie, hors saisie et dialogue ; pas de
+  raccourci concurrent ni d'autorépétition. Navigation milieu/Maj+molette inchangée.
+- Contrôleur transactionnel : décision sûre Cancel, confirmation également avant
+  remplacement/transition, export de tous les résultats manuels indépendamment des
+  marques. Annulation ou export partiel/échoué conserve région/résultats/marques ;
+  les fichiers déjà réussis restent présents et sont signalés. Les nouveaux calculs
+  ne retirent les anciens résultats qu'après réception d'un résultat valide.
+- Worker réel raccordé en mémoire, requêtes monotones vérifiées par ID, audio,
+  Analysis, fréquence, fenêtre et longueur ; retour Whole track sans détecteur ni
+  rechargement, pas de remise à zéro du zoom/tracé. Modifications bloquées pendant
+  calcul ; workers conservés jusqu'à thread.finished. Une fermeture dont wait
+  échoue reste ignorée, cache et références vivants. Un résultat reçu pendant une
+  confirmation de fermeture annulée est différé, puis appliqué sans bloquer l'UI.
+- Lecture du passage via le lecteur existant et un candidat éphémère jamais ajouté
+  aux résultats/exports. Rectangle synchronisé seulement depuis le contrôleur,
+  pas depuis les fins de lecture. Régler Length ou le passage conserve les anciens
+  extraits avec avertissement et bornes d'origine ; exports réels 2/4 vérifiés.
+- Un geste aimanté effondré invalide le passage sans effacer les résultats manuels :
+  Chop est désactivé, Whole track/Esc restent disponibles et gardés. Signal dédié
+  ajouté après un test rouge montrant une région cachée mais une ancienne cible C.
+- Tests rouges supplémentaires : clics de couloirs encore permis pendant calcul,
+  rappel QAction après destruction de la fenêtre, et erreur worker traitée dans
+  le mauvais thread via lambda. Correction par widgets désactivés, QTimer enfant,
+  slot QObject principal et ID de requête lu sur le worker émetteur. Aucun accès
+  QWidget depuis le nouveau worker ; documentation officielle Qt vérifiée.
+- 712 tests complets et 164 d'intégration/gestes/actions/couloirs sous Wayland à
+  150 % réussis ; Ruff lint/format, mypy et Bandit verts. Cas limites : sélection
+  courte/vide, événements anciens/modalité, export annulé/partiel ou paramètres
+  non sauvegardables, fermeture réentrante et wait échoué. Revue indépendante
+  finale encore à effectuer avant livraison déclarée.
+- `src/choppeur/` absent dans cet espace : aucun nettoyage nécessaire. Aucun audio
+  utilisateur modifié, aucun ancien export supprimé ; recherche sans écriture et
+  mises à jour UI silencieuses. Exports répétés volontairement non idempotents,
+  noms distincts sans écrasement. Aucun push, ZIP ou essai audio/DAW réel implicite.
+
 ## 17/11/2026 — Sélection manuelle, étape 4 : recherche en mémoire identifiée
 
 - `search_candidates` réutilise exclusivement l'audio et l'Analysis du LoadedTrack.

@@ -201,6 +201,13 @@ Validation attendue avant tâche 5 ; le raccordement MainWindow reste à réalis
 - [ ] **10. Vérifications finales :** `uv run ruff check src tests scripts prototypes evaluate.py`, `uv run ruff format --check src tests scripts prototypes evaluate.py`, `uv run mypy src tests scripts prototypes evaluate.py`, `uv run bandit -qc pyproject.toml -r src scripts prototypes evaluate.py -ll`, `git diff --check`. Suite complète puis tests gestes/actions/couloirs sous `QT_QPA_PLATFORM=wayland` et `QT_SCALE_FACTOR=1.5` si session disponible ; sinon annoncer explicitement l'absence de validation native. Aucune nouvelle analyse matérielle ou export utilisateur pendant les tests automatisés.
 - [ ] **11. Commit :** `Intègre la découpe manuelle et protège les résultats`. Tous les hooks actifs. Revue indépendante finale de toute la plage du plan ; correctifs justifiés en tests rouges puis verts. Aucun push/ZIP automatique ; montrer les résultats et attendre l'essai utilisateur.
 
+**Résultat étape 5 :** 35 nouveaux échecs initiaux observés, puis cas rouges
+supplémentaires pour destruction QAction, widgets occupés, erreur hors thread UI,
+sélection effondrée et export manuel par poignée. 712 tests complets et 164 sous
+Wayland à 150 % réussis. Régressions des glissers automatiques conservées.
+`src/choppeur/` absent, aucun dossier/fichier supprimé. Les onze points sont
+implémentés ; revue indépendante finale restante après le commit et task-done.
+
 ## Passage final et mémoire du travail
 
 Exécution native proposée comme pour le travail précédent : une étape, ses tests,
@@ -235,6 +242,6 @@ Documentation Qt vérifiée : https://doc.qt.io/qtforpython-6/PySide6/QtCore/QTh
 Le design est l'autorité ; toute adaptation du plan doit être motivée dans son
 ledger et rester dans le périmètre approuvé, sans élargir les opérations destructives.
 
-**État :** plan validé par l'utilisateur le 13/11/2026 ; tâches 1 à 3 validées,
-tâche 4 implémentée, validation attendue avant tâche 5. Intégration des contrôles,
-lecture et confirmations restante ; pas de publication implicite.
+**État :** plan validé par l'utilisateur le 13/11/2026 ; tâches 1 à 4 validées,
+tâche 5 implémentée et testée ; revue indépendante finale et essai utilisateur
+restants. Aucun push ni ZIP implicite.

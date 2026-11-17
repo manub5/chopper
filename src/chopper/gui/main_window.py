@@ -3,9 +3,10 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QThread
+from PySide6.QtCore import Qt, QThread, Slot
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QFileDialog,
     QHBoxLayout,
@@ -23,7 +24,7 @@ from PySide6.QtWidgets import (
 from chopper.core import audio_io
 from chopper.core.cache import AnalysisCache
 from chopper.core.exporting import export_batch, export_drag
-from chopper.core.models import Track
+from chopper.core.models import Candidate, CandidateType, Track
 from chopper.core.settings import (
     Settings,
     default_cache_path,
@@ -34,16 +35,19 @@ from chopper.gui.actions import ActionRegistry
 from chopper.gui.candidates_panel import CandidatesPanel
 from chopper.gui.export_folder_dialog import choose_export_folder
 from chopper.gui.library_panel import LibraryPanel
-from chopper.gui.presentation import LoadedTrack
+from chopper.gui.presentation import CandidateSearchResult, LoadedTrack, Window, format_time
 from chopper.gui.preview_player import PreviewPlayer
 from chopper.gui.sample_drag import start_file_drag
 from chopper.gui.sample_lanes import SampleLanesView
 from chopper.gui.sample_state import SampleState
+from chopper.gui.selection_controller import SelectionController
+from chopper.gui.selection_dialog import confirm_selection_transition
 from chopper.gui.settings_dialog import SettingsDialog
 from chopper.gui.theme import ThemeManager
 from chopper.gui.waveform_view import WaveformView
 from chopper.gui.workers import (
     AlbumAnalysisWorker,
+    CandidateSearchWorker,
     TrackAnalysisWorker,
     start_in_thread,
 )
@@ -69,15 +73,28 @@ class MainWindow(QMainWindow):
         self._current_folder: Path | None = None
         self._thread: QThread | None = None
         self._analysis_busy = False
+        self._closing = False
+        self._search_request_id: int | None = None
         # Référence gardée : PySide6 ne garde pas le worker en vie tout seul (voir
         # _run_worker) une fois qu'il n'y a plus de variable Python qui le référence.
-        self._worker: TrackAnalysisWorker | AlbumAnalysisWorker | None = None
+        self._worker: TrackAnalysisWorker | AlbumAnalysisWorker | CandidateSearchWorker | None = None
 
         self.library_panel = LibraryPanel()
         self.waveform_view = WaveformView()
         self.sample_state = SampleState(auto_play=self.settings.auto_play, parent=self)
+        self.selection_controller = SelectionController(
+            self.sample_state,
+            choose=lambda action, can_export: confirm_selection_transition(self, action, can_export),
+            export_all=self._export_manual_candidates,
+            parent=self,
+        )
+        self.selection_controller.search_requested.connect(self._start_candidate_search)
+        self.waveform_view.selection_finished.connect(self.selection_controller.set_selection)
+        self.waveform_view.selection_invalidated.connect(self.selection_controller.invalidate_selection)
+        self.waveform_view.selection_clear_requested.connect(self.selection_controller.request_whole_track)
         self.preview_player = PreviewPlayer(self)
         self.sample_state.play_requested.connect(self._play_sample)
+        self.sample_state.range_play_requested.connect(self._play_range)
         self.sample_state.stop_requested.connect(self.preview_player.stop)
         self.sample_state.error_reported.connect(self._on_preview_failed)
         self.preview_player.started.connect(self.sample_state.playback_started)
@@ -121,6 +138,34 @@ class MainWindow(QMainWindow):
         self.sample_lanes.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         right_layout = QVBoxLayout(right_panel)
         right_layout.addWidget(self.track_label)
+        selection_bar = QHBoxLayout()
+        selection_bar.addWidget(QLabel("Length"))
+        self.length_combo = QComboBox()
+        for label, bars in (
+            ("¼ bar", 0.25),
+            ("½ bar", 0.5),
+            ("1 bar", 1.0),
+            ("2 bars", 2.0),
+            ("4 bars", 4.0),
+        ):
+            self.length_combo.addItem(label, bars)
+        self.length_combo.setCurrentIndex(2)
+        self.length_combo.currentIndexChanged.connect(
+            lambda index: self.selection_controller.set_length(self.length_combo.itemData(index))
+        )
+        selection_bar.addWidget(self.length_combo)
+        self.chop_selection_button = QPushButton("Chop selection")
+        self.whole_track_button = QPushButton("Whole track")
+        selection_bar.addWidget(self.chop_selection_button)
+        selection_bar.addWidget(self.whole_track_button)
+        selection_bar.addStretch(1)
+        right_layout.addLayout(selection_bar)
+        self.selection_label = QLabel()
+        self.selection_label.setWordWrap(True)
+        self.selection_status_label = QLabel()
+        self.selection_status_label.setWordWrap(True)
+        right_layout.addWidget(self.selection_label)
+        right_layout.addWidget(self.selection_status_label)
         right_layout.addWidget(self.waveform_view, 3)
         right_layout.addWidget(self.sample_lanes, 1)
         right_layout.addWidget(self.candidates_panel, 1)
@@ -148,7 +193,9 @@ class MainWindow(QMainWindow):
         actions["analyze_album"].triggered.connect(self._on_analyze_album_clicked)
         actions["quit"].triggered.connect(self.close)
         actions["play"].triggered.connect(self.sample_state.toggle_playback)
-        actions["stop"].triggered.connect(self.sample_state.stop)
+        actions["stop"].triggered.connect(self._stop_or_leave_selection)
+        actions["chop_selection"].triggered.connect(self.selection_controller.request_chop)
+        actions["whole_track"].triggered.connect(self.selection_controller.request_whole_track)
         actions["mark"].triggered.connect(self._mark_active_sample)
         actions["mark_all"].triggered.connect(self.sample_state.mark_all)
         actions["clear_marks"].triggered.connect(self.sample_state.clear_marks)
@@ -158,6 +205,8 @@ class MainWindow(QMainWindow):
         self.action_registry.bind_button(open_library_button, "open_library")
         self.action_registry.bind_button(settings_button, "settings")
         self.action_registry.bind_button(self.analyze_album_button, "analyze_album")
+        self.action_registry.bind_button(self.chop_selection_button, "chop_selection")
+        self.action_registry.bind_button(self.whole_track_button, "whole_track")
         self.action_registry.bind_button(
             self.candidates_panel.export_marked_button, "export_marked", connect_click=False
         )
@@ -165,6 +214,8 @@ class MainWindow(QMainWindow):
             self.candidates_panel.export_all_button, "export_all", connect_click=False
         )
         self.sample_state.changed.connect(self._sync_actions)
+        self.selection_controller.changed.connect(self._sync_selection)
+        self._sync_selection()
         self._sync_actions()
         self.candidates_panel.drag_requested.connect(self._on_drag_requested)
 
@@ -205,7 +256,10 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage("Analysis is already running. Please wait.", 4000)
             return
 
+        if not self.selection_controller.authorize_transition("track", include_region=True):
+            return
         track = audio_io.read_track(path)
+        self.selection_controller.reset()
         self.sample_state.clear()
         self.track_label.clear()
         self.waveform_view.clear()
@@ -219,6 +273,9 @@ class MainWindow(QMainWindow):
         self._run_worker(worker)
 
     def _on_track_analyzed(self, result: LoadedTrack) -> None:
+        if self._closing:
+            return
+        self.selection_controller.reset()
         self._set_busy(False)
         analysis = result.analysis
         samples, sample_rate = result.samples, result.sample_rate
@@ -227,6 +284,7 @@ class MainWindow(QMainWindow):
         self.waveform_view.set_waveform(samples, sample_rate)
         self.waveform_view.set_downbeats(analysis.downbeat_times)
         self.sample_state.load_track(result)
+        self._sync_selection()
         self.track_label.setText(f"{analysis.track.title} — {analysis.tempo_bpm:.1f} BPM")
 
         sample_word = "sample" if len(candidates) == 1 else "samples"
@@ -249,6 +307,10 @@ class MainWindow(QMainWindow):
         if self._current_folder is None:
             QMessageBox.information(self, "Chopper", "Select an album folder first.")
             return
+
+        if not self.selection_controller.authorize_transition("album", include_region=True):
+            return
+        self.sample_state.stop()
 
         # Le dossier est parcouru dans le worker (voir AlbumAnalysisWorker.run), pas ici :
         # sur un dossier réseau avec des milliers de pistes, lire les tags de chacune
@@ -319,15 +381,24 @@ class MainWindow(QMainWindow):
 
     def _sync_actions(self) -> None:
         state = self.sample_state
+        controller = self.selection_controller
+        locked = controller.locked or self._analysis_busy or self._thread is not None
         available = {
-            "analyze_album": self._current_folder is not None and not self._analysis_busy,
-            "play": state.active_id is not None,
-            "stop": state.playing_id is not None,
-            "mark": state.active_id is not None,
-            "mark_all": bool(state.items),
-            "clear_marks": bool(state.marked_ids),
-            "export_marked": bool(state.marked_ids),
-            "export_all": bool(state.items),
+            "analyze_album": self._current_folder is not None and not locked,
+            "settings": not locked,
+            "open_library": not locked,
+            "play": state.can_preview and not locked,
+            "stop": state.has_playback
+            or controller.window is not None
+            or controller.result_window is not None,
+            "chop_selection": controller.window is not None and state.loaded_track is not None and not locked,
+            "whole_track": (controller.window is not None or controller.result_window is not None)
+            and not locked,
+            "mark": state.active_id is not None and not locked,
+            "mark_all": bool(state.items) and not locked,
+            "clear_marks": bool(state.marked_ids) and not locked,
+            "export_marked": bool(state.marked_ids) and not locked,
+            "export_all": bool(state.items) and not locked,
         }
         for name, enabled in available.items():
             self.action_registry.set_available(name, enabled)
@@ -346,12 +417,76 @@ class MainWindow(QMainWindow):
             item = next(item for item in self.sample_state.items if item.id == item_id)
             self.preview_player.play(loaded.samples, loaded.sample_rate, item.candidate, token)
 
+    def _play_range(self, window: Window, token: int) -> None:
+        loaded = self.sample_state.loaded_track
+        if loaded is not None:
+            candidate = Candidate(CandidateType.ONE_SHOT, window[0], window[1], 0.0)
+            self.preview_player.play(loaded.samples, loaded.sample_rate, candidate, token)
+
     def _sync_playback_highlight(self) -> None:
         candidate = next(
             (item.candidate for item in self.sample_state.items if item.id == self.sample_state.playing_id),
             None,
         )
+        window = self.sample_state.playing_window
+        if window is not None:
+            candidate = Candidate(CandidateType.ONE_SHOT, window[0], window[1], 0.0)
         self.waveform_view.set_playing_candidate(candidate)
+
+    def _stop_or_leave_selection(self) -> None:
+        self.sample_state.stop()
+        self.selection_controller.request_whole_track()
+
+    def _sync_selection(self) -> None:
+        controller = self.selection_controller
+        loaded = self.sample_state.loaded_track
+        locked = controller.locked or self._analysis_busy or self._thread is not None
+        self.length_combo.setEnabled(loaded is not None and not locked)
+        self.candidates_panel.setEnabled(not locked)
+        self.sample_lanes.setEnabled(not locked)
+        index = self.length_combo.findData(controller.length_bars)
+        self.length_combo.blockSignals(True)
+        self.length_combo.setCurrentIndex(index)
+        self.length_combo.blockSignals(False)
+        self.waveform_view.set_selection_enabled(loaded is not None and not locked)
+        if self.waveform_view.selection != controller.window:
+            self.waveform_view.set_selection(controller.window)
+        text = "Whole track"
+        if controller.window is not None:
+            text = "Selection: " + " - ".join(format_time(t) for t in controller.window)
+        if controller.result_window is not None:
+            text += " | Samples from: " + " - ".join(format_time(t) for t in controller.result_window)
+        self.selection_label.setText(text)
+        self.selection_status_label.setText(controller.status_message)
+        self._sync_actions()
+
+    def _start_candidate_search(self, request_id: int, window: Window | None, length: float | None) -> None:
+        loaded = self.sample_state.loaded_track
+        if self._is_analysis_running() or loaded is None:
+            self.selection_controller.fail(request_id, "Another task is still finishing. Please wait.")
+            return
+        self._search_request_id = request_id
+        worker = CandidateSearchWorker(request_id, loaded, self.settings, window=window, length_bars=length)
+        worker.finished.connect(self._on_candidate_search_finished)
+        worker.failed.connect(self._on_candidate_search_failed)
+        self._run_worker(worker)
+        self._sync_selection()
+        self.library_panel.setEnabled(False)
+
+    @Slot(object)
+    def _on_candidate_search_finished(self, result: CandidateSearchResult) -> None:
+        if not self._closing and self.selection_controller.apply_result(result):
+            self.status_bar.showMessage(result.message, 8000)
+
+    @Slot(str)
+    def _on_candidate_search_failed(self, message: str) -> None:
+        worker = self.sender()
+        if (
+            isinstance(worker, CandidateSearchWorker)
+            and not self._closing
+            and self.selection_controller.fail(worker.request_id, message)
+        ):
+            self.status_bar.showMessage(self.selection_controller.status_message, 8000)
 
     # --- export -------------------------------------------------------
 
@@ -383,9 +518,22 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Chopper", "No samples marked for export.")
             return
 
+        self._export_candidates(candidates)
+
+    def _export_manual_candidates(self) -> bool:
+        if self.selection_controller.result_window is None:
+            return False
+        return self._export_candidates(tuple(item.candidate for item in self.sample_state.items))
+
+    def _export_candidates(self, candidates: tuple[Candidate, ...]) -> bool:
+        loaded = self.sample_state.loaded_track
+        if loaded is None or not candidates:
+            return False
+        self.sample_state.stop()
+
         directory = self._ensure_export_directory()
         if directory is None:
-            return
+            return False
 
         report = export_batch(
             loaded.samples,
@@ -403,15 +551,23 @@ class MainWindow(QMainWindow):
                 message = f"Partial export: {len(report.paths)} {file_word} kept: {names}. {report.error}"
             self.status_bar.setToolTip(message)
             self.status_bar.showMessage(message, 10000)
+            return False
         else:
             self.status_bar.setToolTip("")
             self.status_bar.showMessage(f"Exported {len(report.paths)} {file_word}", 5000)
+            return len(report.paths) == len(candidates)
 
     def _on_drag_requested(self, item_id: int) -> None:
         loaded = self.sample_state.loaded_track
         item = next((item for item in self.sample_state.items if item.id == item_id), None)
         if loaded is None or item is None:
             return
+        # Preserve legacy drag playback outside manual mode.
+        if (
+            self.selection_controller.window is not None
+            or self.selection_controller.result_window is not None
+        ):
+            self.sample_state.stop()
         needed_setup = not self.settings.export_dir
         directory = self._ensure_export_directory()
         if directory is None:
@@ -443,7 +599,7 @@ class MainWindow(QMainWindow):
     # --- infrastructure -------------------------------------------------
 
     def _is_analysis_running(self) -> bool:
-        return self._thread is not None and self._thread.isRunning()
+        return self._thread is not None
 
     def _set_busy(self, busy: bool) -> None:
         """Empêche de lancer une deuxième analyse pendant qu'une autre tourne déjà :
@@ -453,8 +609,9 @@ class MainWindow(QMainWindow):
         self.library_panel.setEnabled(not busy)
         self.analyze_album_button.setEnabled(not busy and self._current_folder is not None)
         self.action_registry.set_available("analyze_album", not busy and self._current_folder is not None)
+        self._sync_selection()
 
-    def _run_worker(self, worker: TrackAnalysisWorker | AlbumAnalysisWorker) -> None:
+    def _run_worker(self, worker: TrackAnalysisWorker | AlbumAnalysisWorker | CandidateSearchWorker) -> None:
         self._worker = worker  # évite que Python ne le détruise pendant l'exécution
         self._thread = start_in_thread(worker)
         self._thread.finished.connect(self._on_worker_thread_finished)
@@ -470,8 +627,15 @@ class MainWindow(QMainWindow):
         # c'est sûr.
         self._thread = None
         self._worker = None
+        self._search_request_id = None
+        self.library_panel.setEnabled(not self._analysis_busy)
+        self._sync_selection()
 
     def closeEvent(self, event) -> None:
+        if self._closing or not self.selection_controller.authorize_transition("close", include_region=True):
+            event.ignore()
+            return
+        self._closing = True
         self.sample_state.stop()
         self.preview_player.stop()
         if isinstance(self._worker, AlbumAnalysisWorker):
@@ -487,6 +651,15 @@ class MainWindow(QMainWindow):
             # restantes. On attend donc la vraie fin, avec une limite large plutôt
             # qu'absente pour ne pas bloquer indéfiniment sur un dossier réseau
             # devenu injoignable en cours d'analyse.
-            self._thread.wait(30_000)
+            if not self._thread.wait(30_000):
+                self._closing = False
+                if self._search_request_id is not None:
+                    self.selection_controller.fail(
+                        self._search_request_id, "Task still running; close again when it finishes."
+                    )
+                self.status_bar.showMessage("Task still running. Chopper remains open; please wait.", 10000)
+                event.ignore()
+                return
+        self.selection_controller.reset()
         self.cache.close()
         super().closeEvent(event)

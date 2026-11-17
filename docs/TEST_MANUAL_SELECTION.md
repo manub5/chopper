@@ -1,10 +1,10 @@
 # Manual selection gesture checks
 
-Stage 2 implements the waveform widget only. Passage playback, Chop selection,
-Whole track and confirmation dialogs are not connected yet. This checklist is
-not a claim of a completed end-to-end feature or a hands-on KDE test.
+The waveform, preview, Chop selection, Whole track and confirmations are now
+connected. Automated widget and real-worker integration checks pass; this is not
+a claim of hands-on audio/DAW validation on the user's KDE installation.
 
-Stage 3 adds the shared preview state, not the MainWindow/player connection.
+The shared preview state is covered independently.
 Run `uv run pytest -q tests/test_sample_state.py tests/test_preview_player.py`
 to check sample/passage token ownership, stale callbacks, explicit playback with
 Auto-preview off, and candidate replacement without copying audio or starting
@@ -12,13 +12,14 @@ playback. The last selected passage remains the Space target after candidate
 replacement; clicking/navigating to a sample selects that sample as the target.
 Clearing the passage restores any still-active sample target without playing it.
 
-Stage 4 adds identified background searches using the same in-memory audio and
+Identified background searches use the same in-memory audio and
 analysis. Run `uv run pytest -q tests/test_workers.py tests/test_candidate_window.py`
 to check manual/automatic lengths, quotas, short/empty selection messages, copied
 settings and actual thread completion on both success and failure. These checks
 forbid detector, decoder and cache calls during re-ranking. Repeated thread
-lifecycle cases also run under Wayland. MainWindow integration and stale-result
-rejection remain stage 5 work, not a completed end-to-end check.
+lifecycle cases also run under Wayland. For the integrated real-thread flows,
+confirmations, stale-result rejection, shortcut/editor/modal behavior and safe
+closing, run `uv run pytest -q tests/test_manual_selection.py tests/test_selection_controller.py tests/test_actions.py tests/test_main_window.py`.
 
 ## Automated widget checks
 
@@ -45,7 +46,7 @@ Use a track with known downbeats, then repeat without downbeats:
    releasing the mouse to snap again. A collapsed snapped range is not expanded
    into an invented bar.
 3. Click inside: no new preview request. Click outside: one clear request, with
-   the region retained until the future controller approves removal. Drag outside
+   the region retained until the controller approves removal. Drag outside
    to replace the region without issuing a clear request.
 4. Middle-drag or Shift+wheel to move horizontally on waveform or sample lanes;
    wheel alone zooms. Right-drag must not scale. Never move beyond the track or

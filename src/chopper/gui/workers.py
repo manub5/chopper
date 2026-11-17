@@ -141,6 +141,10 @@ class CandidateSearchWorker(QObject):
         self._window = window
         self._length_bars = length_bars
 
+    @property
+    def request_id(self) -> int:
+        return self._request_id
+
     @Slot()
     def run(self) -> None:
         try:
