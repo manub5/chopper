@@ -12,6 +12,14 @@ playback. The last selected passage remains the Space target after candidate
 replacement; clicking/navigating to a sample selects that sample as the target.
 Clearing the passage restores any still-active sample target without playing it.
 
+Stage 4 adds identified background searches using the same in-memory audio and
+analysis. Run `uv run pytest -q tests/test_workers.py tests/test_candidate_window.py`
+to check manual/automatic lengths, quotas, short/empty selection messages, copied
+settings and actual thread completion on both success and failure. These checks
+forbid detector, decoder and cache calls during re-ranking. Repeated thread
+lifecycle cases also run under Wayland. MainWindow integration and stale-result
+rejection remain stage 5 work, not a completed end-to-end check.
+
 ## Automated widget checks
 
 Run from the project directory:

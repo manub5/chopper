@@ -37,6 +37,15 @@ class LoadedTrack:
 
 
 @dataclass(frozen=True)
+class CandidateSearchResult:
+    request_id: int
+    loaded: LoadedTrack
+    window: Window | None
+    length_bars: float | None
+    message: str
+
+
+@dataclass(frozen=True)
 class SampleItem:
     id: int
     candidate: Candidate

@@ -6,6 +6,37 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 17/11/2026 — Sélection manuelle, étape 4 : recherche en mémoire identifiée
+
+- `search_candidates` réutilise exclusivement l'audio et l'Analysis du LoadedTrack.
+  En sélection, une seule longueur manuelle valide ; en Whole track, uniquement
+  les longueurs automatiques des Settings. Quota par catégorie et durée maximale
+  des one-shots conservés, tuple final classé par score avec temps absolus piste.
+- Résultat figé `CandidateSearchResult` portant identifiant de requête, piste,
+  fenêtre, longueur et message. `CandidateSearchWorker` copie les Settings à sa
+  construction, remplace uniquement les candidats du LoadedTrack ; audio/Analysis
+  et fréquence restent identiques, sans nouvelle analyse, décodage ni accès cache.
+- Messages anglais distincts : sélection trop courte pour la longueur demandée,
+  grille rythmique inutilisable, aucun résultat, nombre de one-shots effectivement
+  trouvés. Une grille absente n'est pas présentée comme une sélection trop courte.
+  Erreurs transmises par failed ; QThread quitte sur succès comme sur erreur.
+- Tests rouges observés : 22 échecs de contrats absents, 66 réussites historiques.
+  Après implémentation, un test Wayland a révélé un SIGSEGV intermittent avec la
+  destruction native supplémentaire du worker. Retour à la propriété Python déjà
+  utilisée par les analyses : garder worker/thread jusqu'au vrai thread.finished,
+  pas seulement jusqu'au résultat. 192 cycles succès/erreur supplémentaires passent
+  ensuite sous Wayland ; cause interne exacte de PySide6/Qt non établie.
+- Vérification finale : 665 tests complets et 110 ciblés sous Wayland à 150 % ;
+  Ruff lint/format, mypy et Bandit passent. Cas limites : requête incohérente,
+  absence de grille/attaques, sélection courte, résultat vide, Settings modifiés
+  après construction, fin de thread en réussite/erreur répétée. Tests de barrières
+  faisant échouer tout accès détecteur/fichier/cache et tableaux audio en lecture
+  seule ; analyses de piste/album historiques toujours couvertes.
+- Recherche déterministe sans écriture source/audio, paramètres, cache ou exports ;
+  aucun effet persistant supplémentaire en cas de répétition. Aucun nouveau QWidget
+  consulté par le worker. Raccordement MainWindow et rejet des résultats obsolètes
+  prévus en tâche 5, pas encore livrés. Aucun push ni ZIP reconstruit.
+
 ## 17/11/2026 — Sélection manuelle, étape 3 : cible et identité de préécoute communes
 
 - SampleState gère une cible de sample ou de passage, avec un compteur de jetons

@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QThread, Signal
+import numpy as np
+from PySide6.QtCore import QObject, QThread, Signal, Slot
 
 from chopper.core import audio_io, onsets, rhythm
 from chopper.core import candidates as candidates_module
 from chopper.core.audio_io import AUDIO_EXTENSIONS
 from chopper.core.cache import AnalysisCache
-from chopper.core.models import Analysis, Candidate, Track
+from chopper.core.models import Analysis, Candidate, Track, is_loop_length
 from chopper.core.settings import Settings
-from chopper.gui.presentation import LoadedTrack
+from chopper.gui.presentation import CandidateSearchResult, LoadedTrack, Window
 
 
 def tracks_in_folder(folder: Path) -> list[Track]:
@@ -61,6 +64,100 @@ def analyze_track(
     )
     all_candidates = sorted(loops + shots, key=lambda c: c.score, reverse=True)
     return analysis, all_candidates
+
+
+def search_candidates(
+    loaded: LoadedTrack,
+    settings: Settings,
+    *,
+    window: Window | None = None,
+    length_bars: float | None = None,
+) -> tuple[tuple[Candidate, ...], str]:
+    """Re-rank cached rhythm/onsets against the original in-memory audio only."""
+    if window is None:
+        if length_bars is not None:
+            raise ValueError("A manual loop length requires a selection window.")
+        lengths = settings.loop_lengths_bars
+    else:
+        if length_bars is None or not is_loop_length(length_bars):
+            raise ValueError("Select a supported manual loop length.")
+        lengths = (float(length_bars),)
+    analysis = loaded.analysis
+    loops = candidates_module.find_loop_candidates(
+        loaded.samples,
+        loaded.sample_rate,
+        analysis.tempo_bpm,
+        analysis.downbeat_times,
+        lengths_bars=lengths,
+        max_candidates=settings.candidates_per_track,
+        window=window,
+    )
+    shots = candidates_module.find_one_shot_candidates(
+        loaded.samples,
+        loaded.sample_rate,
+        analysis.onset_times,
+        max_duration_seconds=settings.max_one_shot_seconds,
+        max_candidates=settings.candidates_per_track,
+        window=window,
+    )
+    found = tuple(sorted(loops + shots, key=lambda candidate: candidate.score, reverse=True))
+    message = f"Found {len(loops)} loops and {len(shots)} one-shots." if found else "No samples found."
+    if window is not None:
+        bar_duration = (
+            float(np.median(np.diff(analysis.downbeat_times))) if len(analysis.downbeat_times) >= 2 else 0.0
+        )
+        if analysis.tempo_bpm <= 0 or not np.isfinite(bar_duration) or bar_duration <= 0:
+            explanation = "No usable downbeat grid."
+        elif window[1] - window[0] < bar_duration * lengths[0]:
+            explanation = f"Selection too short for {lengths[0]:g}-bar loops."
+        else:
+            explanation = ""
+        if explanation:
+            message = f"{explanation} Found {len(shots)} one-shots."
+            if not found:
+                message = f"No samples found. {message}"
+    return found, message
+
+
+class CandidateSearchWorker(QObject):
+    """Search cached data with a settings snapshot and a caller-owned request ID."""
+
+    finished = Signal(object)  # CandidateSearchResult
+    failed = Signal(str)
+
+    def __init__(
+        self,
+        request_id: int,
+        loaded: LoadedTrack,
+        settings: Settings,
+        *,
+        window: Window | None = None,
+        length_bars: float | None = None,
+    ):
+        super().__init__()
+        self._request_id = request_id
+        self._loaded = loaded
+        self._settings = deepcopy(settings)
+        self._window = window
+        self._length_bars = length_bars
+
+    @Slot()
+    def run(self) -> None:
+        try:
+            candidates, message = search_candidates(
+                self._loaded, self._settings, window=self._window, length_bars=self._length_bars
+            )
+            result = CandidateSearchResult(
+                self._request_id,
+                replace(self._loaded, candidates=candidates),
+                self._window,
+                self._length_bars,
+                message,
+            )
+        except Exception as exc:  # noqa: BLE001 - report worker failures to the interface
+            self.failed.emit(str(exc))
+        else:
+            self.finished.emit(result)
 
 
 class TrackAnalysisWorker(QObject):
@@ -140,14 +237,15 @@ class AlbumAnalysisWorker(QObject):
         self.finished.emit()
 
 
-def start_in_thread(worker: TrackAnalysisWorker | AlbumAnalysisWorker) -> QThread:
+def start_in_thread(worker: TrackAnalysisWorker | AlbumAnalysisWorker | CandidateSearchWorker) -> QThread:
     """Câblage standard Qt : lance worker.run() dans un nouveau QThread au démarrage,
     et arrête le thread sur succès comme sur échec."""
     thread = QThread()
     worker.moveToThread(thread)
     thread.started.connect(worker.run)
     worker.finished.connect(thread.quit)
-    if isinstance(worker, TrackAnalysisWorker):
+    if isinstance(worker, (TrackAnalysisWorker, CandidateSearchWorker)):
         worker.failed.connect(thread.quit)
+    # The caller retains the worker until thread.finished, not just its result.
     thread.finished.connect(thread.deleteLater)
     return thread

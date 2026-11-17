@@ -1,3 +1,5 @@
+from dataclasses import FrozenInstanceError, replace
+
 import numpy as np
 import pytest
 import soundfile as sf
@@ -369,3 +371,175 @@ def test_track_worker_returns_original_stereo_audio(monkeypatch, tmp_path):
     np.testing.assert_array_equal(results[0].samples, samples)
     assert results[0].samples.shape == (1000, 2)
     assert path.read_bytes() == before
+
+
+@pytest.fixture
+def memory_track(loaded_track, monkeypatch):
+    def forbidden(*args, **kwargs):
+        raise AssertionError("In-memory search must not load, detect or access cache")
+
+    for module, name in [
+        (workers.audio_io, "load"),
+        (workers.rhythm, "analyze_rhythm"),
+        (workers.rhythm, "resolve_device"),
+        (workers.onsets, "detect_onsets"),
+        (AnalysisCache, "get"),
+        (AnalysisCache, "set"),
+        (workers, "analyze_track"),
+    ]:
+        monkeypatch.setattr(module, name, forbidden)
+    samples = np.column_stack([np.full(18000, 0.25), np.full(18000, -0.5)]).astype(np.float32)
+    samples.setflags(write=False)
+    analysis = replace(
+        loaded_track.analysis,
+        track=replace(loaded_track.analysis.track, duration_seconds=18.0),
+        downbeat_times=tuple(float(t) for t in range(0, 19, 2)),
+        onset_times=tuple(float(t) + 0.1 for t in range(18)),
+    )
+    return replace(loaded_track, analysis=analysis, samples=samples)
+
+
+@pytest.mark.parametrize("length", [0.25, 0.5, 1.0, 2.0, 4.0])
+def test_memory_search_only_uses_selected_length_and_settings_limits(memory_track, length):
+    before = memory_track.samples.copy()
+    settings = Settings(candidates_per_track=2, max_one_shot_seconds=0.2)
+    found, message = workers.search_candidates(memory_track, settings, window=(2.0, 18.0), length_bars=length)
+    loops = [c for c in found if c.type is CandidateType.LOOP]
+    shots = [c for c in found if c.type is CandidateType.ONE_SHOT]
+    assert isinstance(found, tuple) and isinstance(message, str)
+    assert len(loops) == len(shots) == 2
+    assert {c.bars for c in loops} == {length}
+    assert all(c.duration_seconds == pytest.approx(2 * length) for c in loops)
+    assert all(c.duration_seconds <= 0.2 + 1e-12 for c in shots)
+    assert all(2.0 <= c.start_seconds < c.end_seconds <= 18.0 for c in found)
+    assert [c.score for c in found] == sorted((c.score for c in found), reverse=True)
+    np.testing.assert_array_equal(memory_track.samples, before)
+    assert len(memory_track.candidates) == 2
+
+
+def test_whole_track_search_uses_automatic_settings_not_previous_manual_length(memory_track):
+    settings = Settings(loop_lengths_bars=(0.25, 1.0), candidates_per_track=2, max_one_shot_seconds=0.2)
+    workers.search_candidates(memory_track, settings, window=(2.0, 18.0), length_bars=4.0)
+    found, _ = workers.search_candidates(memory_track, settings)
+    loops = [c for c in found if c.type is CandidateType.LOOP]
+    shots = [c for c in found if c.type is CandidateType.ONE_SHOT]
+    assert len(found) == 6 and len(shots) == 2
+    assert {c.bars for c in loops} == {0.25, 1.0}
+    assert {c.bars: sum(other.bars == c.bars for other in loops) for c in loops} == {0.25: 2, 1.0: 2}
+    assert settings.loop_lengths_bars == (0.25, 1.0)
+
+
+def test_short_selection_still_finds_the_two_cached_onsets(loaded_track):
+    loaded = replace(loaded_track, analysis=replace(loaded_track.analysis, onset_times=(0.1, 0.3)))
+    found, message = workers.search_candidates(
+        loaded, Settings(candidates_per_track=2, max_one_shot_seconds=0.2), window=(0.0, 0.6), length_bars=4.0
+    )
+    assert len(found) == 2 and all(c.type is CandidateType.ONE_SHOT for c in found)
+    assert all(0.0 <= c.start_seconds < c.end_seconds <= 0.6 for c in found)
+    assert "4-bar" in message and "2 one-shots" in message
+    assert "too short" in message.lower()
+
+
+@pytest.mark.parametrize("downbeats,tempo", [((), 120.0), ((0.0,), 120.0), ((0.0, 2.0), 0.0)])
+def test_missing_usable_rhythm_explains_one_shots_without_claiming_too_short(memory_track, downbeats, tempo):
+    loaded = replace(
+        memory_track, analysis=replace(memory_track.analysis, downbeat_times=downbeats, tempo_bpm=tempo)
+    )
+    found, message = workers.search_candidates(
+        loaded, Settings(candidates_per_track=2), window=(0.0, 0.6), length_bars=4.0
+    )
+    assert found and all(c.type is CandidateType.ONE_SHOT for c in found)
+    assert "downbeat" in message.lower() and "one-shot" in message.lower()
+    assert "too short" not in message.lower()
+
+
+def test_empty_search_is_clear_without_inventing_short_selection(memory_track):
+    loaded = replace(
+        memory_track, analysis=replace(memory_track.analysis, downbeat_times=(0.0, 2.0), onset_times=())
+    )
+    found, message = workers.search_candidates(loaded, Settings(), window=(5.0, 15.0), length_bars=4.0)
+    assert found == () and "no samples" in message.lower()
+    assert "too short" not in message.lower()
+
+
+@pytest.mark.parametrize(
+    "window,length",
+    [
+        (None, 1.0),
+        ((0.0, 2.0), None),
+        ((0.0, 2.0), 3.0),
+        ((0.0, 2.0), True),
+        ((0.0, 2.0), float("nan")),
+        ((2.0, 0.0), 1.0),
+        ((-1.0, 2.0), 1.0),
+    ],
+)
+def test_memory_search_rejects_inconsistent_request(memory_track, window, length):
+    with pytest.raises(ValueError):
+        workers.search_candidates(memory_track, Settings(), window=window, length_bars=length)
+
+
+def test_worker_snapshot_and_result_keep_request_identity_and_original_audio(qapp, memory_track):
+    settings = Settings(candidates_per_track=2, max_one_shot_seconds=0.2)
+    worker = workers.CandidateSearchWorker(41, memory_track, settings, window=(2.0, 18.0), length_bars=2.0)
+    settings.candidates_per_track = 1
+    settings.max_one_shot_seconds = 0.01
+    results, errors = [], []
+    worker.finished.connect(results.append)
+    worker.failed.connect(errors.append)
+    worker.run()
+    assert errors == [] and len(results) == 1
+    result = results[0]
+    assert result.request_id == 41 and result.window == (2.0, 18.0) and result.length_bars == 2.0
+    assert result.loaded is not memory_track and result.loaded.samples is memory_track.samples
+    assert result.loaded.analysis is memory_track.analysis and result.loaded.sample_rate == 1000
+    assert len(result.loaded.candidates) == 4 and isinstance(result.message, str)
+    assert max(
+        c.duration_seconds for c in result.loaded.candidates if c.type is CandidateType.ONE_SHOT
+    ) == pytest.approx(0.2)
+    assert settings.candidates_per_track == 1 and settings.max_one_shot_seconds == 0.01
+    with pytest.raises(FrozenInstanceError):
+        result.request_id = 42
+
+
+def test_worker_snapshots_automatic_loop_settings(qapp, memory_track):
+    settings = Settings(loop_lengths_bars=(0.25, 1.0), candidates_per_track=2)
+    worker = workers.CandidateSearchWorker(42, memory_track, settings)
+    settings.loop_lengths_bars = (0.5,)
+    results = []
+    worker.finished.connect(results.append)
+    worker.run()
+    assert len(results) == 1
+    result = results[0]
+    assert result.request_id == 42 and result.window is result.length_bars is None
+    assert {c.bars for c in result.loaded.candidates if c.type is CandidateType.LOOP} == {0.25, 1.0}
+
+
+@pytest.mark.parametrize("invalid", [False, True])
+@pytest.mark.parametrize("attempt", range(12))
+def test_candidate_worker_thread_really_finishes_on_result_or_error(qapp, memory_track, invalid, attempt):
+    worker = workers.CandidateSearchWorker(
+        43, memory_track, Settings(), window=(0.0, 0.6), length_bars=None if invalid else 4.0
+    )
+    results, errors, finished = [], [], []
+    worker.finished.connect(results.append)
+    worker.failed.connect(errors.append)
+    thread = workers.start_in_thread(worker)
+    loop = QEventLoop()
+    thread.finished.connect(lambda: finished.append(True))
+    thread.finished.connect(loop.quit)
+    timeout = QTimer()
+    timeout.setSingleShot(True)
+    timeout.timeout.connect(loop.quit)
+    timeout.start(5000)
+    thread.start()
+    loop.exec()
+    timeout.stop()
+    if not finished:
+        thread.quit()
+        thread.wait(5000)
+    assert finished == [True], "Worker emitted no actual QThread.finished signal"
+    if invalid:
+        assert len(errors) == 1 and "length" in errors[0].lower() and results == []
+    else:
+        assert errors == [] and len(results) == 1 and results[0].request_id == 43

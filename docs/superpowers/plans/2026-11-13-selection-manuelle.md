@@ -145,8 +145,8 @@ aucune écriture persistante. Validation attendue avant tâche 4.
 
 **Interfaces:** `search_candidates(loaded: LoadedTrack, settings: Settings, *, window: Window | None=None, length_bars: float | None=None) -> tuple[tuple[Candidate,...],str]` dans workers. Dataclass figée `CandidateSearchResult(request_id: int, loaded: LoadedTrack, window: Window | None, length_bars: float | None, message: str)` dans presentation. `CandidateSearchWorker(request_id: int, loaded: LoadedTrack, settings: Settings, *, window: Window | None=None, length_bars: float | None=None)` avec `finished = Signal(object)` et `failed = Signal(str)`, méthode `run() -> None` ; Settings copié au constructeur. Étendre start_in_thread à ce troisième worker, sans changer les deux analyses existantes.
 
-- [ ] **1. Tests rouges orchestration :** un LoadedTrack réel, settings quota 2/durée one-shot 0.2 ; en mode manuel, seule la longueur choisie est transmise, toutes les bornes respectées, limites Settings appliquées. En automatique `window=None`, longueurs courtes Settings, pas la longueur manuelle précédente. Les fonctions beat_this/onsets/audio_io.load/cache lèvent si appelées : la recherche doit quand même réussir avec les données mémorisées. Samples/Analysis conservés par identité et données inchangées.
-- [ ] **2. Tests rouges erreurs/messages :** fenêtre trop courte pour 4 mesures avec attaques valides : aucun loop, shots présents, message indiquant `4-bar` et nombre de shots ; absence de rythme = shots seuls avec explication ; pas d'attaque = résultat vide clair. Vérifier erreur propagée par failed et fin du QThread sur réussite et erreur ; changer Settings après construction ne modifie pas la requête copiée. Les slots du thread ne doivent ni lire un QWidget ni changer les préférences.
+- [x] **1. Tests rouges orchestration :** un LoadedTrack réel, settings quota 2/durée one-shot 0.2 ; en mode manuel, seule la longueur choisie est transmise, toutes les bornes respectées, limites Settings appliquées. En automatique `window=None`, longueurs courtes Settings, pas la longueur manuelle précédente. Les fonctions beat_this/onsets/audio_io.load/cache lèvent si appelées : la recherche doit quand même réussir avec les données mémorisées. Samples/Analysis conservés par identité et données inchangées.
+- [x] **2. Tests rouges erreurs/messages :** fenêtre trop courte pour 4 mesures avec attaques valides : aucun loop, shots présents, message indiquant `4-bar` et nombre de shots ; absence de rythme = shots seuls avec explication ; pas d'attaque = résultat vide clair. Vérifier erreur propagée par failed et fin du QThread sur réussite et erreur ; changer Settings après construction ne modifie pas la requête copiée. Les slots du thread ne doivent ni lire un QWidget ni changer les préférences.
 
   ```python
   def test_short_selection_still_finds_the_two_cached_onsets(loaded_track):
@@ -157,10 +157,16 @@ aucune écriture persistante. Validation attendue avant tâche 4.
       assert all(0.0 <= c.start_seconds < c.end_seconds <= 0.6 for c in found)
       assert "4-bar" in message and "2 one-shots" in message
   ```
-- [ ] **3. Rouge :** `uv run pytest -q tests/test_workers.py tests/test_candidate_window.py` ; attendu : worker/fonction absents ou message manquant.
-- [ ] **4. Implémenter :** réutiliser les fonctions de tâche 1, pas analyze_track ; tuple trié par score comme aujourd'hui, LoadedTrack remplacé uniquement sur candidats. `window != None` impose une longueur manuelle valide, `window=None` impose `length_bars=None`. Calcul des messages avec la durée globale de mesure et les résultats effectifs, sans annoncer « trop court » quand le vrai problème est l'absence de grille.
-- [ ] **5. Vert :** tests ciblés puis suite complète. Le raccordement thread de ce worker doit quitter aussi sur failed ; conserver la référence worker/thread jusqu'au signal réel thread.finished, pas au résultat.
-- [ ] **6. Commit :** `Reclasse les samples en mémoire dans un worker identifié`. Montrer les tests puis attendre validation.
+- [x] **3. Rouge :** `uv run pytest -q tests/test_workers.py tests/test_candidate_window.py` ; attendu : worker/fonction absents ou message manquant.
+- [x] **4. Implémenter :** réutiliser les fonctions de tâche 1, pas analyze_track ; tuple trié par score comme aujourd'hui, LoadedTrack remplacé uniquement sur candidats. `window != None` impose une longueur manuelle valide, `window=None` impose `length_bars=None`. Calcul des messages avec la durée globale de mesure et les résultats effectifs, sans annoncer « trop court » quand le vrai problème est l'absence de grille.
+- [x] **5. Vert :** tests ciblés puis suite complète. Le raccordement thread de ce worker doit quitter aussi sur failed ; conserver la référence worker/thread jusqu'au signal réel thread.finished, pas au résultat.
+- [x] **6. Commit :** `Reclasse les samples en mémoire dans un worker identifié`. Montrer les tests puis attendre validation.
+
+**Résultat étape 4 :** rouge initial 22 échecs/66 réussites, puis 665 tests complets
+et 110 ciblés sous Wayland à 150 % réussis ; Ruff/mypy/Bandit verts. Cycle de vie
+des threads répété après correction d'un plantage natif intermittent (voir historique).
+Aucun accès disque/cache/détecteur dans la recherche ; aucune écriture persistante.
+Validation attendue avant tâche 5 ; le raccordement MainWindow reste à réaliser.
 
 ## Task 5: Contrôles, confirmations et parcours complet
 
@@ -229,6 +235,6 @@ Documentation Qt vérifiée : https://doc.qt.io/qtforpython-6/PySide6/QtCore/QTh
 Le design est l'autorité ; toute adaptation du plan doit être motivée dans son
 ledger et rester dans le périmètre approuvé, sans élargir les opérations destructives.
 
-**État :** plan validé par l'utilisateur le 13/11/2026 ; tâches 1 et 2 validées,
-tâche 3 implémentée, validation attendue avant tâche 4. Reclassement et intégration
-lecture/confirmations restent à implémenter ; pas de publication implicite.
+**État :** plan validé par l'utilisateur le 13/11/2026 ; tâches 1 à 3 validées,
+tâche 4 implémentée, validation attendue avant tâche 5. Intégration des contrôles,
+lecture et confirmations restante ; pas de publication implicite.
