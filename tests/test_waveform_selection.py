@@ -218,6 +218,67 @@ def test_right_drag_cannot_scale_or_create_selection(view):
     assert view.viewRange() == before and view.selection is None
 
 
+@pytest.mark.parametrize("free", [False, True])
+@pytest.mark.parametrize(
+    "start,end,snapped,exact",
+    [
+        (2.0, 6.8, (4.0, 6.0), (4.0, 6.8)),
+        (4.0, 0.8, (0.0, 2.0), (0.8, 2.0)),
+    ],
+)
+def test_handle_crossing_keeps_opposite_edge_and_native_region_consistent(
+    view, free, start, end, snapped, exact
+):
+    view.set_selection((2.0, 4.0))
+    finished = []
+    view.selection_finished.connect(finished.append)
+    first, last = point(view, start), point(view, end)
+    modifier = Qt.KeyboardModifier.AltModifier if free else Qt.KeyboardModifier.NoModifier
+    mouse(view, QEvent.Type.MouseMove, first)
+    QApplication.processEvents()
+    mouse(
+        view,
+        QEvent.Type.MouseButtonPress,
+        first,
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.LeftButton,
+        modifiers=modifier,
+    )
+    for step in range(1, 13):
+        mouse(
+            view,
+            QEvent.Type.MouseMove,
+            first + (last - first) * step / 12,
+            buttons=Qt.MouseButton.LeftButton,
+            modifiers=modifier,
+        )
+    mouse(view, QEvent.Type.MouseButtonRelease, last, Qt.MouseButton.LeftButton, modifiers=modifier)
+    QApplication.processEvents()
+    expected = exact if free else snapped
+    assert view.selection == pytest.approx(expected, abs=0.025)
+    assert view._selection_region.getRegion() == pytest.approx(expected, abs=0.025)
+    assert len(finished) == 1 and finished[0] == pytest.approx(expected, abs=0.025)
+
+
+@pytest.mark.parametrize("seconds", [2.0, 4.0, 3.0])
+def test_subthreshold_handle_or_body_motion_restores_canonical_rectangle(view, seconds):
+    view.set_selection((2.0, 4.0))
+    finished = []
+    view.selection_finished.connect(finished.append)
+    first = point(view, seconds)
+    distance = max(1, int(QApplication.startDragDistance() * 0.7))
+    last = first + QPointF(distance, 0)
+    mouse(view, QEvent.Type.MouseMove, first)
+    QApplication.processEvents()
+    mouse(view, QEvent.Type.MouseButtonPress, first, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton)
+    mouse(view, QEvent.Type.MouseMove, last, buttons=Qt.MouseButton.LeftButton)
+    mouse(view, QEvent.Type.MouseButtonRelease, last, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+    assert view.selection == (2.0, 4.0)
+    assert view._selection_region.getRegion() == (2.0, 4.0)
+    assert not finished
+
+
 @pytest.mark.parametrize(
     "start,end,expected", [(2.0, 1.1, (1.1, 4.0)), (4.0, 5.2, (2.0, 5.2)), (3.0, 4.1, (3.1, 5.1))]
 )

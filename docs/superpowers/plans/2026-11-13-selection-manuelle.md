@@ -206,7 +206,10 @@ supplémentaires pour destruction QAction, widgets occupés, erreur hors thread 
 sélection effondrée et export manuel par poignée. 712 tests complets et 164 sous
 Wayland à 150 % réussis. Régressions des glissers automatiques conservées.
 `src/choppeur/` absent, aucun dossier/fichier supprimé. Les onze points sont
-implémentés ; revue indépendante finale restante après le commit et task-done.
+implémentés ; revue indépendante finale effectuée après commit et task-done :
+deux défauts gestuels importants corrigés avec sept tests rouges puis verts,
+719 tests complets et 171 sous Wayland à 150 %. Point mineur d'explication de
+l'analyse d'album différé ; détail dans `docs/REVUE_SELECTION_MANUELLE.md`.
 
 ## Passage final et mémoire du travail
 
@@ -243,5 +246,5 @@ Le design est l'autorité ; toute adaptation du plan doit être motivée dans so
 ledger et rester dans le périmètre approuvé, sans élargir les opérations destructives.
 
 **État :** plan validé par l'utilisateur le 13/11/2026 ; tâches 1 à 4 validées,
-tâche 5 implémentée et testée ; revue indépendante finale et essai utilisateur
-restants. Aucun push ni ZIP implicite.
+tâche 5 implémentée et testée, revue indépendante et correctifs terminés.
+Essai audio/DAW utilisateur restant. Aucun push ni ZIP implicite.

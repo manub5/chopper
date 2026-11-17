@@ -6,6 +6,28 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 18/11/2026 — Revue finale de la sélection manuelle : poignées et seuil de clic
+
+- Revue indépendante unique de toute la plage du plan, du moteur à l'interface :
+  deux anomalies importantes reproduites sur les gestes natifs, aucun problème
+  critique signalé. Rapport et arbitrages : `docs/REVUE_SELECTION_MANUELLE.md`.
+- Croiser une poignée réaffectait les valeurs triées aux lignes physiques et
+  déplaçait la borne opposée jusqu'à faire disparaître la région. Conserver
+  l'identité de la ligne déplacée et la coordonnée brute de la borne fixe pendant
+  le geste, puis appliquer l'aimantation sans redistribuer les poignées.
+- pyqtgraph déplace parfois les poignées/l'intérieur avant le seuil de glisser Qt.
+  Un petit mouvement changeait donc le rectangle visible sans modifier les bornes
+  de l'état. Restaurer le rectangle canonique au relâchement traité comme clic,
+  silencieusement et sans préécoute supplémentaire.
+- Sept tests rouges observés (croisement gauche/droite avec/sans Alt, petits
+  mouvements des deux poignées et du corps), puis verts. Suite complète : 719
+  réussites ; 171 sous Wayland à 150 %, Ruff/mypy/Bandit verts. Les limites et
+  régressions des gestes, lecture, exports et réglages restent couvertes.
+- Point mineur différé : sans résultat exportable, le texte de confirmation
+  d'album annonce le retrait de la sélection, alors que ce traitement cache-only
+  la conserve volontairement. Aucun risque de perte de résultat, mais texte à
+  clarifier. Aucun push/ZIP, source audio ni export existant modifié par ce correctif.
+
 ## 18/11/2026 — Sélection manuelle, étape 5 : parcours complet et protections
 
 - Barre Length ¼/½/1/2/4 (1 par défaut, session seulement), Chop selection/C et
@@ -39,7 +61,7 @@ dans pre-commit et la préécoute ne joue plus en boucle.
   150 % réussis ; Ruff lint/format, mypy et Bandit verts. Cas limites : sélection
   courte/vide, événements anciens/modalité, export annulé/partiel ou paramètres
   non sauvegardables, fermeture réentrante et wait échoué. Revue indépendante
-  finale encore à effectuer avant livraison déclarée.
+  finale et vérifications après correctifs décrites ci-dessus.
 - `src/choppeur/` absent dans cet espace : aucun nettoyage nécessaire. Aucun audio
   utilisateur modifié, aucun ancien export supprimé ; recherche sans écriture et
   mises à jour UI silencieuses. Exports répétés volontairement non idempotents,

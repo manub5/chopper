@@ -55,6 +55,8 @@ class WaveformView(pg.PlotWidget):
         self._dragging = False
         self._free = False
         self._native_source = ""
+        self._drag_line: pg.InfiniteLine | None = None
+        self._fixed_edge = 0.0
         self._gesture_id = 0
         self._finish_id = 0
         self._finish_timer = QTimer(self)
@@ -107,6 +109,7 @@ class WaveformView(pg.PlotWidget):
         self._raw_selection = None
         self._dragging = False
         self._native_source = ""
+        self._drag_line = None
 
     def clear(self) -> None:
         self._cancel_gesture()
@@ -142,7 +145,16 @@ class WaveformView(pg.PlotWidget):
             if window is None:
                 region.hide()
             else:
-                region.setRegion(window)
+                values = window
+                if (
+                    self._drag_line is not None
+                    and self._press_pos is not None
+                    and self._raw_selection is not None
+                ):
+                    # Keep physical line identity when the moving edge crosses the fixed one.
+                    moving, fixed = window if self._raw_selection[0] <= self._fixed_edge else window[::-1]
+                    values = (moving, fixed) if self._drag_line is region.lines[0] else (fixed, moving)
+                region.setRegion(values)
                 region.show()
         finally:
             self._applying_region = False
@@ -187,7 +199,11 @@ class WaveformView(pg.PlotWidget):
             and not self._applying_region
         ):
             self._native_source = "line"
-            self._raw_selection = tuple(region.getRegion())
+            if self._drag_line is None:
+                self._drag_line = line
+                other = region.lines[1] if line is region.lines[0] else region.lines[0]
+                self._fixed_edge = float(other.value())
+            self._raw_selection = (float(line.value()), self._fixed_edge)
             self._apply_raw_region()
 
     def _native_region_finished(self, region) -> None:
@@ -234,11 +250,14 @@ class WaveformView(pg.PlotWidget):
             selection = self._selection
             self._press_pos = None
             self._dragging = False
+            self._drag_line = None
             if selection is not None:
                 self.selection_finished.emit(selection)
             else:
                 self.selection_invalidated.emit()
         else:
+            # pyqtgraph can move items before Qt's application drag threshold.
+            self._display_region(self._selection)
             seconds = self._press_time if self._click_time is None else self._click_time
             outside = (
                 self._press_selection is not None
