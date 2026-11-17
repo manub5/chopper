@@ -1,7 +1,5 @@
 """Scrollable sample rows mapped to the waveform's actual time-to-pixel transform."""
 
-import math
-
 from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QAbstractScrollArea, QApplication, QWidget
@@ -27,7 +25,9 @@ class SampleLanesView(QAbstractScrollArea):
         self._headers: list[tuple[str, int]] = []
         self._content_height = 0
         self._last_active: int | None = None
-        self._pressed: tuple[QPointF, int | None, Qt.KeyboardModifier, list[float]] | None = None
+        self._pressed: tuple[QPointF, int | None, Qt.KeyboardModifier, list[float], Qt.MouseButton] | None = (
+            None
+        )
         self.setFrameShape(QAbstractScrollArea.Shape.NoFrame)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -168,20 +168,24 @@ class SampleLanesView(QAbstractScrollArea):
         )
 
     def mousePressEvent(self, event) -> None:
-        if event.button() == Qt.MouseButton.LeftButton and self._waveform is not None:
+        if (
+            event.button() in (Qt.MouseButton.LeftButton, Qt.MouseButton.MiddleButton)
+            and self._waveform is not None
+        ):
             self._pressed = (
                 event.position(),
                 self._hit(event.position()),
                 event.modifiers(),
                 self._waveform.viewRange()[0][:],
+                event.button(),
             )
             event.accept()
 
     def mouseMoveEvent(self, event) -> None:
         if self._pressed is not None and self._waveform is not None:
-            position, _item_id, _modifiers, x_range = self._pressed
+            position, _item_id, _modifiers, x_range, button = self._pressed
             dx = event.position().x() - position.x()
-            if abs(dx) >= QApplication.startDragDistance():
+            if button == Qt.MouseButton.MiddleButton and abs(dx) >= QApplication.startDragDistance():
                 width = self._waveform.getViewBox().width()
                 shift = -dx * (x_range[1] - x_range[0]) / max(width, 1)
                 self._waveform.setXRange(x_range[0] + shift, x_range[1] + shift, padding=0)
@@ -191,19 +195,20 @@ class SampleLanesView(QAbstractScrollArea):
 
     def mouseReleaseEvent(self, event) -> None:
         if self._pressed is not None:
-            position, item_id, modifiers, _x_range = self._pressed
+            position, item_id, modifiers, _x_range, button = self._pressed
             self._pressed = None
             if (
-                event.position() - position
-            ).manhattanLength() < QApplication.startDragDistance() and item_id is not None:
+                button == event.button() == Qt.MouseButton.LeftButton
+                and (event.position() - position).manhattanLength() < QApplication.startDragDistance()
+                and item_id is not None
+            ):
                 self.state.click(item_id, bool(modifiers & Qt.KeyboardModifier.ControlModifier))
             event.accept()
 
     def wheelEvent(self, event) -> None:
         if self._waveform is not None:
-            low, high = self._waveform.viewRange()[0]
-            factor = math.exp(-max(-1200, min(1200, event.angleDelta().y())) / 600)
-            center = (low + high) / 2
-            half = max(0.0005, (high - low) * factor / 2)
-            self._waveform.setXRange(center - half, center + half, padding=0)
+            self._waveform.navigate_wheel(
+                float(event.angleDelta().y()),
+                shift=bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier),
+            )
             event.accept()

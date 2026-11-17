@@ -6,6 +6,28 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 17/11/2026 — Sélection manuelle, étape 2 : rectangle et navigation
+
+- Région manuelle ajustable, distincte du surlignage passif de lecture ; glisser
+  gauche sur le fond pour dessiner, bords et intérieur pour ajuster. Aimantation
+  aux downbeats valides, Alt pour le mouvement libre, bornage à la piste ; aucune
+  mesure inventée quand les deux bords aboutissent au même repère.
+- Milieu et Maj+molette déplacent horizontalement, molette seule zoome ; même
+  navigation dans les couloirs, sans pan gauche ni zoom droit sur la forme d'onde.
+  Clic/Ctrl+clic des samples, bornes, alignement et axe y restent testés.
+- Fin physique du geste suivie indépendamment des signaux pyqtgraph (setRegion
+  émet aussi un signal de fin) : une seule notification par glisser valide, aucune
+  au setter ou clic intérieur. Le clic extérieur demande seulement l'effacement,
+  sans retirer la région avant décision du futur contrôleur. Modificateurs Alt
+  lus jusqu'au relâchement ; changement de piste/clear/disable/hide annule la fin
+  différée. Aucun raccourci Échap concurrent installé.
+- Recette des gestes : `docs/TEST_MANUAL_SELECTION.md`. Tests Qt réels sur le
+  viewport, avec bouton tenu ; 587 tests complets et 55 ciblés sous Wayland à 150 %. Ruff,
+  mypy et Bandit passent (avertissements historiques uniquement).
+- Lecture et confirmations non raccordées à cette étape : intégration prévue en
+  tâche 5. Aucun audio source, export, préférence ni cache modifié ; mises à jour
+  programmatiques silencieuses et répétables. Aucun push ni ZIP reconstruit.
+
 ## 13/11/2026 — Sélection manuelle, étape 1 : moteur borné et longueurs 2/4
 
 - Plan validé ; première étape uniquement, gestes et boutons manuels encore à

@@ -188,9 +188,44 @@ def test_lane_zoom_out_and_drag_share_track_bounds(lane_ui, qapp):
         assert waveform.viewRange()[0] == pytest.approx([0, 3])
     for distance, expected in [(1000, (0, 1)), (-1000, (2, 3))]:
         waveform.setXRange(1, 2, padding=0)
-        QTest.mousePress(lanes.viewport(), Qt.MouseButton.LeftButton, pos=center)
+        QTest.mousePress(lanes.viewport(), Qt.MouseButton.MiddleButton, pos=center)
         QTest.mouseMove(lanes.viewport(), center + QPoint(distance, 0))
-        QTest.mouseRelease(lanes.viewport(), Qt.MouseButton.LeftButton, pos=center + QPoint(distance, 0))
+        QTest.mouseRelease(lanes.viewport(), Qt.MouseButton.MiddleButton, pos=center + QPoint(distance, 0))
         qapp.processEvents()
         assert waveform.viewRange()[0] == pytest.approx(expected)
     assert waveform.viewRange()[1] == pytest.approx(before_y)
+
+
+def test_left_lane_drag_does_not_pan_or_edit_samples(lane_ui, qapp):
+    _, waveform, state, lanes = lane_ui
+    waveform.setXRange(1.0, 2.0, padding=0)
+    before = waveform.viewRange()
+    items = state.items
+    center = lanes.viewport().rect().center()
+    QTest.mousePress(lanes.viewport(), Qt.MouseButton.LeftButton, pos=center)
+    QTest.mouseMove(lanes.viewport(), center + QPoint(40, 0))
+    QTest.mouseRelease(lanes.viewport(), Qt.MouseButton.LeftButton, pos=center + QPoint(40, 0))
+    qapp.processEvents()
+    assert waveform.viewRange() == before and state.items == items
+
+
+def test_shift_wheel_on_lanes_pans_without_zooming(lane_ui, qapp):
+    _, waveform, _, lanes = lane_ui
+    waveform.setXRange(1.0, 2.0, padding=0)
+    before_y = waveform.viewRange()[1][:]
+    center = lanes.viewport().rect().center()
+    event = QWheelEvent(
+        QPointF(center),
+        QPointF(lanes.viewport().mapToGlobal(center)),
+        QPoint(),
+        QPoint(0, -120),
+        Qt.MouseButton.NoButton,
+        Qt.KeyboardModifier.ShiftModifier,
+        Qt.ScrollPhase.NoScrollPhase,
+        False,
+    )
+    QApplication.sendEvent(lanes.viewport(), event)
+    qapp.processEvents()
+    low, high = waveform.viewRange()[0]
+    assert low > 1.0 and high - low == pytest.approx(1.0)
+    assert waveform.viewRange()[1] == before_y

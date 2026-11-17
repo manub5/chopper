@@ -102,6 +102,12 @@ aucun push/ZIP ; validation attendue avant la tâche 2.
 - [ ] **6. Vert :** mêmes tests puis `uv run pytest -q`. Le dessin/navigation devient testable dans le widget ; la lecture et les confirmations seront raccordées en tâche 5, ne pas créer de câblage provisoire à supprimer ensuite. Mettre à jour historique et recette des gestes.
 - [ ] **7. Commit :** `Ajoute la sélection aimantée et la navigation horizontale`. Montrer les tests puis attendre validation.
 
+**Résultat étape 2 :** contrats et sept points réalisés ; rouge initial 29 échecs/
+15 réussites, puis 587 tests complets et 55 ciblés réussis dont une exécution Wayland à 150 %.
+Cas ajoutés : Alt au seul relâchement, annulation des fins différées et indépendance
+du surlignage de lecture. Ruff/mypy/Bandit passent ; recette dans
+`docs/TEST_MANUAL_SELECTION.md`. Validation attendue avant tâche 3.
+
 ## Task 3: Lecture de passage avec identité partagée
 
 **Files:** modifier `src/chopper/gui/sample_state.py`, `tests/test_sample_state.py` ; étendre `tests/test_preview_player.py` si une signature interne doit changer. Aucun nouveau flux audio ni nouveau type de candidat persisté.
@@ -218,6 +224,6 @@ Documentation Qt vérifiée : https://doc.qt.io/qtforpython-6/PySide6/QtCore/QTh
 Le design est l'autorité ; toute adaptation du plan doit être motivée dans son
 ledger et rester dans le périmètre approuvé, sans élargir les opérations destructives.
 
-**État :** plan validé par l'utilisateur le 13/11/2026 ; tâche 1 implémentée,
-validation d'étape attendue avant tâche 2. Les gestes complets ne sont pas encore
-livrés ; pas de publication implicite.
+**État :** plan validé par l'utilisateur le 13/11/2026 ; tâche 1 validée,
+tâche 2 implémentée, validation attendue avant tâche 3. Lecture de passage,
+reclassement et confirmations restent à implémenter ; pas de publication implicite.
