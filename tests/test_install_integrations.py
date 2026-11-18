@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -39,7 +40,13 @@ def cli(installation, *, answers="", initial_path="/usr/bin:/bin", path=None):
         text=True,
         check=False,
         timeout=10,
-        env={**os.environ, "HOME": str(home), "XDG_DATA_HOME": str(data), "PATH": path or initial_path},
+        env={
+            **os.environ,
+            "HOME": str(home),
+            "XDG_DATA_HOME": str(data),
+            "XDG_CONFIG_HOME": str(home / "config"),
+            "PATH": path or initial_path,
+        },
     )
 
 
@@ -311,3 +318,240 @@ def test_concurrent_project_installation_is_refused_without_writes(installation,
         assert not home.exists() and not (launcher.parent / ".chopper-install.json").exists()
     finally:
         os.close(descriptor)
+
+
+def copy_icon_source(launcher):
+    source = SCRIPTS.parent / "assets/chopper.svg"
+    assert source.is_file(), "The dedicated SVG must be shipped"
+    destination = launcher.parent / "assets/chopper.svg"
+    destination.parent.mkdir(exist_ok=True)
+    shutil.copyfile(source, destination)
+
+
+def xdg_tool(tmp_path, output, *, status=0):
+    tools = tmp_path / "xdg tools"
+    tools.mkdir(exist_ok=True)
+    script = tools / "xdg-user-dir"
+    script.write_text(
+        f"#!/bin/sh\n[ \"$1\" = DESKTOP ] || exit 98\nprintf '%s\\n' '{output}'\nexit {status}\n"
+    )
+    script.chmod(0o755)
+    return str(tools)
+
+
+def test_svg_is_static_and_renders_at_small_sizes():
+    import xml.etree.ElementTree as ET
+
+    from PySide6.QtGui import QImage, QPainter
+    from PySide6.QtSvg import QSvgRenderer
+
+    source = SCRIPTS.parent / "assets/chopper.svg"
+    assert source.is_file()
+    root = ET.fromstring(source.read_bytes())
+    assert root.attrib["viewBox"] == "0 0 64 64"
+    for element in root.iter():
+        assert element.tag.split("}")[-1] in {"svg", "rect", "path", "circle", "g", "title"}
+        assert all(not key.lower().startswith("on") and "href" not in key for key in element.attrib)
+        assert all("url(" not in value for value in element.attrib.values())
+    assert {"#292B2E", "#D99A64"} <= {value for node in root.iter() for value in node.attrib.values()}
+    renderer = QSvgRenderer(str(source))
+    assert renderer.isValid()
+    for size in (16, 32, 64):
+        image = QImage(size, size, QImage.Format.Format_ARGB32_Premultiplied)
+        image.fill(0)
+        painter = QPainter(image)
+        renderer.render(painter)
+        painter.end()
+        assert image.pixelColor(size // 2, size // 2).alpha() > 0
+        assert any(image.pixelColor(x, y).red() > 150 for x in range(size) for y in range(size))
+
+
+def test_all_integrations_share_icon_and_desktop_content(installation, tmp_path):
+    launcher, home, data = installation
+    copy_icon_source(launcher)
+    desktop = tmp_path / "My desktop with spaces"
+    desktop.mkdir()
+    path = xdg_tool(tmp_path, desktop)
+    result = cli(installation, answers="y\ny\ny\ny\n", path=path)
+    assert result.returncode == 0, result.stderr
+    icon = data / "icons/hicolor/scalable/apps/chopper.svg"
+    menu = data / "applications/chopper.desktop"
+    shortcut = desktop / "chopper.desktop"
+    assert icon.read_bytes() == (launcher.parent / "assets/chopper.svg").read_bytes()
+    assert shortcut.read_bytes() == menu.read_bytes()
+    assert f"Icon={icon}" in menu.read_text().splitlines()
+    assert shortcut.stat().st_mode & 0o777 == 0o755
+    receipt = launcher.parent / ".chopper-install.json"
+    before = receipt.read_bytes()
+    stamps = [p.stat().st_ino for p in (icon, menu, shortcut)]
+    again = cli(installation, answers="y\ny\ny\ny\n", path=path)
+    assert again.returncode == 0, again.stderr
+    assert receipt.read_bytes() == before
+    assert stamps == [p.stat().st_ino for p in (icon, menu, shortcut)]
+    assert set(json.loads(before)["artifacts"]) == {"menu", "global-command", "icon", "desktop"}
+    assert not (home / "Desktop").exists()
+
+
+@pytest.mark.parametrize("output,status", [("", 0), ("relative", 0), ("HOME", 0), ("unused", 1)])
+def test_invalid_xdg_desktop_never_creates_a_fallback(installation, tmp_path, output, status):
+    _, home, data = installation
+    path = xdg_tool(tmp_path, home if output == "HOME" else output, status=status)
+    result = cli(installation, answers="n\nn\nn\ny\n", path=path)
+    assert result.returncode == 0, result.stderr
+    assert "Desktop shortcut unavailable" in result.stdout
+    assert not home.exists() and not data.exists()
+
+
+def test_missing_xdg_tool_is_reported_without_writes(installation, tmp_path):
+    tools = tmp_path / "empty-tools"
+    tools.mkdir()
+    result = cli(installation, answers="n\nn\nn\ny\n", path=str(tools))
+    assert result.returncode == 0, result.stderr
+    assert "Desktop shortcut unavailable" in result.stdout
+
+
+@pytest.mark.parametrize("role", ["icon", "desktop", "menu"])
+@pytest.mark.parametrize("kind", ["foreign", "symlink", "directory", "identical-unowned"])
+def test_new_integrations_refuse_unowned_destinations(installation, tmp_path, monkeypatch, role, kind):
+    launcher, _, data = installation
+    tool = integration_tool(monkeypatch)
+    copy_icon_source(launcher)
+    desktop = tmp_path / "desktop"
+    desktop.mkdir()
+    if role == "icon":
+        destination = data / "icons/hicolor/scalable/apps/chopper.svg"
+        content = (launcher.parent / "assets/chopper.svg").read_bytes()
+
+        def action():
+            return tool.install_icon(launcher, data_home=data)
+    else:
+        destination = (desktop if role == "desktop" else data / "applications") / "chopper.desktop"
+        content = tool.desktop_entry(launcher, icon=None).encode()
+        action = (
+            (lambda: tool.install_desktop_copy(launcher, desktop_dir=desktop, icon=None))
+            if role == "desktop"
+            else (lambda: tool._install_menu(launcher, data))
+        )
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if kind == "directory":
+        destination.mkdir()
+    elif kind == "symlink":
+        destination.symlink_to(tmp_path / "missing")
+    else:
+        destination.write_bytes(content if kind == "identical-unowned" else b"foreign sentinel")
+        destination.chmod(0o755 if role == "desktop" else 0o644)
+    before = destination.lstat()
+    if role == "menu" and kind == "identical-unowned":
+        action()  # Only the exact historical menu is adoptable.
+    else:
+        with pytest.raises((OSError, ValueError)):
+            action()
+    assert destination.lstat().st_ino == before.st_ino
+
+
+def test_menu_can_switch_owned_icon_and_preserves_old_bytes_on_receipt_failure(installation, monkeypatch):
+    launcher, _, data = installation
+    tool = integration_tool(monkeypatch)
+    copy_icon_source(launcher)
+    entry = tool._install_menu(launcher, data)
+    old = entry.read_bytes()
+    icon = tool.install_icon(launcher, data_home=data)
+    original_save = tool._save_receipt
+
+    def fail(*args):
+        raise PermissionError("receipt unavailable")
+
+    monkeypatch.setattr(tool, "_save_receipt", fail)
+    with pytest.raises(OSError):
+        tool._install_menu(launcher, data, icon=icon)
+    assert entry.read_bytes() == old
+    monkeypatch.setattr(tool, "_save_receipt", original_save)
+    tool._install_menu(launcher, data, icon=icon)
+    assert f"Icon={icon}" in entry.read_text().splitlines()
+    assert tool.load_receipt(launcher.parent)["artifacts"]["menu"] == tool._stamp(entry)
+
+
+def test_declined_icon_keeps_shortcuts_generic(installation, tmp_path):
+    _, _, data = installation
+    desktop = tmp_path / "Desktop space"
+    desktop.mkdir()
+    path = xdg_tool(tmp_path, desktop)
+    result = cli(installation, answers="y\nn\nn\ny\n", path=path)
+    assert result.returncode == 0, result.stderr
+    assert (desktop / "chopper.desktop").read_bytes() == (data / "applications/chopper.desktop").read_bytes()
+    assert "Icon=audio-x-generic" in (desktop / "chopper.desktop").read_text()
+    assert not (data / "icons").exists()
+
+
+@pytest.mark.parametrize("role", ["icon", "desktop"])
+def test_owned_file_modified_or_recreated_is_preserved(installation, tmp_path, monkeypatch, role):
+    launcher, _, data = installation
+    copy_icon_source(launcher)
+    tool = integration_tool(monkeypatch)
+    desktop = tmp_path / "desktop"
+    desktop.mkdir()
+
+    def install():
+        return (
+            tool.install_icon(launcher, data_home=data)
+            if role == "icon"
+            else tool.install_desktop_copy(launcher, desktop_dir=desktop, icon=None)
+        )
+
+    path = install()
+    original = path.read_bytes()
+    path.rename(tmp_path / "old-file")
+    path.write_bytes(original)
+    path.chmod(0o644 if role == "icon" else 0o755)
+    before = path.stat()
+    with pytest.raises((OSError, ValueError)):
+        install()
+    assert path.read_bytes() == original and path.stat().st_ino == before.st_ino
+
+
+@pytest.mark.parametrize("role", ["icon", "desktop"])
+def test_new_file_receipt_failure_rolls_back_created_object(installation, tmp_path, monkeypatch, role):
+    launcher, _, data = installation
+    copy_icon_source(launcher)
+    tool = integration_tool(monkeypatch)
+    desktop = tmp_path / "desktop"
+    desktop.mkdir()
+
+    def fail(*args):
+        raise PermissionError("receipt full")
+
+    monkeypatch.setattr(tool, "_save_receipt", fail)
+    with pytest.raises(OSError):
+        if role == "icon":
+            tool.install_icon(launcher, data_home=data)
+        else:
+            tool.install_desktop_copy(launcher, desktop_dir=desktop, icon=None)
+    assert not (desktop / "chopper.desktop").exists()
+    assert not (data / "icons/hicolor/scalable/apps/chopper.svg").exists()
+
+
+def test_failed_receipt_update_restores_without_allocating_another_file(installation, monkeypatch):
+    launcher, _, data = installation
+    tool = integration_tool(monkeypatch)
+    copy_icon_source(launcher)
+    entry = tool._install_menu(launcher, data)
+    old = entry.read_bytes()
+    icon = tool.install_icon(launcher, data_home=data)
+    publish = tool._publish_bytes
+    receipt_failed = False
+
+    def fail_receipt(*args):
+        nonlocal receipt_failed
+        receipt_failed = True
+        raise OSError("disk full")
+
+    def no_further_allocation(path, content, mode, expected):
+        if receipt_failed:
+            raise OSError("disk still full")
+        return publish(path, content, mode, expected)
+
+    monkeypatch.setattr(tool, "_save_receipt", fail_receipt)
+    monkeypatch.setattr(tool, "_publish_bytes", no_further_allocation)
+    with pytest.raises(OSError):
+        tool._install_menu(launcher, data, icon=icon)
+    assert entry.read_bytes() == old

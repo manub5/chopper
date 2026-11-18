@@ -62,8 +62,20 @@ def test_desktop_entry_identifies_audio_app_and_quotes_launcher(launcher):
     assert f'Exec=env -- "{launcher}"' in entry.splitlines()
 
 
+def test_icon_path_is_absolute_and_uses_desktop_string_escaping(launcher, tmp_path):
+    icon = tmp_path / " icon\\ $cash %f.svg"
+    icon.write_text("svg probe")
+    entry = desktop_tool().desktop_entry(launcher, icon=icon)
+    assert "Icon=" + str(icon).replace("\\", "\\\\") in entry.splitlines()
+    with pytest.raises(ValueError):
+        desktop_tool().desktop_entry(launcher, icon=Path("relative.svg"))
+    with pytest.raises(ValueError):
+        desktop_tool().desktop_entry(launcher, icon=tmp_path / "line\nbreak.svg")
+
+
 @pytest.mark.parametrize("name", ["space ' $cash %f", 'quote"back\\tick`', "échantillon"])
-def test_desktop_entry_launches_exact_special_path_with_real_consumer(tmp_path, launcher, name):
+@pytest.mark.parametrize("with_icon", [False, True])
+def test_desktop_entry_launches_exact_special_path_with_real_consumer(tmp_path, launcher, name, with_icon):
     gio = shutil.which("gio")
     if gio is None:
         pytest.skip("GLib Desktop Entry launcher unavailable")
@@ -73,7 +85,10 @@ def test_desktop_entry_launches_exact_special_path_with_real_consumer(tmp_path, 
     shutil.copyfile(launcher, special_launcher)
     special_launcher.chmod(0o755)
     entry = tmp_path / "probe.desktop"
-    entry.write_text(desktop_tool().desktop_entry(special_launcher))
+    icon = parent / "chopper.svg" if with_icon else None
+    if icon is not None:
+        shutil.copyfile(HELPER.parent.parent / "assets/chopper.svg", icon)
+    entry.write_text(desktop_tool().desktop_entry(special_launcher, icon))
     output = tmp_path / "probe-output"
     env = {
         **os.environ,
@@ -95,12 +110,16 @@ def test_desktop_entry_launches_exact_special_path_with_real_consumer(tmp_path, 
     assert output.read_text() == "launched\n"
 
 
-def test_desktop_entry_passes_official_validator(tmp_path, launcher):
+@pytest.mark.parametrize("with_icon", [False, True])
+def test_desktop_entry_passes_official_validator(tmp_path, launcher, with_icon):
     validator = shutil.which("desktop-file-validate")
     if validator is None:
         pytest.skip("Desktop Entry validator unavailable")
     entry = tmp_path / "chopper.desktop"
-    entry.write_text(desktop_tool().desktop_entry(launcher))
+    icon = tmp_path / "icon \\ $cash %f.svg" if with_icon else None
+    if icon is not None:
+        shutil.copyfile(HELPER.parent.parent / "assets/chopper.svg", icon)
+    entry.write_text(desktop_tool().desktop_entry(launcher, icon))
     result = subprocess.run([validator, str(entry)], capture_output=True, text=True, check=False, timeout=10)
     assert result.returncode == 0, result.stdout + result.stderr
 

@@ -51,11 +51,26 @@ who replaces both files: only accept the pair from a trusted source.
    location before agreeing. Declining/EOF creates neither a command nor a receipt
    for that action. Existing foreign, broken or manually recreated links are
    refused, even if their target matches the intended launcher.
+7. A separate prompt offers the dedicated charcoal/orange SVG, normally at
+   `~/.local/share/icons/hicolor/scalable/apps/chopper.svg`. Refusing it uses the
+   system's generic audio icon in shortcuts generated during this run.
+8. If `xdg-user-dir DESKTOP` identifies an existing desktop folder, the installer
+   shows its exact `chopper.desktop` destination and asks separately before writing.
+   It does not guess `~/Desktop`, create a desktop folder, or copy into HOME when
+   the desktop is disabled. Missing XDG tools or invalid locations are reported
+   without preventing the other integrations.
 
 Once installed, find **Chopper** in KDE's application menu. If you skipped the
 menu entry, open a terminal in the application folder and run `./chopper`.
-The menu entry uses your system's audio application icon; it does not place an
-icon on the desktop or add autostart behavior.
+The optional Desktop shortcut and menu entry use the same generated content and
+absolute icon path, avoiding a KDE icon-cache refresh. The Desktop copy is
+executable (0755), as required by KDE's desktop-file authorization checks. Local
+administrative policies can still prevent execution; no GNOME-specific trust
+metadata is added. Nothing adds autostart behavior.
+
+All four integration choices are collected before writing; accepted integrations
+are then installed independently, with the icon first. An error can leave earlier
+accepted integrations installed; it never authorizes a declined destination.
 
 ## Run from any folder
 
@@ -103,7 +118,7 @@ files that must stay available to that DAW. Repeated drags intentionally create
 distinct permanent WAVs, even when a drop is canceled; installation does not
 clean up samples, settings or old application folders.
 
-## Retry or fix a menu entry
+## Retry or fix an integration
 
 - If installation fails, read the terminal error and run `bash install.sh` again
   after resolving it. A dependency error is not reported as a completed install.
@@ -114,8 +129,17 @@ clean up samples, settings or old application folders.
   symbolic links. The global command accepts only its own recorded symlink. Menu
   ownership is recorded too; an old menu entry can be adopted only if its exact
   historical content points to this same launcher, not on its marker alone.
-  Keep `.chopper-install.json` in the project folder. Move an unrelated
-  conflicting file yourself only if you know what it is and want to keep it elsewhere.
+   Keep `.chopper-install.json` in the project folder. Move an unrelated
+   conflicting file yourself only if you know what it is and want to keep it elsewhere.
+- The icon and Desktop copy also require recorded ownership, even if a foreign
+  file has identical bytes. Unchanged reinstalls preserve files and receipt;
+  changing an owned icon or shortcut updates its recorded identity. If saving the
+  receipt fails, a new file is removed only while it is still identifiable as ours;
+  an updated file's previous content is restored from a preallocated backup.
+  If even refreshing the restored identity fails (for example, a full disk), the
+  error explicitly warns that further automatic changes will be refused safely.
+  Parent folders created after consent may remain after an error; no recursive
+  cleanup of user folders is performed.
 - A path containing `=` or control characters cannot be used for the menu entry;
   choose another application folder. Spaces, apostrophes, dollar signs,
   percentages, quotes, backslashes and accented characters are tested.
@@ -140,6 +164,9 @@ Record the actual Kubuntu version and CPU architecture (the terminal commands
 1. Install from a fresh extraction; verify that each requested destination is clear.
 2. Skip the menu entry once: no shortcut should be created. Rerun installation
    and accept it; find Chopper in KDE's menu and open it without a terminal.
+   Test the separate icon/Desktop choices as well. The Desktop copy should use
+   the same Chopper icon and launch the app without a terminal. Try `chopper`
+   from another folder after accepting the global command and checking PATH.
 3. Analyze one of your tracks, including the first-use model download if needed.
 4. Preview audio on your actual output device, mark a sample, and export it to a
    folder you choose. Confirm that the source audio is unchanged.

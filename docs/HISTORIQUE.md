@@ -6,6 +6,41 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 18/11/2026 — Extension Kubuntu, étape 5 : SVG et raccourci Bureau consentis
+
+- Icône SVG statique anthracite/orange doux, sans scripts ni ressources externes.
+  Rendu Qt vérifié à 16, 32 et 64 pixels. Champ Icon absolu et échappé selon les
+  chaînes Desktop Entry, identique dans le menu et sa copie sur le Bureau ; refus
+  de l'icône = pictogramme audio générique. Aucun changement du thème applicatif.
+- Quatre confirmations distinctes, chemins et relevé annoncés avant écriture :
+  menu, commande globale, icône, Bureau. Recueillir les choix puis installer le SVG
+  avant les raccourcis. Bureau obtenu par `xdg-user-dir DESKTOP` sans shell : outil
+  absent/en erreur, réponse vide/relative/HOME ou dossier absent = message clair,
+  aucune copie ailleurs ni création de Bureau. Copie exécutable 0755 pour KDE,
+  sans métadonnée de confiance GNOME inventée. Politiques administratives KDE
+  éventuelles et vraie recette graphique restent à vérifier sur machine cible.
+- Rôles `icon` et `desktop` dans le relevé strict ; fichiers identiques étrangers,
+  liens et dossiers refusés. Réinstallation identique sans remplacement ni doublon.
+  Mise à jour réservée aux fichiers encore identifiables, ancien menu générique
+  adoptable uniquement par contenu historique exact vers le même lanceur.
+- Échec de relevé : retirer seulement un nouveau fichier encore prouvé. Pour une
+  mise à jour, sauvegarde privée préallouée avant mutation puis restauration par
+  renommage, sans allocation supplémentaire si disque plein. Rouge observé sur
+  ce dernier cas avant correction. L'identité restaurée est réenregistrée ; si
+  le disque refuse encore le relevé, erreur explicite et refus prudent des futures
+  mutations. Pas de suppression automatique de fichier devenu étranger.
+- Vérification : 21 nouveaux échecs/77 réussites historiques observés au rouge,
+  puis 108 tests ciblés réussis et 778 tests complets. Vrais `gio launch` et
+  `desktop-file-validate` exécutés sur des sondes, chemins spéciaux et icône dédiée.
+  Ruff, mypy, Bandit, syntaxe Bash et diff propres (avertissements Bandit historiques).
+  Régressions : installateur/dépendances/lanceur et suite audio/interface existante.
+  Limites : refus/EOF, XDG invalide, collisions, fichier recréé, disque plein.
+- Effets : intégrations acceptées indépendantes, les premières peuvent rester si
+  une suivante échoue ; dossiers parents consentis non retirés récursivement.
+  Tests isolés, aucun audio source ni profil modifié, aucun lancement de Chopper
+  réel, aucune intégration dans le compte utilisateur. Aucun ZIP reconstruit ni
+  push ; désinstallation/liste blanche d'archive/revue finale restent à l'étape 6.
+
 ## 18/11/2026 — Extension Kubuntu, étape 4 : commande globale consentie
 
 - Plan d'extension validé ; première étape seulement. Le lanceur résout ses liens

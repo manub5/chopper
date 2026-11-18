@@ -9,6 +9,7 @@ import json
 import os
 import shutil
 import stat
+import subprocess
 import sys
 import tempfile
 from collections.abc import Iterator
@@ -92,7 +93,7 @@ def _validate_receipt(data: object, project: Path) -> dict:
     ):
         raise ValueError("Foreign or invalid Chopper installation receipt.")
     for role, record in data["artifacts"].items():
-        if role not in {"global-command", "menu"} or not isinstance(record, dict):
+        if role not in {"global-command", "menu", "icon", "desktop"} or not isinstance(record, dict):
             raise ValueError("Invalid receipt artifact role.")
         is_link = role == "global-command"
         expected = {
@@ -126,8 +127,15 @@ def _validate_receipt(data: object, project: Path) -> dict:
             ):
                 raise ValueError("Invalid receipt command destination or target.")
         elif (
-            destination.name != "chopper.desktop"
-            or destination.parent.name != "applications"
+            (
+                role == "menu"
+                and (destination.name != "chopper.desktop" or destination.parent.name != "applications")
+            )
+            or (role == "desktop" and destination.name != "chopper.desktop")
+            or (
+                role == "icon"
+                and tuple(destination.parts[-5:]) != ("icons", "hicolor", "scalable", "apps", "chopper.svg")
+            )
             or not isinstance(record["sha256"], str)
             or len(record["sha256"]) != 64
             or any(char not in "0123456789abcdef" for char in record["sha256"])
@@ -256,41 +264,136 @@ def _install_global_command(launcher: Path, *, home: Path) -> Path:
     return destination
 
 
-def _install_menu(launcher: Path, data_home: Path) -> Path:
+def _install_menu(launcher: Path, data_home: Path, icon: Path | None = None) -> Path:
     launcher = _absolute(launcher).resolve(strict=True)
     with _project_lock(launcher.parent):
-        return _install_menu_locked(launcher, data_home)
+        return _install_file(
+            launcher,
+            "menu",
+            _absolute(data_home) / "applications/chopper.desktop",
+            desktop_entry(launcher, icon).encode(),
+            0o644,
+            legacy=desktop_entry(launcher).encode(),
+        )
 
 
-def _install_menu_locked(launcher: Path, data_home: Path) -> Path:
+def _install_file(
+    launcher: Path, role: str, destination: Path, content: bytes, mode: int, *, legacy: bytes | None = None
+) -> Path:
     project = launcher.parent
-    content = desktop_entry(launcher).encode("utf-8")
     data, receipt_before = _read_receipt(project)
-    destination = data_home / "applications" / "chopper.desktop"
-    previous = data["artifacts"].get("menu")
+    previous = data["artifacts"].get(role)
     current = _stamp(destination)
-    created_here = current is None
     if previous is not None and (
         previous["path"] != str(destination) or (current is not None and previous != current)
     ):
-        raise ValueError(f"Refusing to overwrite an unowned or modified menu entry: {destination}")
+        raise ValueError(f"Refusing to overwrite an unowned or modified {role}: {destination}")
+    old_content = None
     if current is not None:
-        if current["type"] != "file" or destination.read_bytes() != content or current["mode"] != 0o644:
-            raise ValueError(f"Refusing to overwrite an unrelated menu entry: {destination}")
-        if previous is not None:
+        if current["type"] != "file" or current["mode"] != mode:
+            raise ValueError(f"Refusing to overwrite an unrelated {role}: {destination}")
+        old_content = destination.read_bytes()
+        if previous is None and (legacy is None or old_content != legacy):
+            raise ValueError(f"Refusing to overwrite an unrelated {role}: {destination}")
+        if previous is not None and old_content == content:
             return destination
-        # Adopt only the exact historical entry for this launcher, not a marker alone.
-    else:
-        current = _publish_bytes(destination, content, 0o644, None)
-    assert current is not None
-    data["artifacts"]["menu"] = current
-    try:
-        _save_receipt(project, data, receipt_before)
-    except (OSError, ValueError):
-        if created_here:
-            _rollback_created(destination, current)
-        raise
+    before = current
+    with _restore_point(destination, old_content if old_content != content else None, mode) as backup:
+        if old_content != content:
+            current = _publish_bytes(destination, content, mode, current)
+        assert current is not None
+        data["artifacts"][role] = current
+        try:
+            _save_receipt(project, data, receipt_before)
+        except (OSError, ValueError):
+            if before is None:
+                _rollback_created(destination, current)
+            elif backup is not None and _stamp(destination) == current:
+                # The backup was allocated before mutation, so even disk-full rollback can rename it.
+                saved, descriptor = backup
+                saved_stamp = _stamp(saved)
+                owned = os.fstat(descriptor)
+                if saved_stamp is None or (saved_stamp["device"], saved_stamp["inode"]) != (
+                    owned.st_dev,
+                    owned.st_ino,
+                ):
+                    raise FileExistsError("Rollback backup changed; refusing to use it.") from None
+                os.replace(saved, destination)
+                restored = _stamp(destination)
+                if restored is None or (restored["device"], restored["inode"]) != (
+                    owned.st_dev,
+                    owned.st_ino,
+                ):
+                    raise FileExistsError("Restored entry changed concurrently; preserving it.") from None
+                if previous is None:
+                    data["artifacts"].pop(role)
+                else:
+                    data["artifacts"][role] = restored
+                if receipt_before is not None:
+                    recovery = (json.dumps(data, indent=2, sort_keys=True) + "\n").encode()
+                    try:
+                        _publish_bytes(project / RECEIPT_NAME, recovery, 0o600, receipt_before)
+                    except (OSError, ValueError) as recovery_error:
+                        raise OSError(
+                            "Old integration content restored, but its receipt could not be refreshed; "
+                            "further changes will be refused safely."
+                        ) from recovery_error
+            raise
     return destination
+
+
+@contextmanager
+def _restore_point(path: Path, content: bytes | None, mode: int) -> Iterator[tuple[Path, int] | None]:
+    if content is None:
+        yield None
+        return
+    with tempfile.TemporaryDirectory(prefix=".chopper-rollback-", dir=path.parent) as directory:
+        saved = Path(directory) / "original"
+        with saved.open("xb") as stream:
+            stream.write(content)
+            stream.flush()
+            saved.chmod(mode)
+            yield saved, stream.fileno()
+
+
+def install_icon(launcher: Path, *, data_home: Path) -> Path:
+    launcher = _absolute(launcher).resolve(strict=True)
+    desktop_entry(launcher)
+    content = (launcher.parent / "assets/chopper.svg").read_bytes()
+    with _project_lock(launcher.parent):
+        return _install_file(
+            launcher, "icon", _absolute(data_home) / "icons/hicolor/scalable/apps/chopper.svg", content, 0o644
+        )
+
+
+def install_desktop_copy(launcher: Path, *, desktop_dir: Path, icon: Path | None) -> Path:
+    launcher = _absolute(launcher).resolve(strict=True)
+    desktop_dir = _absolute(desktop_dir)
+    if not desktop_dir.is_dir() or desktop_dir.resolve() == Path.home().resolve():
+        raise ValueError("Desktop directory must exist and differ from HOME.")
+    with _project_lock(launcher.parent):
+        return _install_file(
+            launcher,
+            "desktop",
+            desktop_dir / "chopper.desktop",
+            desktop_entry(launcher, icon).encode(),
+            0o755,
+        )
+
+
+def _desktop_directory(home: Path) -> Path | None:
+    try:
+        result = subprocess.run(
+            ["xdg-user-dir", "DESKTOP"], capture_output=True, text=True, check=True, timeout=5
+        )
+        value = result.stdout.rstrip("\n")
+        path = Path(value)
+        if not value or not path.is_absolute() or not path.is_dir() or path.resolve() == home:
+            raise ValueError("XDG DESKTOP is empty, relative, missing, or disabled (HOME).")
+        return path.resolve()
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
+        print(f"Desktop shortcut unavailable: {error}. No fallback folder will be created.")
+        return None
 
 
 def _confirm(destination: Path, project: Path, question: str) -> bool:
@@ -328,16 +431,36 @@ def install_integrations(launcher: Path, *, initial_path: str) -> int:
     configured = os.environ.get("XDG_DATA_HOME")
     data_home = _absolute(Path(configured) if configured else home / ".local" / "share").resolve()
     menu = data_home / "applications" / "chopper.desktop"
-    if _confirm(menu, project, "Create or update the Chopper menu entry there?"):
-        print(f"Menu entry installed: {_install_menu(launcher, data_home)}")
+    want_menu = _confirm(menu, project, "Create or update the Chopper menu entry there?")
+    command = home / ".local" / "bin" / "chopper"
+    want_command = _confirm(command, project, "Create the global Chopper command link there?")
+    icon_destination = data_home / "icons/hicolor/scalable/apps/chopper.svg"
+    want_icon = _confirm(icon_destination, project, "Install or update the dedicated Chopper icon there?")
+    desktop_dir = _desktop_directory(home)
+    want_desktop = desktop_dir is not None and _confirm(
+        desktop_dir / "chopper.desktop",
+        project,
+        "Create or update the executable KDE Desktop shortcut there?",
+    )
+    icon = install_icon(launcher, data_home=data_home) if want_icon else None
+    print(
+        f"Icon installed: {icon}" if icon else "Dedicated icon skipped; shortcuts use the generic audio icon."
+    )
+    if want_menu:
+        print(f"Menu entry installed: {_install_menu(launcher, data_home, icon)}")
     else:
         print("Menu entry skipped. You can still start ./chopper.")
-    command = home / ".local" / "bin" / "chopper"
-    if _confirm(command, project, "Create the global Chopper command link there?"):
+    if want_command:
         print(f"Global command installed: {install_global_command(launcher, home=home)}")
         _report_path(home, initial_path, command)
     else:
         print("Global command skipped. You can still start ./chopper.")
+    if want_desktop:
+        assert desktop_dir is not None
+        installed = install_desktop_copy(launcher, desktop_dir=desktop_dir, icon=icon)
+        print(f"Desktop shortcut installed: {installed}")
+    else:
+        print("Desktop shortcut skipped. No Desktop folder was created.")
     return 0
 
 

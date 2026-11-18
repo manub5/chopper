@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 
 
-def desktop_entry(launcher: Path) -> str:
+def desktop_entry(launcher: Path, icon: Path | None = None) -> str:
     """Quote a launcher using Desktop Entry rules, not shell quoting."""
     path = str(launcher)
     if not launcher.is_absolute():
@@ -23,6 +23,13 @@ def desktop_entry(launcher: Path) -> str:
     # Exec quoting is decoded after the entry's general backslash escaping.
     quoted = "".join("\\" + char if char in '\\"`$' else char for char in path)
     quoted = quoted.replace("%", "%%").replace("\\", "\\\\")
+    icon_value = "audio-x-generic"
+    if icon is not None:
+        if not icon.is_absolute() or any(ord(char) < 32 or ord(char) == 127 for char in str(icon)):
+            raise ValueError("The icon path must be absolute and contain no control characters.")
+        icon_value = str(icon).replace("\\", "\\\\")
+        if icon_value.startswith(" "):
+            icon_value = "\\s" + icon_value[1:]
     return (
         "[Desktop Entry]\n"
         "Type=Application\n"
@@ -30,7 +37,7 @@ def desktop_entry(launcher: Path) -> str:
         "Comment=Find, preview and export loops and one-shots\n"
         # GLib checks the executable before expanding %%: keep the path an argument.
         f'Exec=env -- "{quoted}"\n'
-        "Icon=audio-x-generic\n"
+        f"Icon={icon_value}\n"
         "Terminal=false\n"
         "Categories=AudioVideo;Audio;\n"
         "X-Chopper-Generated=true\n"

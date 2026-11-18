@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Chopper</title>
+  <rect x="2" y="2" width="60" height="60" rx="13" fill="#292B2E"/>
+  <path d="M12 28h5v8h-5zm8-9h5v26h-5zm8 5h5v16h-5zm11-10h5v36h-5zm8 11h5v14h-5z" fill="#D99A64"/>
+</svg>

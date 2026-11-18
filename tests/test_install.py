@@ -37,6 +37,10 @@ def installer_sandbox(tmp_path):
     integrations = Path(__file__).parents[1] / "scripts/install_integrations.py"
     if integrations.exists():
         shutil.copyfile(integrations, project / "scripts/install_integrations.py")
+    icon = Path(__file__).parents[1] / "assets/chopper.svg"
+    if icon.exists():
+        (project / "assets").mkdir()
+        shutil.copyfile(icon, project / "assets/chopper.svg")
     tools = tmp_path / "tools"
     tools.mkdir()
     uv_content = """if [[ "${1:-}" == --version ]]; then
@@ -98,6 +102,7 @@ exit "${CURL_STATUS:-0}"
         "TMPDIR": str(tmp_path),
         "TEST_PYTHON": sys.executable,
         "XDG_DATA_HOME": str(tmp_path / "desktop-data"),
+        "XDG_CONFIG_HOME": str(tmp_path / "config"),
     }
     for key in ("UV_CALLS", "APP_CALLS", "EXTERNAL_CALLS"):
         Path(env[key]).touch()

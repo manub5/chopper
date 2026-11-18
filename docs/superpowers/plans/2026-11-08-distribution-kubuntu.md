@@ -216,7 +216,7 @@ après implémentation et cas complémentaires, 747 tests complets et 77 ciblés
 réussis. Syntaxe Bash, Ruff/mypy/Bandit verts. Menu demandé en premier comme
 historiquement ; relevé local strict, réinstallation sans changement, rollback
 uniquement de l'artefact nouvellement créé. Pas d'écriture réelle dans HOME ni
-profils, aucun push/ZIP ; validation attendue avant tâche 5. Preuve publiée vérifiée
+profils, aucun push/ZIP ; étape validée par l'utilisateur. Preuve publiée vérifiée
 sous descripteur et verrou de projet non bloquant ; cas de remplacements concurrents
 du lien/menu et de deuxième installation couverts sans toucher les objets étrangers.
 
@@ -238,23 +238,29 @@ Ces fonctions utilisent la même preuve et le même relevé que tâche 4. Le men
 généré par le parcours principal est lui aussi enregistré ; ne pas adopter une
 ancienne entrée sur son marqueur seul, vérifier le même lanceur/contenu historique.
 
-- [ ] **1. Rouge :** XDG DESKTOP fictif avec espaces, vrai `.desktop` identique
+- [x] **1. Rouge :** XDG DESKTOP fictif avec espaces, vrai `.desktop` identique
   au menu, droit d'exécution, même SVG référencé. Validation XML/absence de script,
   lien distant et ressource externe ; mêmes couleurs que le design. `xdg-user-dir`
   absent/erreur/retour HOME/vide/relatif : aucune copie improvisée, message clair.
   SVG refusé : Icon générique ; collisions SVG/menu/Bureau préservées. Tester
   XDG_DATA_HOME personnalisé, refus/EOF sans écritures et réinstallation identique.
-- [ ] **2. Vérifier rouge :** `uv run pytest -q tests/test_install_integrations.py tests/test_desktop_install.py tests/test_install.py` ;
+- [x] **2. Vérifier rouge :** `uv run pytest -q tests/test_install_integrations.py tests/test_desktop_install.py tests/test_install.py` ;
   attendu : cas nouveaux rouges, pas d'erreur de fixture.
-- [ ] **3. Implémenter :** confirmations distinctes après affichage des chemins ;
+- [x] **3. Implémenter :** confirmations distinctes après affichage des chemins ;
   résoudre DESKTOP par subprocess sans shell, ne pas créer un Bureau non demandé.
   Copier le Desktop Entry généré, chmod 0755 pour KDE, Icon absolue correctement
   échappée, aucun mécanisme de confiance GNOME inventé. SVG lisible à petite taille,
   sans dépendance au cache KDE. Aucun changement du moteur ou thème de l'application.
-- [ ] **4. Vert :** mêmes tests + suite complète ; vrais desktop-file-validate et
+- [x] **4. Vert :** mêmes tests + suite complète ; vrais desktop-file-validate et
   `gio launch` sur sondes, sans démarrer Chopper ni toucher le compte réel.
-- [ ] **5. Commit :** `Installe une icône et un raccourci Bureau consentis` ;
+- [x] **5. Commit :** `Installe une icône et un raccourci Bureau consentis` ;
   hooks actifs, résultat et validation avant tâche 6.
+
+**Résultat étape 5 :** 21 nouveaux échecs/77 anciens tests verts observés, puis
+108 ciblés et 778 complets réussis. SVG rendu à 16/32/64 px ; vrais consommateurs
+Desktop Entry avec icône et chemins spéciaux. Mise à jour des artefacts propres
+et restauration préallouée testées, dont disque plein rouge puis vert. Aucun
+profil/audio/intégration réel modifié ni archive créée. Validation avant tâche 6.
 
 ### Task 6: Désinstallation conservatrice, archive et recette de mise à jour
 
@@ -307,6 +313,6 @@ consentement, pas de lancement audio utilisateur dans les tests automatisés.
 
 Méthode conservée : native dans cet espace Git isolé, un commit testé puis une
 validation par étape et une revue indépendante finale ; pas d'agent par tâche.
-**État :** extension du plan validée par l'utilisateur ; tâche 4 implémentée et
-testée, validation attendue avant tâche 5. Bureau/SVG/uninstall/archive/recette
-finale restent à livrer, aucune installation réelle dans le compte autorisée.
+**État :** tâche 4 validée ; tâche 5 implémentée et testée, validation attendue
+avant tâche 6 (uninstall/archive/recette et revue finale). Aucune installation
+réelle dans le compte autorisée.
