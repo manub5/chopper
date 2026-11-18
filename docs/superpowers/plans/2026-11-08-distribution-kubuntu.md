@@ -129,3 +129,169 @@ de travail. Essai Kubuntu/KDE/matériel attendu ; aucune intégration ni publica
 ## Auto-revue du plan
 
 Couverture : tâche 1 = dépendances/erreurs/lancement ; tâche 2 = consentement XDG et menu ; tâche 3 = archive/licence/traçabilité/recette cible. Les cinq risques de revue ont chacun des tests attribués. Pas de changement audio ni de publication implicite. Exécution native approuvée et effectuée dans l'espace Git isolé autorisé ; acceptation sur la cible en attente.
+
+## Extension du 18/11/2026 — plan à valider avant implémentation
+
+**Goal:** compléter la même distribution avec commande globale, Bureau, SVG et
+désinstallation conservatrice. **Spec:** addendum du 18/11 dans le design associé.
+**Architecture:** garder Bash pour prérequis/lanceur ; réutiliser la génération
+Desktop Entry, ajouter un outil Python standard de consentement et de suivi des
+artefacts. Tests fictifs pour les comptes utilisateur ; recette réelle consentie.
+
+### Contraintes supplémentaires communes
+
+- Destinations par défaut exactes du design ; XDG absolu, jamais de Bureau en dur.
+- Aucun ajout de dossier dans le compte sans accord à son emplacement ; profils
+  intacts, aucune écriture réelle dans HOME lors des tests.
+- `uninstall.sh` conserve projet, lanceur local, `.venv`, profils, paramètres,
+  caches, audio et exports ; ne retire que les intégrations encore prouvées.
+- Réinstallation/désinstallation répétables ; changement de code seul sans
+  réinstallation. Déplacement du dossier reste une opération distincte.
+- Pas de push/release automatique. Construction éventuelle du ZIP local depuis
+  un commit propre seulement après validation des étapes et de la revue.
+
+### Review Focus de l'extension
+
+1. Lien global exécuté depuis `/tmp`, liens en chaîne et chemins spéciaux : trouver
+   le projet réel, pas `.venv` sous `.local/bin` ; arguments inchangés (tâche 4).
+2. PATH injecté temporairement pour installer uv : ne pas le confondre avec le
+   PATH initial du terminal parent, ne pas modifier `.profile` (tâche 4).
+3. Réinstallation concurrente/collision et relevé illisible ou non enregistrable :
+   ne pas écraser de fichier étranger ni créer une fausse preuve (tâches 4–6).
+4. Bureau XDG absent/désactivé/déplacé, icône refusée ou étrangère : ignorer ou
+   refuser clairement sans déposer dans HOME par défaut (tâche 5).
+5. Artefact modifié/remplacé depuis l'installation, autre copie du projet et
+   nouvelle désinstallation : conserver ce qui n'appartient plus au projet (tâche 6).
+
+### Fichiers et responsabilités
+
+- `install.sh` : PATH initial, lanceur résolvant ses liens, appel de l'intégration.
+- `scripts/install_desktop.py` : génération Desktop Entry existante, option Icon.
+- `scripts/install_integrations.py` (nouveau) : consentements, relevé/propriété,
+  publication sûre des intégrations et désinstallation ; Python standard seul.
+- `assets/chopper.svg` (nouveau) : icône statique anthracite/orange, sans contenu actif.
+- `uninstall.sh` (nouveau) : entrée Bash vers le helper Python, sans uv/Qt.
+- `.gitignore` : exclure `.chopper-install.json`, jamais retirer les règles présentes.
+- `tests/test_install_integrations.py`, `tests/test_uninstall.py` (nouveaux) :
+  artefacts, refus/erreurs et cycle complet ; étendre les tests install/desktop/release.
+- `scripts/build_release.py` : liste blanche explicite des nouveaux scripts/SVG.
+- README, INSTALL_KUBUNTU, FINAL_VALIDATION, HISTORIQUE : consignes et preuves.
+
+### Task 4: Commande globale et preuve de propriété
+
+**Files:** `install.sh`, `.gitignore`, créer `scripts/install_integrations.py` et
+`tests/test_install_integrations.py`, étendre `tests/test_install.py`.
+
+**Interfaces:** `install_integrations(launcher: Path, *, initial_path: str) -> int`
+orchestré par CLI `--launcher PATH --initial-path PATH_VALUE`. Relevé
+`launcher.parent / '.chopper-install.json'`, schéma version 1. Exposer
+`load_receipt(project: Path) -> dict` et
+`install_global_command(launcher: Path, *, home: Path) -> Path` ; les écritures
+de cette dernière supposent le consentement obtenu et mettent à jour le relevé.
+Preuve par rôle/type, cible ou SHA-256, permissions et identité fichier ; ne pas
+confondre un remplacement aux mêmes octets avec le fichier créé auparavant.
+
+- [ ] **1. Rouge :** tests `test_global_symlink_launches_project_from_other_cwd`,
+  `test_launcher_follows_symlink_chain_and_preserves_args` avec espaces/$/% et
+  lanceur factice enregistrant PWD/arguments ; lancer depuis un dossier temporaire,
+  aucun uv au lancement. Refus/EOF : zéro dossier/relevé/lien ; lien étranger,
+  cassé, fichier ordinaire et relevé invalide préservés. Installer uv dans la
+  sandbox avec PATH initial absent : avertissement toujours affiché malgré le
+  PATH modifié dans le processus. Sentinelles `.profile`/`.bashrc` inchangées.
+- [ ] **2. Vérifier rouge :** `uv run pytest -q tests/test_install_integrations.py tests/test_install.py` ;
+  attendu : nouveaux contrats absents, tests historiques toujours exécutés.
+- [ ] **3. Implémenter :** résoudre le lanceur via coreutils avant dirname ; lien
+  symbolique exclusif vers le lanceur absolu, jamais copie. Capturer PATH avant
+  step_uv. Montrer destinations et relevé avant accord, défaut non. Publication
+  sans écrasement d'une destination nouvelle, revalidation des artefacts propres
+  avant actualisation ; erreur de relevé signalée sans faux succès. Pas de
+  modification de profil ; diagnostic de commande masquée par un autre PATH.
+- [ ] **4. Vert :** mêmes tests, `bash -n install.sh`, puis `uv run pytest -q`.
+  Actualiser l'historique avec cas limites, effets et idempotence.
+- [ ] **5. Commit :** `Ajoute une commande globale Chopper après consentement` ;
+  hooks actifs, présenter le résultat et attendre validation avant tâche 5.
+
+### Task 5: Icône dédiée et raccourcis KDE cohérents
+
+**Files:** créer `assets/chopper.svg` ; modifier `scripts/install_integrations.py`,
+`scripts/install_desktop.py`, tests intégrations/desktop/install et docs utilisateur.
+
+**Interfaces:** étendre sans casser les appelants
+`desktop_entry(launcher: Path, icon: Path | None = None) -> str` ; Icon générique
+si None. Ajouter `install_icon(launcher: Path, *, data_home: Path) -> Path` et
+`install_desktop_copy(launcher: Path, *, desktop_dir: Path, icon: Path | None) -> Path`.
+Ces fonctions utilisent la même preuve et le même relevé que tâche 4. Le menu
+généré par le parcours principal est lui aussi enregistré ; ne pas adopter une
+ancienne entrée sur son marqueur seul, vérifier le même lanceur/contenu historique.
+
+- [ ] **1. Rouge :** XDG DESKTOP fictif avec espaces, vrai `.desktop` identique
+  au menu, droit d'exécution, même SVG référencé. Validation XML/absence de script,
+  lien distant et ressource externe ; mêmes couleurs que le design. `xdg-user-dir`
+  absent/erreur/retour HOME/vide/relatif : aucune copie improvisée, message clair.
+  SVG refusé : Icon générique ; collisions SVG/menu/Bureau préservées. Tester
+  XDG_DATA_HOME personnalisé, refus/EOF sans écritures et réinstallation identique.
+- [ ] **2. Vérifier rouge :** `uv run pytest -q tests/test_install_integrations.py tests/test_desktop_install.py tests/test_install.py` ;
+  attendu : cas nouveaux rouges, pas d'erreur de fixture.
+- [ ] **3. Implémenter :** confirmations distinctes après affichage des chemins ;
+  résoudre DESKTOP par subprocess sans shell, ne pas créer un Bureau non demandé.
+  Copier le Desktop Entry généré, chmod 0755 pour KDE, Icon absolue correctement
+  échappée, aucun mécanisme de confiance GNOME inventé. SVG lisible à petite taille,
+  sans dépendance au cache KDE. Aucun changement du moteur ou thème de l'application.
+- [ ] **4. Vert :** mêmes tests + suite complète ; vrais desktop-file-validate et
+  `gio launch` sur sondes, sans démarrer Chopper ni toucher le compte réel.
+- [ ] **5. Commit :** `Installe une icône et un raccourci Bureau consentis` ;
+  hooks actifs, résultat et validation avant tâche 6.
+
+### Task 6: Désinstallation conservatrice, archive et recette de mise à jour
+
+**Files:** créer `uninstall.sh`, `tests/test_uninstall.py` ; modifier helper,
+`scripts/build_release.py`, `tests/test_release.py`, documentation et historique.
+
+**Interfaces:** `uninstall_integrations(project: Path) -> int` dans le helper,
+CLI `--uninstall --project PATH` ; wrapper appelle Python standard, sans .venv.
+Lire seulement le relevé du projet explicite, proposer les artefacts attribuables,
+obtenir l'accord avant unlink ; code non nul si conflit/erreur empêchant le retrait
+complet, compte rendu explicite. Déjà absent = réussite sans action.
+
+- [ ] **1. Rouge :** install/refus uninstall/réinstallation/uninstall/deuxième
+  uninstall, exactement les artefacts créés retirés. Sentinelles projet, lanceur,
+  .venv, profils, cache, settings et exports conservées. Modifier/remplacer fichier
+  ou lien (même contenu/cible), changer le Bureau, appeler depuis une autre copie,
+  casser le relevé et simuler PermissionError : rien d'étranger supprimé. Aucun
+  retrait récursif ni suppression des dossiers parents. Uninstall sans environnement.
+- [ ] **2. Rouge parcours Git :** dépôt/bare remote locaux isolés, installation
+  avec exécutable-sonde, nouveau commit changeant seulement du code, vrai `git pull
+  --ff-only`, puis commande depuis un autre dossier et sondes menu/Bureau : nouvelle
+  sortie, mêmes liens/lanceur/raccourcis, aucun nouvel install. Vérifier la liste
+  blanche du ZIP inclut désinstallateur/helpers/SVG mais pas relevé, secrets ou audio.
+- [ ] **3. Vérifier rouge :** `uv run pytest -q tests/test_uninstall.py tests/test_install_integrations.py tests/test_release.py` ;
+  attendu : nouveaux contrats et ressources manquants.
+- [ ] **4. Implémenter :** suppression après vérification de propriété actuelle,
+  relevé actualisé seulement pour les retraits prouvés ; conserver et signaler les
+  fichiers modifiés et tout relevé encore nécessaire. Liste blanche ZIP explicite,
+  pas d'inclusion large d'assets/données. Aucune désinstallation d'uv/paquets système.
+- [ ] **5. Vert :** tests ciblés, `bash -n install.sh uninstall.sh`, suite complète,
+  Ruff lint/format, mypy, Bandit et `git diff --check`. Ajouter références officielles
+  PATH/KDE/XDG et consignes de profil non modifié aux docs anglaises.
+- [ ] **6. Commit/revue :** `Ajoute une désinstallation conservatrice des intégrations` ;
+  hooks actifs puis une revue indépendante unique de l'extension, correctifs rouges
+  puis verts si nécessaires. Aucune modification des hooks existants.
+- [ ] **7. Recette/livraison :** uniquement après consentement aux destinations
+  réelles, installation puis `cd /tmp && chopper`, menu KDE et icône Bureau. Distinguer
+  tests de sondes de l'observation réelle des clics. Vérifier code seul par Git dans
+  la sandbox ; ne pas faire un pull artificiel dans le projet utilisateur. ZIP local
+  depuis commit propre si approuvé ; ni publication ni release automatique.
+
+### Auto-revue et passage à l'exécution
+
+Les tâches 4/5/6 partagent le relevé et la propriété : tests de collisions et
+d'erreur de relevé dans 4, ressources/Desktop Entry dans 5, retraits et Git dans 6.
+Les cinq risques supplémentaires ont chacun un test attribué ci-dessus. Les API
+historiques restent appelables ; les fixtures d'install doivent copier les nouveaux
+helpers et le SVG dans leur seul projet temporaire. Pas d'intégration réelle avant
+consentement, pas de lancement audio utilisateur dans les tests automatisés.
+
+Méthode conservée : native dans cet espace Git isolé, un commit testé puis une
+validation par étape et une revue indépendante finale ; pas d'agent par tâche.
+**État :** portée de désinstallation et approche acceptées ; extension du plan
+rédigée, en attente de validation avant implémentation.
