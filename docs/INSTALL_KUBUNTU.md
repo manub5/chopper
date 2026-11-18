@@ -140,6 +140,14 @@ clean up samples, settings or old application folders.
   error explicitly warns that further automatic changes will be refused safely.
   Parent folders created after consent may remain after an error; no recursive
   cleanup of user folders is performed.
+- Updates and removals first move the actual destination into a private holding
+  folder, check its identity there, then publish without overwriting another name.
+  A last-moment replacement is restored without overwriting any new file. If a
+  conflict prevents restoration, the error gives the exact `.chopper-held-*` or
+  `.chopper-rollback-*` recovery path. Keep that folder and resolve the conflict
+  before retrying; do not broadly delete hidden integration folders. Safe changes
+  require Linux `renameat2(RENAME_NOREPLACE)` support; an unsupported filesystem
+  reports an error instead of falling back to an unsafe replacement.
 - A path containing `=` or control characters cannot be used for the menu entry;
   choose another application folder. Spaces, apostrophes, dollar signs,
   percentages, quotes, backslashes and accented characters are tested.
@@ -158,6 +166,8 @@ bash uninstall.sh
 Standard Python 3 is enough; `.venv`, Qt and the audio engine need not work.
 The uninstaller reads only this project's `.chopper-install.json`, lists the
 integrations it can still identify, and asks before removing them (default: no).
+Installation holds the project lock for its entire integration-writing phase;
+an overlapping install/uninstall is refused rather than interleaved.
 It removes only the recorded global link, menu/Desktop shortcuts and SVG that
 still match their recorded identity, parent, content/target and permissions.
 A modified or recreated file/link is preserved and reported, even if identical.

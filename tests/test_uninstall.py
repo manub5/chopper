@@ -147,14 +147,14 @@ def test_missing_artifacts_are_successfully_pruned(installed, monkeypatch):
 def test_permission_error_keeps_receipt_for_failed_removal(installed, monkeypatch):
     tool, project, _, paths = installed
     failed = paths[0]
-    unlink = Path.unlink
+    capture = tool._rename_no_replace
 
-    def deny(path, *args, **kwargs):
+    def deny(path, destination):
         if path == failed:
             raise PermissionError("denied sentinel")
-        return unlink(path, *args, **kwargs)
+        return capture(path, destination)
 
-    monkeypatch.setattr(Path, "unlink", deny)
+    monkeypatch.setattr(tool, "_rename_no_replace", deny)
     confirm(monkeypatch)
     assert tool.uninstall_integrations(project) != 0
     assert failed.is_file()
@@ -232,3 +232,43 @@ def test_receipt_write_failure_is_reported_and_retry_is_safe(installed, monkeypa
     assert tool.uninstall_integrations(project) != 0
     assert paths[0].read_text() == "modified entry"
     assert set(tool.load_receipt(project)["artifacts"]) == {"menu"}
+
+
+def test_last_moment_replacement_before_removal_is_preserved(installed, tmp_path, monkeypatch):
+    tool, project, _, paths = installed
+    entry = paths[0]
+    unlink = Path.unlink
+    rename = tool.os.rename
+    injected = False
+
+    def inject():
+        nonlocal injected
+        if not injected:
+            injected = True
+            rename(entry, tmp_path / "saved-entry")
+            entry.write_text("foreign removal sentinel")
+
+    def race_unlink(path, *args, **kwargs):
+        if path == entry:
+            inject()
+        return unlink(path, *args, **kwargs)
+
+    def race_rename(source, destination, *args, **kwargs):
+        if Path(source) == entry:
+            inject()
+        return rename(source, destination, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", race_unlink)
+    monkeypatch.setattr(tool.os, "rename", race_rename)
+    if hasattr(tool, "_rename_no_replace"):
+        no_replace = tool._rename_no_replace
+
+        def race_capture(source, destination):
+            if source == entry:
+                inject()
+            return no_replace(source, destination)
+
+        monkeypatch.setattr(tool, "_rename_no_replace", race_capture)
+    confirm(monkeypatch)
+    assert tool.uninstall_integrations(project) != 0
+    assert injected and entry.read_text() == "foreign removal sentinel"

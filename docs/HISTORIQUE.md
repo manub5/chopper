@@ -6,6 +6,35 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 18/11/2026 — Revue finale de l'extension Kubuntu : concurrence
+
+- Revue indépendante unique de `3c02cf3..69692d7` : deux anomalies importantes
+  reproduites avant correction. Un remplacement entre contrôle et opération
+  destructive pouvait être écrasé/supprimé ; un désinstallateur pouvait s'intercaler
+  entre deux intégrations d'une même installation et produire un faux succès.
+- Capture privée de l'objet réel avant toute suppression/mise à jour/retrait de
+  relevé ; vérification après déplacement, suppression seulement dans cet espace
+  privé. Publication et restauration sans écrasement via primitives exclusives,
+  `renameat2(RENAME_NOREPLACE)` Linux documenté officiellement. Pas de fallback
+  destructeur sur système de fichiers non compatible. Si restauration impossible,
+  objet/sauvegarde conservé et chemin de récupération affiché, pas d'effacement
+  récursif. Étendre le traitement au rollback et à la sauvegarde du relevé.
+- Un verrou couvre désormais toute la phase de mutation des quatre intégrations,
+  avec helpers internes sans reprise du verrou. Test d'un véritable second processus
+  de désinstallation entre commande globale et Bureau : rejet, résultat cohérent.
+- Tests rouges puis verts : remplacement à l'opération de mise à jour et de retrait,
+  entrelacement install/uninstall ; cas complémentaire de conflit de restauration
+  préserve le fichier étranger ET la sauvegarde originale. Une seule passe de
+  correctifs, pas de deuxième revue déléguée.
+- Vérification : 159 tests ciblés et 800 complets réussis ; Ruff lint/format, mypy,
+  Bandit (avertissements historiques), syntaxe Bash et diff verts. Régressions :
+  installateur, vrais consommateurs Desktop Entry, retrait, Git local et suite
+  audio/interface. Limites : concurrence ordonnée au dernier instant, disque plein,
+  conflits de reprise et processus concurrent, aucune intégration du compte réel.
+- Mineur différé : diagnostic PATH inutile si `~/.local/bin` est lui-même un lien
+  symbolique ; commande fonctionnelle, pas de fichier/profil modifié. Recette KDE,
+  matériel audio, NAS représentatif et ZIP final non exécutés ni présumés validés.
+
 ## 18/11/2026 — Extension Kubuntu, étape 6 : retrait conservateur et archive préparée
 
 - `bash uninstall.sh` utilise Python standard, sans dépendre de `.venv`, Qt ou

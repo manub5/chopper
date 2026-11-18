@@ -421,7 +421,9 @@ def test_real_git_pull_updates_command_menu_and_desktop_without_reinstall(instal
         "import os\nfrom pathlib import Path\n"
         "Path(os.environ['CHOPPER_PROBE_OUTPUT']).write_text('version-one')\n"
     )
-    (project / ".gitignore").write_text(".venv/\n.chopper-install.json\n/chopper\n")
+    (project / ".gitignore").write_text(
+        ".env\n*.key\n*.pem\nbuild/\ndist/\n.venv/\n.chopper-install.json\n/chopper\n"
+    )
     git_env = {key: value for key, value in env.items() if not key.startswith("GIT_")}
     git_env.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull)
 

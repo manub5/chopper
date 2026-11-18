@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
 import fcntl
 import hashlib
 import json
@@ -13,7 +14,7 @@ import subprocess
 import sys
 import tempfile
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 
 from install_desktop import desktop_entry
@@ -163,6 +164,70 @@ def load_receipt(project: Path) -> dict:
     return _read_receipt(_absolute(project).resolve(strict=True))[0]
 
 
+def _rename_no_replace(source: Path, destination: Path) -> None:
+    """Linux renameat2(RENAME_NOREPLACE): never replace a concurrently created name."""
+    try:
+        rename = ctypes.CDLL(None, use_errno=True).renameat2
+    except AttributeError as error:
+        raise OSError("Safe integration changes require Linux renameat2 support.") from error
+    rename.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+    rename.restype = ctypes.c_int
+    source_fd = os.open(source.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        destination_fd = os.open(destination.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            if rename(source_fd, os.fsencode(source.name), destination_fd, os.fsencode(destination.name), 1):
+                error_number = ctypes.get_errno()
+                raise OSError(error_number, os.strerror(error_number), str(destination))
+        finally:
+            os.close(destination_fd)
+    finally:
+        os.close(source_fd)
+
+
+@contextmanager
+def _quarantine_owned(path: Path, expected: dict) -> Iterator[Path]:
+    """Check the actual moved object privately before deleting it, not its public name."""
+    directory = Path(tempfile.mkdtemp(prefix=".chopper-held-", dir=path.parent))
+    held = directory / "artifact"
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(path, os.O_PATH | os.O_NOFOLLOW)
+        owned = os.fstat(descriptor)
+        if _stamp(path) != expected or (owned.st_dev, owned.st_ino, owned.st_ctime_ns) != (
+            expected["device"],
+            expected["inode"],
+            expected["ctime_ns"],
+        ):
+            raise FileExistsError(f"Integration changed before capture: {path}")
+        _rename_no_replace(path, held)
+        moved = _stamp(held)
+        # Rename changes ctime and location. Identity, bytes/target and mode must still match.
+        keys = set(expected) - {"path", "parent", "ctime_ns"}
+        if moved is None or any(moved[key] != expected[key] for key in keys):
+            raise FileExistsError(f"Foreign replacement captured, not removed: {path}")
+        yield held
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        try:
+            if os.path.lexists(held):
+                try:
+                    _rename_no_replace(held, path)
+                except OSError as error:
+                    raise FileExistsError(
+                        f"Destination occupied or recovery failed; preserved captured object at {held}"
+                    ) from error
+        finally:
+            if not os.path.lexists(held):
+                directory.rmdir()
+
+
+def _remove_owned(path: Path, expected: dict) -> None:
+    with _quarantine_owned(path, expected) as held:
+        held.unlink()
+
+
 def _publish_bytes(path: Path, content: bytes, mode: int, expected: dict | None) -> dict:
     """Publish new files exclusively; only replace an unchanged owned object."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -177,24 +242,25 @@ def _publish_bytes(path: Path, content: bytes, mode: int, expected: dict | None)
             temporary.chmod(mode)
             if _stamp(path) != expected:
                 raise FileExistsError(f"Destination changed during installation: {path}")
-            if expected is None:
+            capture = _quarantine_owned(path, expected) if expected is not None else nullcontext(None)
+            with capture as held:
                 os.link(temporary, path)
-            else:
-                os.replace(temporary, path)
-            temporary.unlink(missing_ok=True)
-            created = _stamp(path)
-            owned = os.fstat(stream.fileno())
-            if (
-                created is None
-                or created["type"] != "file"
-                or created["device"] != owned.st_dev
-                or created["inode"] != owned.st_ino
-                or created["ctime_ns"] != owned.st_ctime_ns
-                or created["mode"] != mode
-                or created["sha256"] != hashlib.sha256(content).hexdigest()
-            ):
-                raise FileExistsError(f"File changed during publication; preserving it: {path}")
-            return created
+                temporary.unlink(missing_ok=True)
+                created = _stamp(path)
+                owned = os.fstat(stream.fileno())
+                if (
+                    created is None
+                    or created["type"] != "file"
+                    or created["device"] != owned.st_dev
+                    or created["inode"] != owned.st_ino
+                    or created["ctime_ns"] != owned.st_ctime_ns
+                    or created["mode"] != mode
+                    or created["sha256"] != hashlib.sha256(content).hexdigest()
+                ):
+                    raise FileExistsError(f"File changed during publication; preserving it: {path}")
+                if held is not None:
+                    held.unlink()
+                return created
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
@@ -208,7 +274,7 @@ def _save_receipt(project: Path, data: dict, expected: dict | None) -> None:
 
 def _rollback_created(path: Path, created: dict) -> None:
     if _stamp(path) == created:
-        path.unlink()
+        _remove_owned(path, created)
 
 
 def install_global_command(launcher: Path, *, home: Path) -> Path:
@@ -267,14 +333,18 @@ def _install_global_command(launcher: Path, *, home: Path) -> Path:
 def _install_menu(launcher: Path, data_home: Path, icon: Path | None = None) -> Path:
     launcher = _absolute(launcher).resolve(strict=True)
     with _project_lock(launcher.parent):
-        return _install_file(
-            launcher,
-            "menu",
-            _absolute(data_home) / "applications/chopper.desktop",
-            desktop_entry(launcher, icon).encode(),
-            0o644,
-            legacy=desktop_entry(launcher).encode(),
-        )
+        return _install_menu_locked(launcher, data_home, icon)
+
+
+def _install_menu_locked(launcher: Path, data_home: Path, icon: Path | None) -> Path:
+    return _install_file(
+        launcher,
+        "menu",
+        _absolute(data_home) / "applications/chopper.desktop",
+        desktop_entry(launcher, icon).encode(),
+        0o644,
+        legacy=desktop_entry(launcher).encode(),
+    )
 
 
 def _install_file(
@@ -318,13 +388,15 @@ def _install_file(
                     owned.st_ino,
                 ):
                     raise FileExistsError("Rollback backup changed; refusing to use it.") from None
-                os.replace(saved, destination)
-                restored = _stamp(destination)
-                if restored is None or (restored["device"], restored["inode"]) != (
-                    owned.st_dev,
-                    owned.st_ino,
-                ):
-                    raise FileExistsError("Restored entry changed concurrently; preserving it.") from None
+                with _quarantine_owned(destination, current) as displaced:
+                    _rename_no_replace(saved, destination)
+                    restored = _stamp(destination)
+                    if restored is None or (restored["device"], restored["inode"]) != (
+                        owned.st_dev,
+                        owned.st_ino,
+                    ):
+                        raise FileExistsError("Restored entry changed concurrently; preserving it.") from None
+                    displaced.unlink()
                 if previous is None:
                     data["artifacts"].pop(role)
                 else:
@@ -347,38 +419,55 @@ def _restore_point(path: Path, content: bytes | None, mode: int) -> Iterator[tup
     if content is None:
         yield None
         return
-    with tempfile.TemporaryDirectory(prefix=".chopper-rollback-", dir=path.parent) as directory:
-        saved = Path(directory) / "original"
+    directory = Path(tempfile.mkdtemp(prefix=".chopper-rollback-", dir=path.parent))
+    saved = directory / "original"
+    try:
         with saved.open("xb") as stream:
             stream.write(content)
             stream.flush()
             saved.chmod(mode)
             yield saved, stream.fileno()
+        saved.unlink(missing_ok=True)
+    except BaseException as error:
+        if os.path.lexists(saved):
+            raise OSError(f"Integration change failed; original content preserved at {saved}") from error
+        raise
+    finally:
+        if not os.path.lexists(saved):
+            directory.rmdir()
 
 
 def install_icon(launcher: Path, *, data_home: Path) -> Path:
     launcher = _absolute(launcher).resolve(strict=True)
     desktop_entry(launcher)
-    content = (launcher.parent / "assets/chopper.svg").read_bytes()
     with _project_lock(launcher.parent):
-        return _install_file(
-            launcher, "icon", _absolute(data_home) / "icons/hicolor/scalable/apps/chopper.svg", content, 0o644
-        )
+        return _install_icon_locked(launcher, data_home)
+
+
+def _install_icon_locked(launcher: Path, data_home: Path) -> Path:
+    content = (launcher.parent / "assets/chopper.svg").read_bytes()
+    return _install_file(
+        launcher, "icon", _absolute(data_home) / "icons/hicolor/scalable/apps/chopper.svg", content, 0o644
+    )
 
 
 def install_desktop_copy(launcher: Path, *, desktop_dir: Path, icon: Path | None) -> Path:
     launcher = _absolute(launcher).resolve(strict=True)
+    with _project_lock(launcher.parent):
+        return _install_desktop_copy_locked(launcher, desktop_dir, icon)
+
+
+def _install_desktop_copy_locked(launcher: Path, desktop_dir: Path, icon: Path | None) -> Path:
     desktop_dir = _absolute(desktop_dir)
     if not desktop_dir.is_dir() or desktop_dir.resolve() == Path.home().resolve():
         raise ValueError("Desktop directory must exist and differ from HOME.")
-    with _project_lock(launcher.parent):
-        return _install_file(
-            launcher,
-            "desktop",
-            desktop_dir / "chopper.desktop",
-            desktop_entry(launcher, icon).encode(),
-            0o755,
-        )
+    return _install_file(
+        launcher,
+        "desktop",
+        desktop_dir / "chopper.desktop",
+        desktop_entry(launcher, icon).encode(),
+        0o755,
+    )
 
 
 def _desktop_directory(home: Path) -> Path | None:
@@ -442,25 +531,28 @@ def install_integrations(launcher: Path, *, initial_path: str) -> int:
         project,
         "Create or update the executable KDE Desktop shortcut there?",
     )
-    icon = install_icon(launcher, data_home=data_home) if want_icon else None
-    print(
-        f"Icon installed: {icon}" if icon else "Dedicated icon skipped; shortcuts use the generic audio icon."
-    )
-    if want_menu:
-        print(f"Menu entry installed: {_install_menu(launcher, data_home, icon)}")
-    else:
-        print("Menu entry skipped. You can still start ./chopper.")
-    if want_command:
-        print(f"Global command installed: {install_global_command(launcher, home=home)}")
-        _report_path(home, initial_path, command)
-    else:
-        print("Global command skipped. You can still start ./chopper.")
-    if want_desktop:
-        assert desktop_dir is not None
-        installed = install_desktop_copy(launcher, desktop_dir=desktop_dir, icon=icon)
-        print(f"Desktop shortcut installed: {installed}")
-    else:
-        print("Desktop shortcut skipped. No Desktop folder was created.")
+    with _project_lock(project):
+        icon = _install_icon_locked(launcher, data_home) if want_icon else None
+        print(
+            f"Icon installed: {icon}"
+            if icon
+            else "Dedicated icon skipped; shortcuts use the generic audio icon."
+        )
+        if want_menu:
+            print(f"Menu entry installed: {_install_menu_locked(launcher, data_home, icon)}")
+        else:
+            print("Menu entry skipped. You can still start ./chopper.")
+        if want_command:
+            print(f"Global command installed: {_install_global_command(launcher, home=home)}")
+            _report_path(home, initial_path, command)
+        else:
+            print("Global command skipped. You can still start ./chopper.")
+        if want_desktop:
+            assert desktop_dir is not None
+            installed = _install_desktop_copy_locked(launcher, desktop_dir, icon)
+            print(f"Desktop shortcut installed: {installed}")
+        else:
+            print("Desktop shortcut skipped. No Desktop folder was created.")
     return 0
 
 
@@ -522,7 +614,7 @@ def _uninstall_locked(project: Path) -> int:
             if current is not None:
                 if current != record:
                     raise FileExistsError("Integration changed while awaiting removal")
-                path.unlink()
+                _remove_owned(path, record)
                 print(f"Removed: {path}")
             del data["artifacts"][role]
         except (OSError, ValueError) as error:
@@ -536,7 +628,7 @@ def _uninstall_locked(project: Path) -> int:
     else:
         if _stamp(receipt) != receipt_before:
             raise FileExistsError("Receipt changed; preserving it.")
-        receipt.unlink()
+        _remove_owned(receipt, receipt_before)
         print(f"Removed unused receipt: {receipt}")
     return int(conflicts)
 

@@ -555,3 +555,110 @@ def test_failed_receipt_update_restores_without_allocating_another_file(installa
     with pytest.raises(OSError):
         tool._install_menu(launcher, data, icon=icon)
     assert entry.read_bytes() == old
+
+
+def test_public_replacement_at_destructive_operation_is_preserved(installation, tmp_path, monkeypatch):
+    launcher, _, data = installation
+    tool = integration_tool(monkeypatch)
+    copy_icon_source(launcher)
+    entry = tool._install_menu(launcher, data)
+    icon = tool.install_icon(launcher, data_home=data)
+    replace = tool.os.replace
+    rename = tool.os.rename
+    injected = False
+
+    def inject():
+        nonlocal injected
+        if not injected:
+            injected = True
+            rename(entry, tmp_path / "saved-menu")
+            entry.write_text("foreign last-moment sentinel")
+
+    def race_replace(source, destination, *args, **kwargs):
+        if Path(destination) == entry:
+            inject()
+        return replace(source, destination, *args, **kwargs)
+
+    def race_rename(source, destination, *args, **kwargs):
+        if Path(source) == entry:
+            inject()
+        return rename(source, destination, *args, **kwargs)
+
+    monkeypatch.setattr(tool.os, "replace", race_replace)
+    monkeypatch.setattr(tool.os, "rename", race_rename)
+    if hasattr(tool, "_rename_no_replace"):
+        no_replace = tool._rename_no_replace
+
+        def race_capture(source, destination):
+            if source == entry:
+                inject()
+            return no_replace(source, destination)
+
+        monkeypatch.setattr(tool, "_rename_no_replace", race_capture)
+    with pytest.raises((OSError, ValueError)):
+        tool._install_menu(launcher, data, icon=icon)
+    assert injected and entry.read_text() == "foreign last-moment sentinel"
+
+
+def test_whole_installation_blocks_interleaved_uninstall(installation, tmp_path, monkeypatch):
+    launcher, home, data = installation
+    copy_icon_source(launcher)
+    desktop = tmp_path / "Desktop"
+    desktop.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("XDG_DATA_HOME", str(data))
+    tool = integration_tool(monkeypatch)
+    monkeypatch.setattr(tool, "_confirm", lambda *args: True)
+    monkeypatch.setattr(tool, "_desktop_directory", lambda *args: desktop)
+    attempts = []
+    report = tool._report_path
+
+    def uninstall_after_command(*args):
+        report(*args)
+        result = subprocess.run(
+            [sys.executable, str(HELPER), "--uninstall", "--project", str(launcher.parent)],
+            input="y\n",
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=10,
+        )
+        attempts.append(result)
+
+    monkeypatch.setattr(tool, "_report_path", uninstall_after_command)
+    assert tool.install_integrations(launcher, initial_path="/usr/bin:/bin") == 0
+    assert len(attempts) == 1 and attempts[0].returncode != 0
+    receipt = tool.load_receipt(launcher.parent)
+    assert set(receipt["artifacts"]) == {"menu", "icon", "global-command", "desktop"}
+    assert all(tool._stamp(Path(record["path"])) == record for record in receipt["artifacts"].values())
+
+
+def test_rollback_conflict_preserves_foreign_file_and_original_backup(installation, tmp_path, monkeypatch):
+    launcher, _, data = installation
+    tool = integration_tool(monkeypatch)
+    copy_icon_source(launcher)
+    entry = tool._install_menu(launcher, data)
+    old = entry.read_bytes()
+    icon = tool.install_icon(launcher, data_home=data)
+    failed = False
+    capture = tool._rename_no_replace
+
+    def fail_receipt(*args):
+        nonlocal failed
+        failed = True
+        raise PermissionError("receipt unavailable")
+
+    def race_capture(source, destination):
+        if failed and source == entry:
+            # Replace precisely at the rollback capture boundary.
+            os.rename(entry, tmp_path / "new-chopper-entry")
+            entry.write_text("foreign rollback sentinel")
+        return capture(source, destination)
+
+    monkeypatch.setattr(tool, "_save_receipt", fail_receipt)
+    monkeypatch.setattr(tool, "_rename_no_replace", race_capture)
+    with pytest.raises((OSError, ValueError)):
+        tool._install_menu(launcher, data, icon=icon)
+    assert entry.read_text() == "foreign rollback sentinel"
+    backups = list(entry.parent.glob(".chopper-rollback-*/original"))
+    assert any(path.read_bytes() == old for path in backups)

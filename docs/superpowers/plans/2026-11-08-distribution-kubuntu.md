@@ -293,7 +293,7 @@ complet, compte rendu explicite. Déjà absent = réussite sans action.
 - [x] **5. Vert :** tests ciblés, `bash -n install.sh uninstall.sh`, suite complète,
   Ruff lint/format, mypy, Bandit et `git diff --check`. Ajouter références officielles
   PATH/KDE/XDG et consignes de profil non modifié aux docs anglaises.
-- [ ] **6. Commit/revue :** `Ajoute une désinstallation conservatrice des intégrations` ;
+- [x] **6. Commit/revue :** `Ajoute une désinstallation conservatrice des intégrations` ;
   hooks actifs puis une revue indépendante unique de l'extension, correctifs rouges
   puis verts si nécessaires. Aucune modification des hooks existants.
 - [ ] **7. Recette/livraison :** uniquement après consentement aux destinations
@@ -319,5 +319,7 @@ consentement, pas de lancement audio utilisateur dans les tests automatisés.
 
 Méthode conservée : native dans cet espace Git isolé, un commit testé puis une
 validation par étape et une revue indépendante finale ; pas d'agent par tâche.
-**État :** tâches 4/5 validées ; tâche 6 implémentée et testée. Revue indépendante
-finale à suivre. Recette réelle et création du ZIP attendent un accord séparé.
+**État :** tâches 4/5 validées ; tâche 6 et revue indépendante effectuées. Deux
+anomalies importantes corrigées en une passe avec preuves rouges/vertes ; 800 tests
+complets et 159 ciblés passent. Mineur différé : avertissement PATH superflu si
+`.local/bin` est un lien. Recette réelle et ZIP attendent un accord séparé.
