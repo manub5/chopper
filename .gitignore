@@ -15,3 +15,6 @@ build/
 
 # Only generated, redistributable synthetic fixtures may be committed.
 !tests/corpus/*.wav
+
+# Local receipt for consented desktop/command integrations, never distributed.
+/.chopper-install.json

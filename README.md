@@ -43,6 +43,23 @@ never overwritten. See [Kubuntu installation and first-run checks](docs/INSTALL_
 for details, retry instructions and shortcut removal. Kubuntu 26.04.1 is the
 initial target, not yet a claim of verified compatibility on a clean machine.
 
+The installer then offers an optional global command:
+`~/.local/bin/chopper` is a **symbolic link** to this folder's `./chopper`, not a
+copy. After accepting it, you can run `chopper` from another directory. The
+launcher resolves its links and uses this project's environment without running uv.
+Keep the project folder in place so future code updates use the same launcher.
+
+The exact destinations and the local `.chopper-install.json` ownership receipt
+are shown before consent. Keep this receipt: it identifies the integrations this
+installation owns. Foreign or modified files/links are not replaced, even when
+they have the same name or target. The receipt is not tracked or distributed.
+
+If `~/.local/bin` was absent from the terminal's initial PATH, installation prints
+instructions. Ubuntu's default profile adds the directory at login when it exists;
+log out and back in, or use `export PATH="$HOME/.local/bin:$PATH"` in the current
+terminal only. No profile files are edited. A different `chopper` command earlier
+on PATH is reported rather than overwritten.
+
 ## Manual installation
 
 With uv and the system audio packages already installed:

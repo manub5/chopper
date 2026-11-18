@@ -34,6 +34,9 @@ def installer_sandbox(tmp_path):
     if helper.exists():
         (project / "scripts").mkdir()
         shutil.copyfile(helper, project / "scripts/install_desktop.py")
+    integrations = Path(__file__).parents[1] / "scripts/install_integrations.py"
+    if integrations.exists():
+        shutil.copyfile(integrations, project / "scripts/install_integrations.py")
     tools = tmp_path / "tools"
     tools.mkdir()
     uv_content = """if [[ "${1:-}" == --version ]]; then
@@ -339,3 +342,61 @@ def test_installer_propagates_desktop_error_without_losing_local_launcher(instal
     assert "Done." not in result.stdout
     assert (project / "chopper").is_file()
     assert Path(env["XDG_DATA_HOME"]).read_text() == "foreign file sentinel"
+
+
+def test_global_symlink_launches_project_from_other_cwd(installer_sandbox, tmp_path):
+    project, env = installer_sandbox
+    result = run_installer(project, env, answers="n\ny\n")
+    assert result.returncode == 0, result.stderr
+    link = Path(env["HOME"]) / ".local/bin/chopper"
+    assert link.is_symlink() and os.readlink(link) == str(project / "chopper")
+    Path(env["UV_CALLS"]).write_text("")
+    subprocess.run(
+        [str(link), "--probe", "argument $ with % spaces"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        check=True,
+        timeout=10,
+    )
+    assert Path(env["APP_CALLS"]).read_text().splitlines() == [
+        str(project),
+        "--probe",
+        "argument $ with % spaces",
+    ]
+    assert Path(env["UV_CALLS"]).read_text() == ""
+
+
+def test_launcher_follows_symlink_chain_and_preserves_args(installer_sandbox, tmp_path):
+    project, env = installer_sandbox
+    assert run_installer(project, env).returncode == 0
+    second = tmp_path / "second link"
+    second.symlink_to(project / "chopper")
+    first = tmp_path / "first link"
+    first.symlink_to(second.name)
+    Path(env["UV_CALLS"]).write_text("")
+    subprocess.run(
+        [str(first), "arg with spaces", "x$y%z"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        check=True,
+        timeout=10,
+    )
+    assert Path(env["APP_CALLS"]).read_text().splitlines() == [str(project), "arg with spaces", "x$y%z"]
+    assert Path(env["UV_CALLS"]).read_text() == ""
+
+
+def test_path_warning_uses_parent_path_before_uv_bootstrap(installer_sandbox):
+    project, env = installer_sandbox
+    home = Path(env["HOME"])
+    (home / ".profile").write_text("profile sentinel\n")
+    (home / ".bashrc").write_text("bashrc sentinel\n")
+    (Path(env["PATH"].split(":")[0]) / "uv").unlink()
+    result = run_installer(project, env, answers="y\nn\ny\n")
+    assert result.returncode == 0, result.stderr
+    assert (home / ".local/bin/chopper").is_symlink()
+    assert "not in the initial PATH" in result.stdout
+    assert 'export PATH="$HOME/.local/bin:$PATH"' in result.stdout
+    assert (home / ".profile").read_text() == "profile sentinel\n"
+    assert (home / ".bashrc").read_text() == "bashrc sentinel\n"

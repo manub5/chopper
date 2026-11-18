@@ -191,25 +191,39 @@ de cette dernière supposent le consentement obtenu et mettent à jour le relev�
 Preuve par rôle/type, cible ou SHA-256, permissions et identité fichier ; ne pas
 confondre un remplacement aux mêmes octets avec le fichier créé auparavant.
 
-- [ ] **1. Rouge :** tests `test_global_symlink_launches_project_from_other_cwd`,
+- [x] **1. Rouge :** tests `test_global_symlink_launches_project_from_other_cwd`,
   `test_launcher_follows_symlink_chain_and_preserves_args` avec espaces/$/% et
   lanceur factice enregistrant PWD/arguments ; lancer depuis un dossier temporaire,
   aucun uv au lancement. Refus/EOF : zéro dossier/relevé/lien ; lien étranger,
   cassé, fichier ordinaire et relevé invalide préservés. Installer uv dans la
   sandbox avec PATH initial absent : avertissement toujours affiché malgré le
   PATH modifié dans le processus. Sentinelles `.profile`/`.bashrc` inchangées.
-- [ ] **2. Vérifier rouge :** `uv run pytest -q tests/test_install_integrations.py tests/test_install.py` ;
+- [x] **2. Vérifier rouge :** `uv run pytest -q tests/test_install_integrations.py tests/test_install.py` ;
   attendu : nouveaux contrats absents, tests historiques toujours exécutés.
-- [ ] **3. Implémenter :** résoudre le lanceur via coreutils avant dirname ; lien
+- [x] **3. Implémenter :** résoudre le lanceur via coreutils avant dirname ; lien
   symbolique exclusif vers le lanceur absolu, jamais copie. Capturer PATH avant
   step_uv. Montrer destinations et relevé avant accord, défaut non. Publication
   sans écrasement d'une destination nouvelle, revalidation des artefacts propres
   avant actualisation ; erreur de relevé signalée sans faux succès. Pas de
   modification de profil ; diagnostic de commande masquée par un autre PATH.
-- [ ] **4. Vert :** mêmes tests, `bash -n install.sh`, puis `uv run pytest -q`.
+- [x] **4. Vert :** mêmes tests, `bash -n install.sh`, puis `uv run pytest -q`.
   Actualiser l'historique avec cas limites, effets et idempotence.
-- [ ] **5. Commit :** `Ajoute une commande globale Chopper après consentement` ;
+- [x] **5. Commit :** `Ajoute une commande globale Chopper après consentement` ;
   hooks actifs, présenter le résultat et attendre validation avant tâche 5.
+
+**Résultat étape 4 :** 22 nouveaux échecs constatés, 24 tests historiques verts ;
+après implémentation et cas complémentaires, 747 tests complets et 77 ciblés
+réussis. Syntaxe Bash, Ruff/mypy/Bandit verts. Menu demandé en premier comme
+historiquement ; relevé local strict, réinstallation sans changement, rollback
+uniquement de l'artefact nouvellement créé. Pas d'écriture réelle dans HOME ni
+profils, aucun push/ZIP ; validation attendue avant tâche 5. Preuve publiée vérifiée
+sous descripteur et verrou de projet non bloquant ; cas de remplacements concurrents
+du lien/menu et de deuxième installation couverts sans toucher les objets étrangers.
+
+Relevé produit pour tâches 5/6 : clés `schema_version`, `project`, `artifacts` ;
+chaque rôle contient `path`, `parent`, `type`, `device`, `inode`, `ctime_ns`, `mode`,
+et `target` (lien) ou `sha256` (fichier). Réutiliser `_project_lock(project)` lors
+des mutations d'installation/désinstallation ; aucun fichier de verrou créé.
 
 ### Task 5: Icône dédiée et raccourcis KDE cohérents
 
@@ -293,5 +307,6 @@ consentement, pas de lancement audio utilisateur dans les tests automatisés.
 
 Méthode conservée : native dans cet espace Git isolé, un commit testé puis une
 validation par étape et une revue indépendante finale ; pas d'agent par tâche.
-**État :** portée de désinstallation et approche acceptées ; extension du plan
-rédigée, en attente de validation avant implémentation.
+**État :** extension du plan validée par l'utilisateur ; tâche 4 implémentée et
+testée, validation attendue avant tâche 5. Bureau/SVG/uninstall/archive/recette
+finale restent à livrer, aucune installation réelle dans le compte autorisée.

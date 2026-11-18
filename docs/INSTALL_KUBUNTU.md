@@ -46,11 +46,44 @@ who replaces both files: only accept the pair from a trusted source.
    and entry are only written after you agree. Pressing Enter, answering `n`,
    or reaching the end of input skips the menu entry without failing the local
    installation.
+6. A second optional prompt offers `~/.local/bin/chopper`, linked to this project's
+   launcher. Read its destination and the local `.chopper-install.json` receipt
+   location before agreeing. Declining/EOF creates neither a command nor a receipt
+   for that action. Existing foreign, broken or manually recreated links are
+   refused, even if their target matches the intended launcher.
 
 Once installed, find **Chopper** in KDE's application menu. If you skipped the
 menu entry, open a terminal in the application folder and run `./chopper`.
 The menu entry uses your system's audio application icon; it does not place an
 icon on the desktop or add autostart behavior.
+
+## Run from any folder
+
+If you accepted the global command, try:
+
+```bash
+cd /tmp
+chopper
+```
+
+The global command is a symbolic link, so code updates in the same project
+directory do not require copying a launcher again. Arguments, spaces and special
+characters are preserved; the launcher finds the real project before using `.venv`.
+
+The [official Ubuntu 26.04 profile](https://git.launchpad.net/ubuntu/+source/bash/plain/debian/skel.profile?h=ubuntu/resolute)
+adds `~/.local/bin` at login **if that directory exists**. A session opened before
+its creation may still lack it. The installer checks the original PATH, not a
+temporary PATH it may use while installing uv. If warned, log out and back in.
+For the current terminal only, you may instead run:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+No `.profile`, `.bashrc` or other profile is modified. A customized login setup
+may need a separate, explicitly approved configuration change. If another command
+shadows Chopper earlier on PATH, installation reports that path without changing it.
+You can always use the project's `./chopper` directly.
 
 ## Internet, storage and your audio
 
@@ -60,7 +93,8 @@ An entirely offline first installation or first analysis is not promised.
 
 Keep the application folder: the shortcut points to its launcher and the Python
 environment also depends on that location. For another location, use a fresh
-extraction and run the installer there, then agree to update the menu entry.
+extraction and run the installer there, then deliberately remove the old
+integrations before accepting the new ones.
 Do not simply move the already-installed `.venv` and expect it to work.
 
 Chopper never changes your source audio. Preferences and analysis cache retain
@@ -77,7 +111,10 @@ clean up samples, settings or old application folders.
   is still usable. Fix the reported destination or permission problem, then rerun
   the installer. Do not run it with sudo to work around a home-folder error.
 - The installer refuses an unrelated `./chopper` or `chopper.desktop`, including
-  symbolic links. It only updates its own marked regular files. Move an unrelated
+  symbolic links. The global command accepts only its own recorded symlink. Menu
+  ownership is recorded too; an old menu entry can be adopted only if its exact
+  historical content points to this same launcher, not on its marker alone.
+  Keep `.chopper-install.json` in the project folder. Move an unrelated
   conflicting file yourself only if you know what it is and want to keep it elsewhere.
 - A path containing `=` or control characters cannot be used for the menu entry;
   choose another application folder. Spaces, apostrophes, dollar signs,

@@ -6,6 +6,48 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 18/11/2026 — Extension Kubuntu, étape 4 : commande globale consentie
+
+- Plan d'extension validé ; première étape seulement. Le lanceur résout ses liens
+  symboliques via readlink avant de localiser le projet et `.venv`. Proposer
+  `~/.local/bin/chopper` comme lien vers ce lanceur, jamais comme copie ; lancer
+  depuis un autre dossier et traverser une chaîne de liens reste sans appel uv,
+  avec les arguments spéciaux intacts.
+- Consentement du menu conservé en premier, puis proposition de commande globale,
+  défaut non/EOF. Destinations et `.chopper-install.json` annoncés avant écriture.
+  Relevé privé local au projet, ignoré par Git : schéma, projet, rôle, type, cible
+  ou SHA-256, parent résolu, permissions et identité inode/device/ctime. Fichiers
+  étrangers, liens cassés ou recréés à cible identique refusés ; réinstallation
+  inchangée sans remplacement du lien/relevé.
+- Capturer le PATH avant tout ajout interne pour uv. Avertissement et instructions
+  de reconnexion/export temporaire si `.local/bin` manque ; signaler une commande
+  homonyme prioritaire. Aucun profil modifié. Référence officielle Ubuntu Resolute
+  ajoutée au guide, sans promettre le PATH de toutes les sessions personnalisées.
+- Ancien menu adopté uniquement si contenu historique exact, même lanceur et
+  permissions attendues, pas sur marqueur seul. Échec de sauvegarde du relevé :
+  retirer seulement le nouvel artefact encore prouvé, préserver une entrée
+  préexistante et toute destination étrangère apparue entre-temps. Les dossiers
+  parents créés après accord peuvent rester après échec ; aucun retrait récursif.
+- Rouge observé : 22 échecs nouveaux/24 réussites historiques. Cas complémentaires
+  rouges puis verts : mise à jour d'atime lors d'une simple lecture, échec de
+  relevé après création du menu. Comparaison d'identité hors atime ; rollback
+  réservé aux artefacts de l'invocation, sans toucher l'ancien menu.
+- Trois cas de concurrence rouges puis verts : remplacer le lien ou le menu au
+  moment de sa publication ne doit ni enregistrer ni retirer l'objet étranger ;
+  deux installations du même projet ne doivent pas se marcher dessus. Publication
+  exclusive avec identité vérifiée sur l'objet détenu ouvert, verrou de répertoire
+  Linux non bloquant sans fichier de verrou supplémentaire. Échec annoncé, pas de
+  faux succès, aucun remplacement étranger supprimé pendant le rollback.
+- Vérification : 747 tests complets, 77 ciblés installateur/intégrations/Desktop
+  Entry, Bash -n, Ruff lint/format, mypy et Bandit réussis. Régressions : uv/sudo/
+  dépendances/menus et tous les parcours audio existants ; limites : refus/EOF,
+  collisions, relevé invalide ou concurrent, liens spéciaux et PATH initial.
+- Aucun changement du moteur ni données audio ; pas d'installation réelle dans
+  HOME, pas de profil ni fichiers étrangers modifiés pendant les tests. Liens et
+  relevés répétables sans doublons. Bureau/SVG/uninstall et liste blanche ZIP
+  restent les étapes 5/6 : ne pas livrer une archive intermédiaire de cette étape.
+  Aucun push, ZIP reconstruit ni modification du dossier habituel.
+
 ## 18/11/2026 — Revue finale de la sélection manuelle : poignées et seuil de clic
 
 - Revue indépendante unique de toute la plage du plan, du moteur à l'interface :
