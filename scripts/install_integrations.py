@@ -464,11 +464,96 @@ def install_integrations(launcher: Path, *, initial_path: str) -> int:
     return 0
 
 
+def uninstall_integrations(project: Path) -> int:
+    """Remove only proven integrations, after consent; keep all user/project data."""
+    try:
+        project = _absolute(project).resolve(strict=True)
+        with _project_lock(project):
+            return _uninstall_locked(project)
+    except (OSError, ValueError) as error:
+        print(
+            f"Uninstall error: {error}. Unproven integrations and user data are preserved.", file=sys.stderr
+        )
+        return 1
+
+
+def _uninstall_locked(project: Path) -> int:
+    data, receipt_before = _read_receipt(project)
+    if receipt_before is None:
+        print("No installation receipt; nothing to remove. No files were changed.")
+        return 0
+    receipt = project / RECEIPT_NAME
+    removable = []
+    absent = []
+    conflicts = False
+    print(f"Project: {project}\nOwnership receipt: {receipt}")
+    print("Project, local launcher, .venv, uv, system packages, profiles, settings, cache and audio stay.")
+    for role, record in data["artifacts"].items():
+        path = Path(record["path"])
+        try:
+            current = _stamp(path)
+            if current is None:
+                absent.append(role)
+                print(f"Already absent: {path}")
+            elif current == record:
+                removable.append(role)
+                print(f"Proven integration to remove: {path}")
+            else:
+                raise ValueError("identity, parent, content or permissions changed")
+        except (OSError, ValueError) as error:
+            conflicts = True
+            print(f"Preserved {role}: {path} ({error})", file=sys.stderr)
+    print("No parent folders will be removed. The receipt is removed only if no artifacts remain.")
+    try:
+        agreed = input("Remove the proven integrations and update their receipt? [y/N] ").strip().lower()
+    except EOFError:
+        agreed = ""
+    if agreed not in {"y", "yes"}:
+        print("Uninstall skipped. No files were changed.")
+        return int(conflicts)
+    if _stamp(receipt) != receipt_before:
+        raise FileExistsError("Receipt changed while awaiting consent; nothing removed.")
+    for role in absent + removable:
+        record = data["artifacts"][role]
+        path = Path(record["path"])
+        try:
+            # Recheck after consent: a replacement, even identical, is not ours.
+            current = _stamp(path)
+            if current is not None:
+                if current != record:
+                    raise FileExistsError("Integration changed while awaiting removal")
+                path.unlink()
+                print(f"Removed: {path}")
+            del data["artifacts"][role]
+        except (OSError, ValueError) as error:
+            conflicts = True
+            print(f"Preserved {role}: {path} ({error})", file=sys.stderr)
+    if data["artifacts"]:
+        original, _ = _read_receipt(project)
+        if data != original:
+            _save_receipt(project, data, receipt_before)
+        print(f"Receipt retained for remaining integrations: {receipt}")
+    else:
+        if _stamp(receipt) != receipt_before:
+            raise FileExistsError("Receipt changed; preserving it.")
+        receipt.unlink()
+        print(f"Removed unused receipt: {receipt}")
+    return int(conflicts)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--launcher", required=True, type=Path)
-    parser.add_argument("--initial-path", required=True)
+    parser.add_argument("--launcher", type=Path)
+    parser.add_argument("--initial-path")
+    parser.add_argument("--uninstall", action="store_true")
+    parser.add_argument("--project", type=Path)
     args = parser.parse_args()
+    if args.uninstall:
+        if args.project is None or args.launcher is not None or args.initial_path is not None:
+            parser.error("--uninstall requires --project only")
+        return uninstall_integrations(args.project)
+    if args.launcher is None or args.initial_path is None or args.project is not None:
+        parser.error("installation requires --launcher and --initial-path only")
     try:
         return install_integrations(args.launcher, initial_path=args.initial_path)
     except (OSError, ValueError) as error:

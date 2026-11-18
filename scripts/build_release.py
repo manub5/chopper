@@ -16,6 +16,9 @@ from pathlib import Path, PurePosixPath
 REQUIRED_FILES = {
     "install.sh",
     "scripts/install_desktop.py",
+    "scripts/install_integrations.py",
+    "uninstall.sh",
+    "assets/chopper.svg",
     "pyproject.toml",
     "uv.lock",
     "LICENSE",

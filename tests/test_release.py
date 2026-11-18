@@ -48,6 +48,9 @@ def release_repo(tmp_path):
         "README.md": "# Chopper\n",
         "install.sh": "#!/bin/bash\nexit 0\n",
         "scripts/install_desktop.py": '"""Desktop helper fixture."""\n',
+        "scripts/install_integrations.py": '"""Integrations fixture."""\n',
+        "uninstall.sh": "#!/bin/bash\nexit 0\n",
+        "assets/chopper.svg": '<svg xmlns="http://www.w3.org/2000/svg"/>\n',
         "src/chopper/__init__.py": "",
         "src/chopper/app.py": '"""App fixture."""\n',
         "src/chopper/py.typed": "",
@@ -82,6 +85,9 @@ def test_release_has_single_root_exact_blobs_and_matching_checksum(release_repo)
             "README.md",
             "install.sh",
             "scripts/install_desktop.py",
+            "scripts/install_integrations.py",
+            "uninstall.sh",
+            "assets/chopper.svg",
             "src/chopper/__init__.py",
             "src/chopper/app.py",
             "src/chopper/py.typed",
@@ -114,7 +120,17 @@ def test_untracked_and_unrelated_tracked_files_are_not_shipped(release_repo):
     (repo / "internal-notes.txt").write_text("not for distribution")
     git(repo, "add", "internal-notes.txt")
     git(repo, "commit", "-qm", "Unrelated tracked file")
-    for name in (".env", "recording.wav", ".venv/private", "dist/old.zip", "src/chopper/untracked.py"):
+    for name in (
+        ".env",
+        "recording.wav",
+        ".venv/private",
+        "dist/old.zip",
+        "src/chopper/untracked.py",
+        ".chopper-install.json",
+        "assets/private.key",
+        "assets/recording.wav",
+        "assets/other.svg",
+    ):
         path = repo / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("private fixture sentinel")
@@ -123,6 +139,18 @@ def test_untracked_and_unrelated_tracked_files_are_not_shipped(release_repo):
         names = bundle.namelist()
         assert not any(b"private fixture sentinel" in bundle.read(name) for name in names)
         assert not any("internal-notes" in name or "/.git/" in name or "/dist/" in name for name in names)
+
+
+def test_tracked_receipt_and_extra_assets_are_never_shipped(release_repo):
+    for name in (".chopper-install.json", "assets/other.svg", "assets/private.key", "assets/recording.wav"):
+        path = release_repo / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("private fixture sentinel")
+        git(release_repo, "add", "-f", name)
+    git(release_repo, "commit", "-m", "Private test data must not ship")
+    archive, _ = release_tool().build_release(release_repo)
+    with zipfile.ZipFile(archive) as bundle:
+        assert not any(b"private fixture sentinel" in bundle.read(name) for name in bundle.namelist())
 
 
 @pytest.mark.parametrize("state", ["unstaged", "staged", "deleted"])

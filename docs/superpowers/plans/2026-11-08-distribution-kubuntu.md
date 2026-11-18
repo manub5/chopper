@@ -273,24 +273,24 @@ Lire seulement le relevé du projet explicite, proposer les artefacts attribuabl
 obtenir l'accord avant unlink ; code non nul si conflit/erreur empêchant le retrait
 complet, compte rendu explicite. Déjà absent = réussite sans action.
 
-- [ ] **1. Rouge :** install/refus uninstall/réinstallation/uninstall/deuxième
+- [x] **1. Rouge :** install/refus uninstall/réinstallation/uninstall/deuxième
   uninstall, exactement les artefacts créés retirés. Sentinelles projet, lanceur,
   .venv, profils, cache, settings et exports conservées. Modifier/remplacer fichier
   ou lien (même contenu/cible), changer le Bureau, appeler depuis une autre copie,
   casser le relevé et simuler PermissionError : rien d'étranger supprimé. Aucun
   retrait récursif ni suppression des dossiers parents. Uninstall sans environnement.
-- [ ] **2. Rouge parcours Git :** dépôt/bare remote locaux isolés, installation
+- [x] **2. Rouge parcours Git :** dépôt/bare remote locaux isolés, installation
   avec exécutable-sonde, nouveau commit changeant seulement du code, vrai `git pull
   --ff-only`, puis commande depuis un autre dossier et sondes menu/Bureau : nouvelle
   sortie, mêmes liens/lanceur/raccourcis, aucun nouvel install. Vérifier la liste
   blanche du ZIP inclut désinstallateur/helpers/SVG mais pas relevé, secrets ou audio.
-- [ ] **3. Vérifier rouge :** `uv run pytest -q tests/test_uninstall.py tests/test_install_integrations.py tests/test_release.py` ;
+- [x] **3. Vérifier rouge :** `uv run pytest -q tests/test_uninstall.py tests/test_install_integrations.py tests/test_release.py` ;
   attendu : nouveaux contrats et ressources manquants.
-- [ ] **4. Implémenter :** suppression après vérification de propriété actuelle,
+- [x] **4. Implémenter :** suppression après vérification de propriété actuelle,
   relevé actualisé seulement pour les retraits prouvés ; conserver et signaler les
   fichiers modifiés et tout relevé encore nécessaire. Liste blanche ZIP explicite,
   pas d'inclusion large d'assets/données. Aucune désinstallation d'uv/paquets système.
-- [ ] **5. Vert :** tests ciblés, `bash -n install.sh uninstall.sh`, suite complète,
+- [x] **5. Vert :** tests ciblés, `bash -n install.sh uninstall.sh`, suite complète,
   Ruff lint/format, mypy, Bandit et `git diff --check`. Ajouter références officielles
   PATH/KDE/XDG et consignes de profil non modifié aux docs anglaises.
 - [ ] **6. Commit/revue :** `Ajoute une désinstallation conservatrice des intégrations` ;
@@ -304,6 +304,12 @@ complet, compte rendu explicite. Déjà absent = réussite sans action.
 
 ### Auto-revue et passage à l'exécution
 
+**Résultat technique étape 6 :** 15 nouveaux échecs constatés, puis 125 ciblés et
+796 complets réussis ; contrôles statiques/syntaxe verts. Le parcours Git est
+une preuve de non-régression des étapes 4/5 : déjà vert avant ce nouveau code.
+Désinstallation sans environnement et liste blanche prouvées en sandbox. Commit
+technique puis revue indépendante ; recette réelle et ZIP non autorisés à ce stade.
+
 Les tâches 4/5/6 partagent le relevé et la propriété : tests de collisions et
 d'erreur de relevé dans 4, ressources/Desktop Entry dans 5, retraits et Git dans 6.
 Les cinq risques supplémentaires ont chacun un test attribué ci-dessus. Les API
@@ -313,6 +319,5 @@ consentement, pas de lancement audio utilisateur dans les tests automatisés.
 
 Méthode conservée : native dans cet espace Git isolé, un commit testé puis une
 validation par étape et une revue indépendante finale ; pas d'agent par tâche.
-**État :** tâche 4 validée ; tâche 5 implémentée et testée, validation attendue
-avant tâche 6 (uninstall/archive/recette et revue finale). Aucune installation
-réelle dans le compte autorisée.
+**État :** tâches 4/5 validées ; tâche 6 implémentée et testée. Revue indépendante
+finale à suivre. Recette réelle et création du ZIP attendent un accord séparé.

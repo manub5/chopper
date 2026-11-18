@@ -54,6 +54,11 @@ executable KDE Desktop shortcut. The Desktop folder comes from `xdg-user-dir
 DESKTOP`, never a guessed path. Menu and Desktop shortcuts use the same installed
 SVG; declining the icon keeps a generic audio icon. No autostart is added.
 
+To remove only these optional integrations, run `bash uninstall.sh` from this
+project. It previews proven destinations and asks permission; modified/foreign
+files and all project/audio/settings data are kept. Standard Python 3 suffices,
+without a working `.venv`. Keep the local ownership receipt until removal.
+
 The exact destinations and the local `.chopper-install.json` ownership receipt
 are shown before consent. Keep this receipt: it identifies the integrations this
 installation owns. Foreign or modified files/links are not replaced, even when

@@ -147,14 +147,52 @@ clean up samples, settings or old application folders.
   try `QT_QPA_PLATFORM=xcb ./chopper` from the application folder and report whether
   that helps; this does not change the saved menu entry.
 
-## Remove the shortcut
+## Remove optional integrations
 
-Use Dolphin to remove only the `chopper.desktop` shown by this installer, normally
-under `~/.local/share/applications/`. Check that it is the Chopper-generated entry
-(`X-Chopper-Generated=true`) before deleting it. No automatic uninstall removes
-the application folder, Python, uv, system packages, settings, cache or samples.
-Before manually removing an old application folder, check that it contains no
-audio exports still used by a DAW project.
+From the installed project folder, run:
+
+```bash
+bash uninstall.sh
+```
+
+Standard Python 3 is enough; `.venv`, Qt and the audio engine need not work.
+The uninstaller reads only this project's `.chopper-install.json`, lists the
+integrations it can still identify, and asks before removing them (default: no).
+It removes only the recorded global link, menu/Desktop shortcuts and SVG that
+still match their recorded identity, parent, content/target and permissions.
+A modified or recreated file/link is preserved and reported, even if identical.
+The original recorded Desktop path is used, not a new desktop chosen since install.
+
+No folders are removed, including empty integration parents. The project, local
+launcher, `.venv`, uv, Python, system packages, profiles, preferences, cache,
+source audio and exports are kept. Repeating uninstall after successful removal
+does nothing. A missing receipt means nothing can be attributed: no files are
+removed. A malformed receipt, conflict or failed removal is reported with a
+nonzero exit status. The receipt stays while any unresolved artifact remains;
+if updating it fails, retry after fixing that error. Already absent files are
+handled safely on retry. Do not delete or copy receipts to another installation.
+
+Before manually deleting the project folder, check it contains no audio exports
+still used by a DAW. Never rely on `X-Chopper-Generated=true` alone to decide that
+an existing shortcut is safe to delete.
+
+## Updating an installation
+
+For a Git checkout, keep the project at the same location. A code-only update
+through `git pull --ff-only` uses the same global link and shortcuts without a
+new install. If an update changes dependencies or integration assets, follow its
+instructions and rerun `bash install.sh` if requested. The local Git update test
+uses a bare remote and executable probes, not the real application or a network
+service; real KDE clicks/audio checks are still required below.
+
+## Desktop references
+
+- [Ubuntu login profile](https://git.launchpad.net/ubuntu/+source/bash/plain/debian/skel.profile?h=ubuntu/resolute):
+  `.local/bin` is conditional at login; the installer does not modify profiles.
+- [xdg-user-dir manual](https://manpages.ubuntu.com/manpages/resolute/en/man1/xdg-user-dir.1.html):
+  the desktop location respects XDG user configuration.
+- [KDE desktop-file authorization](https://invent.kde.org/frameworks/kconfig/-/raw/master/src/core/kdesktopfile.cpp):
+  executable desktop files are subject to KDE's administrative restrictions.
 
 ## First target-machine check
 

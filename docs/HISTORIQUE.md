@@ -6,6 +6,39 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 18/11/2026 — Extension Kubuntu, étape 6 : retrait conservateur et archive préparée
+
+- `bash uninstall.sh` utilise Python standard, sans dépendre de `.venv`, Qt ou
+  PyTorch. Lit uniquement le relevé du projet explicite, affiche les artefacts
+  encore prouvés et demande confirmation, défaut non/EOF. Aucun retrait sans accord.
+- Retirer seulement les intégrations enregistrées encore conformes ; conserver et
+  signaler les fichiers/liens modifiés ou recréés, même à contenu/cible identique.
+  Revérifier après consentement. Relevé corrompu/symbolique/copié d'un autre projet
+  refusé. Utiliser le Bureau enregistré, pas un nouvel emplacement XDG contenant
+  un fichier étranger. Verrou de projet partagé avec l'installateur.
+- Relevé actualisé pour les seuls retraits réussis/absences constatées après accord,
+  conservé en cas de conflit. Retour non nul si retrait incomplet ou sauvegarde
+  impossible ; une reprise gère les fichiers déjà absents. Relevé supprimé seulement
+  lorsqu'il ne reste aucun artefact. Répétition après réussite sans effet.
+- Projet, lanceur local, `.venv`, profils, uv/paquets système, paramètres, cache,
+  sources audio et exports conservés ; aucun dossier parent retiré ni effacement
+  récursif. Refus/EOF = aucune écriture. Aucun élargissement de permission implicite.
+- Liste blanche d'archive étendue exactement à `uninstall.sh`, helper d'intégrations
+  et `assets/chopper.svg`. Relevé local et autres assets exclus, même suivis par Git.
+  Aucun ZIP de livraison créé à ce stade : génération soumise à accord séparé.
+- Vrai dépôt/remote bare locaux, commit de code seul et `git pull --ff-only` :
+  sondes commande/menu/Bureau observent la nouvelle version sans réinstaller ; mêmes
+  liens/lanceur/raccourcis/relevé, aucun appel uv au lancement. Aucun serveur réseau.
+- Rouge observé : 15 échecs nouveaux/107 réussites ; puis 125 ciblés et 796 tests
+  complets réussis. Ruff lint/format, mypy, Bandit (avertissements historiques),
+  syntaxe Bash et diff passent. Régressions : suite installateur/audio/interface ;
+  limites : refus/EOF, liens cassés/recréés, relevé étranger, PermissionError,
+  remplacement durant confirmation et sauvegarde impossible avec reprise.
+- Documentation anglaise mise à jour, références officielles PATH/XDG/KDE incluses.
+  Tests isolés sans installation réelle dans HOME ni modification audio/profils.
+  Revue indépendante finale à effectuer après ce commit ; recette réelle KDE et
+  archive restent des validations séparées, pas un résultat déduit des tests.
+
 ## 18/11/2026 — Extension Kubuntu, étape 5 : SVG et raccourci Bureau consentis
 
 - Icône SVG statique anthracite/orange doux, sans scripts ni ressources externes.

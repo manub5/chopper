@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -405,3 +406,95 @@ def test_path_warning_uses_parent_path_before_uv_bootstrap(installer_sandbox):
     assert 'export PATH="$HOME/.local/bin:$PATH"' in result.stdout
     assert (home / ".profile").read_text() == "profile sentinel\n"
     assert (home / ".bashrc").read_text() == "bashrc sentinel\n"
+
+
+def test_real_git_pull_updates_command_menu_and_desktop_without_reinstall(installer_sandbox, tmp_path):
+    project, env = installer_sandbox
+    desktop = tmp_path / "XDG Desktop"
+    desktop.mkdir()
+    tools = Path(env["PATH"].split(":")[0])
+    write_tool(tools / "xdg-user-dir", f"printf '%s\\n' '{desktop}'\n")
+    output = tmp_path / "version-output"
+    env["CHOPPER_PROBE_OUTPUT"] = str(output)
+    code = project / "probe.py"
+    code.write_text(
+        "import os\nfrom pathlib import Path\n"
+        "Path(os.environ['CHOPPER_PROBE_OUTPUT']).write_text('version-one')\n"
+    )
+    (project / ".gitignore").write_text(".venv/\n.chopper-install.json\n/chopper\n")
+    git_env = {key: value for key, value in env.items() if not key.startswith("GIT_")}
+    git_env.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull)
+
+    def git(where, *args):
+        return subprocess.run(
+            [
+                "git",
+                "-c",
+                "core.hooksPath=/dev/null",
+                "-c",
+                "commit.gpgsign=false",
+                "-c",
+                "user.name=Update test",
+                "-c",
+                "user.email=test@example.invalid",
+                *args,
+            ],
+            cwd=where,
+            env=git_env,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        ).stdout
+
+    remote = tmp_path / "remote.git"
+    git(tmp_path, "init", "--bare", str(remote))
+    git(project, "init", "-b", "main")
+    git(project, "add", ".")
+    git(project, "commit", "-m", "Initial probe")
+    git(project, "remote", "add", "origin", str(remote))
+    git(project, "push", "-u", "origin", "main")
+    assert run_installer(project, env, answers="y\ny\ny\ny\n").returncode == 0
+    executable = project / ".venv/bin/chopper"
+    executable.write_text('#!/bin/sh\nexec "$TEST_PYTHON" probe.py\n')
+    executable.chmod(0o755)
+    command = Path(env["HOME"]) / ".local/bin/chopper"
+    menu = Path(env["XDG_DATA_HOME"]) / "applications/chopper.desktop"
+    shortcut = desktop / "chopper.desktop"
+    artifacts = [project / "chopper", command, menu, shortcut, project / ".chopper-install.json"]
+    snapshot = [
+        (path.lstat().st_ino, os.readlink(path) if path.is_symlink() else path.read_bytes())
+        for path in artifacts
+    ]
+    gio = shutil.which("gio")
+    assert gio is not None, "GLib is required for the menu/Desktop update recipe"
+    probe_env = {
+        **env,
+        "GIO_USE_VFS": "local",
+        "DBUS_SESSION_BUS_ADDRESS": "unix:path=/nonexistent-chopper-test-bus",
+    }
+
+    def run_probes(expected):
+        for args in ([str(command)], [gio, "launch", str(menu)], [gio, "launch", str(shortcut)]):
+            output.unlink(missing_ok=True)
+            subprocess.run(args, cwd=tmp_path, env=probe_env, check=True, capture_output=True, timeout=10)
+            deadline = time.monotonic() + 3
+            while not output.exists() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            assert output.read_text() == expected
+
+    run_probes("version-one")
+    author = tmp_path / "author"
+    git(tmp_path, "clone", "-b", "main", str(remote), str(author))
+    (author / "probe.py").write_text(code.read_text().replace("version-one", "version-two"))
+    git(author, "add", "probe.py")
+    git(author, "commit", "-m", "Code-only update")
+    git(author, "push", "origin", "main")
+    Path(env["UV_CALLS"]).write_text("")
+    git(project, "pull", "--ff-only")
+    run_probes("version-two")
+    assert snapshot == [
+        (path.lstat().st_ino, os.readlink(path) if path.is_symlink() else path.read_bytes())
+        for path in artifacts
+    ]
+    assert Path(env["UV_CALLS"]).read_text() == ""
