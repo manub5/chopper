@@ -1,4 +1,6 @@
 import time
+from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -76,6 +78,91 @@ def test_window_starts_with_album_analysis_disabled(qapp, make_window, tmp_path)
     window = make_window()
     assert window.windowTitle() == "Chopper"
     assert window.analyze_album_button.isEnabled() is False
+
+
+def test_command_line_file_uses_normal_analysis_and_displays_waveform(
+    qapp, make_window, tmp_path, monkeypatch
+):
+    from chopper import app as app_module
+
+    path = tmp_path / "échantillon $ with spaces.wav"
+    sf.write(path, np.linspace(-0.2, 0.2, 3000, dtype=np.float32), SAMPLE_RATE, subtype="PCM_16")
+    before = path.read_bytes()
+    window = make_window(auto_play=False, gpu_mode="cpu")
+    monkeypatch.setattr(
+        workers.rhythm,
+        "analyze_rhythm",
+        lambda *args, **kwargs: (120.0, (0.0, 0.5, 1.0, 1.5, 2.0, 2.5), (0.0, 2.0)),
+    )
+    opening = window.open_file
+    progress = []
+
+    def observe(path):
+        assert window.isVisible()
+        opening(path)
+        progress.append(
+            (window.status_bar.currentMessage(), window._analysis_busy, window.library_panel.isEnabled())
+        )
+
+    monkeypatch.setattr(window, "open_file", observe)
+    monkeypatch.setattr(app_module, "build_window", lambda: window)
+
+    def execute():
+        _pump_until(lambda: progress and window._thread is None, timeout_seconds=15)
+        return 0
+
+    monkeypatch.setattr(
+        app_module, "QApplication", lambda args: SimpleNamespace(arguments=lambda: args, exec=execute)
+    )
+    with pytest.raises(SystemExit) as stopped:
+        app_module.main([str(path)])
+    assert stopped.value.code == 0
+    assert len(progress) == 1 and progress[0] == (f"Analyzing {path.stem}…", True, False)
+    assert window.sample_state.loaded_track.analysis.track.path == path
+    assert path.stem in window.track_label.text()
+    assert "120.0 BPM" in window.track_label.text()
+    assert not window._analysis_busy and window.library_panel.isEnabled()
+    expected, _ = sf.read(path, dtype="float32")
+    _, actual = window.waveform_view._waveform_item.getData()
+    np.testing.assert_array_equal(actual, expected)
+    assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize("kind", ["missing", "directory", "unreadable"])
+def test_external_file_errors_leave_window_usable(qapp, make_window, tmp_path, monkeypatch, kind):
+    path = tmp_path / "external.wav"
+    if kind == "directory":
+        path.mkdir()
+    elif kind == "unreadable":
+        path.write_bytes(b"unreadable sentinel")
+        original = Path.open
+
+        def denied(self, *args, **kwargs):
+            if self == path:
+                raise PermissionError("permission denied sentinel")
+            return original(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "open", denied)
+    window = make_window(auto_play=False)
+    window.open_file(path)
+    assert "Could not open" in window.status_bar.currentMessage()
+    assert str(path) in window.status_bar.currentMessage()
+    if kind == "unreadable":
+        assert "permission denied" in window.status_bar.currentMessage()
+    assert window._thread is None and window.library_panel.isEnabled()
+    assert window.sample_state.loaded_track is None
+
+
+def test_corrupt_external_file_reports_worker_error_without_crashing(qapp, make_window, tmp_path):
+    path = tmp_path / "corrupt.wav"
+    path.write_bytes(b"not a WAV file")
+    window = make_window(auto_play=False)
+    window.open_file(path)
+    _pump_until(lambda: window._thread is None)
+    assert "Analysis failed:" in window.status_bar.currentMessage()
+    assert str(path) in window.status_bar.currentMessage()
+    assert not window._analysis_busy and window.library_panel.isEnabled()
+    assert window.sample_state.loaded_track is None
 
 
 def test_shared_layout_title_and_auto_persistence(qapp, make_window, monkeypatch, loaded_track):

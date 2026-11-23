@@ -78,6 +78,7 @@ plus tard (ligne de commande, autre interface, fiche d'analyse).
 - Les dossiers réseau (NAS monté) doivent marcher comme des dossiers locaux.
 
 ## Commandes
+- La commande `chopper <fichier>` est le point d'entrée utilisé par d'autres logiciels (notamment le séparateur de stems). Ne pas la casser.
 - Installer : `uv sync`
 - Lancer : `uv run chopper` (alias temporaire `choppeur` pour les anciens lanceurs).
 - Tests : `uv run pytest`

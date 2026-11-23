@@ -1,7 +1,10 @@
+import argparse
 import os
 import sys
 from collections.abc import Mapping
+from pathlib import Path
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
 from chopper.core.cache import AnalysisCache
@@ -38,7 +41,7 @@ def default_platform_theme_for_session(env: Mapping[str, str] | None = None) -> 
     return None
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     platform = default_platform_for_session()
     if platform:
         os.environ["QT_QPA_PLATFORM"] = platform
@@ -46,9 +49,16 @@ def main() -> None:
     if platform_theme:
         os.environ["QT_QPA_PLATFORMTHEME"] = platform_theme
 
-    app = QApplication(sys.argv)
+    app = QApplication(sys.argv if argv is None else [sys.argv[0], *argv])
+    # Qt consumes its own switches before we interpret the remaining arguments.
+    parser = argparse.ArgumentParser(prog="chopper", description="Find, preview and export audio samples.")
+    parser.add_argument("file", nargs="?", type=Path, help="Audio file to open and analyze")
+    args = parser.parse_args(app.arguments()[1:])
+    initial_path = args.file.expanduser().absolute() if args.file is not None else None
     window = build_window()
     window.show()
+    if initial_path is not None:
+        QTimer.singleShot(0, lambda: window.open_file(initial_path))
     sys.exit(app.exec())
 
 

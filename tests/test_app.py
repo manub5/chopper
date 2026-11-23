@@ -1,4 +1,6 @@
 import os
+import subprocess
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -70,11 +72,59 @@ def test_main_configures_platform_before_qt_and_preserves_kde_portal(
 
     def create_application(args):
         consumed.append((os.environ.get("QT_QPA_PLATFORM"), os.environ.get("QT_QPA_PLATFORMTHEME")))
-        return SimpleNamespace(exec=lambda: 0)
+        return SimpleNamespace(exec=lambda: 0, arguments=lambda: args)
 
     monkeypatch.setattr(app_module, "QApplication", create_application)
     monkeypatch.setattr(app_module, "build_window", lambda: SimpleNamespace(show=lambda: None))
+    monkeypatch.setattr(sys, "argv", ["chopper"])
     with pytest.raises(SystemExit) as stopped:
         app_module.main()
     assert stopped.value.code == 0
     assert consumed == [(expected, "xdgdesktopportal")]
+
+
+def test_main_without_file_keeps_startup_idle(monkeypatch):
+    shown = []
+    monkeypatch.setattr(
+        app_module, "QApplication", lambda args: SimpleNamespace(arguments=lambda: args, exec=lambda: 0)
+    )
+    # There is intentionally no file-opening method: idle startup must not call one.
+    monkeypatch.setattr(app_module, "build_window", lambda: SimpleNamespace(show=lambda: shown.append(True)))
+    with pytest.raises(SystemExit) as stopped:
+        app_module.main([])
+    assert stopped.value.code == 0 and shown == [True]
+
+
+def test_qt_options_are_consumed_before_optional_file_parsing(tmp_path):
+    env = {
+        **os.environ,
+        "HOME": str(tmp_path / "home"),
+        "XDG_CONFIG_HOME": str(tmp_path / "config"),
+        "XDG_CACHE_HOME": str(tmp_path / "cache"),
+        "QT_QPA_PLATFORM": "offscreen",
+    }
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            """
+from types import SimpleNamespace
+from chopper import app
+app.build_window = lambda: SimpleNamespace(show=lambda: None)
+original = app.QApplication
+def create(args):
+    instance = original(args)
+    from PySide6.QtCore import QTimer
+    QTimer.singleShot(0, instance.quit)
+    return instance
+app.QApplication = create
+app.main(['-style', 'Fusion'])
+""",
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=20,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr

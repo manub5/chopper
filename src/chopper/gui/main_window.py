@@ -245,6 +245,19 @@ class MainWindow(QMainWindow):
 
     # --- analyse d'une piste ---------------------------------------------
 
+    def open_file(self, path: Path) -> None:
+        """Open an external file through the normal library-selection pipeline."""
+        try:
+            path = path.expanduser().absolute()
+            if not path.is_file():
+                raise FileNotFoundError("File does not exist or is not a regular file.")
+            # Check readability without decoding or changing the source audio.
+            with path.open("rb"):
+                pass
+            self._on_track_selected(path)
+        except (OSError, ValueError, audio_io.AudioLoadError) as error:
+            self.status_bar.showMessage(f"Could not open {path}: {error}", 10000)
+
     def _on_track_selected(self, path: Path) -> None:
         if self._is_analysis_running():
             # Une analyse (piste ou album) est déjà en cours : la bibliothèque est

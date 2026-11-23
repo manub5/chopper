@@ -6,6 +6,34 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 23/11/2026 — Étape 1 : ouvrir et analyser un fichier depuis la commande
+
+- `chopper /chemin/absolu/fichier.wav` ouvre la fenêtre puis passe la piste au
+  même parcours que la sélection bibliothèque : analyse en arrière-plan,
+  indication « Analyzing… », état occupé habituel, puis forme d'onde/candidats.
+  Sans fichier, aucun chargement automatique ajouté. Qt consomme ses options avant
+  l'argument facultatif ; ouverture différée à la boucle d'événements après show.
+- Point d'entrée public `MainWindow.open_file` : vérifier fichier régulier et
+  accès en lecture avant de déléguer. Absence/dossier/permission refusée annoncés
+  dans la fenêtre, pas de thread démarré ; audio corrompu traité par l'erreur du
+  worker existant, interface réactivée. Aucun traitement d'analyse dupliqué.
+- Contrat externe ajouté mot pour mot dans AGENTS.md, notamment pour le séparateur
+  de stems ; usage avec chemin absolu et espaces documenté dans README.
+- Rouge : 7 nouveaux cas échouaient/71 existants réussissaient. Vert : 78 tests
+  ciblés et 807 tests complets réussis ; Ruff lint/format, mypy, Bandit et diff
+  passent. Bandit affiche ses seuls avertissements historiques de commentaires.
+  Revue indépendante ciblée : aucune anomalie concrète identifiée.
+- Régressions vérifiées : démarrage inchangé, options Qt réelles en sous-processus,
+  fenêtre visible avant analyse, message/état occupé puis WAV et waveform réels.
+  Cas limites : espaces/Unicode/caractère dollar, absent, dossier, PermissionError,
+  audio corrompu. Seule l'inférence rythmique coûteuse est simulée dans le test
+  d'ouverture ; autres étapes et thread réels. Audio source identique avant/après.
+- Effets conservés : cache et éventuel téléchargement initial du modèle comme une
+  sélection bibliothèque ; chaque invocation ouvre sa fenêtre, pas de commande
+  distante vers une fenêtre existante. Rien n'importe Qt dans core. Aucun changement
+  du thème/installateur/dépendances, aucune installation réelle ni modification du
+  dossier habituel ou de son hook Semgrep. Étapes 2/3 en attente de validation.
+
 ## 18/11/2026 — Revue finale de l'extension Kubuntu : concurrence
 
 - Revue indépendante unique de `3c02cf3..69692d7` : deux anomalies importantes

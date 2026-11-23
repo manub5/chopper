@@ -81,6 +81,19 @@ uv run chopper
 
 ## Find and export samples
 
+To open a track directly from another program or a terminal, pass its absolute
+path (quote paths containing spaces):
+
+```bash
+chopper "/absolute/path/to/track.wav"
+```
+
+This starts the same analysis as selecting the track in the library, with the
+usual status indication; the waveform appears when analysis finishes. Missing
+or unreadable files are reported in the window without closing it. Without an
+argument, startup is unchanged. Before installing the global command, use
+`uv run chopper "/absolute/path/to/track.wav"` from the project folder.
+
 1. Choose **Open library…** and browse to an album or track, including a mounted NAS.
 2. Select a track to analyze it, or select an album folder and use **Analyze album**.
 3. Look through **1-bar**, **½-bar** and **¼-bar loops**, plus **One-shots**.
