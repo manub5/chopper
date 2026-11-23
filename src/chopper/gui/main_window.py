@@ -4,6 +4,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, Slot
+from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -373,6 +374,10 @@ class MainWindow(QMainWindow):
 
     def _on_settings_clicked(self) -> None:
         dialog = SettingsDialog(self.settings, self)
+        palette = self.theme_manager.palette
+        if palette.dark:
+            dialog.setPalette(palette.to_qpalette())
+        palette.apply_control_styles(dialog)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.settings = dialog.settings()
             self.auto_play_checkbox.setChecked(self.settings.auto_play)
@@ -382,6 +387,9 @@ class MainWindow(QMainWindow):
     def _apply_theme(self) -> None:
         palette = self.theme_manager.palette
         self.setPalette(palette.to_qpalette())
+        for dialog in self.findChildren(SettingsDialog):
+            dialog.setPalette(palette.to_qpalette() if palette.dark else QPalette())
+        palette.apply_control_styles(self)
         self.waveform_view.apply_theme(palette)
         self.sample_lanes.apply_theme(palette)
         self.candidates_panel.apply_theme(palette)

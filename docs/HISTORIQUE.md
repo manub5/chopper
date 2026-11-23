@@ -6,6 +6,22 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 23/11/2026 — Étape 3 : thème sombre inspiré de Material Design 3
+
+- Palette anthracite, accent ambre, champs et boutons arrondis, marges internes
+  régulières et contour de focus. Police, agencement, PySide6 et pyqtgraph conservés.
+- Qt ne transmettait plus correctement la palette avec une feuille appliquée à
+  toute la fenêtre. Style limité aux contrôles, palette explicite en mode sombre,
+  retour au clair sans résidu. La revue a aussi révélé une liste déroulante sur fond
+  clair et une palette sombre persistante dans les paramètres ouverts ; les deux
+  cas ont été reproduits par test, puis corrigés.
+- Capture Qt hors écran sur données synthétiques, contraste du tracé et des listes,
+  édition des champs, bascule clair/sombre, zoom et état de lecture vérifiés.
+  Pas de test audio matériel. Flèches des champs numériques peu contrastées sous
+  Fusion dans la capture ; zones de clic et clavier restent fonctionnels.
+- Aucun changement de réglage enregistré, dépendance, installation, moteur, audio
+  source ou palette globale. Aucun besoin de réinstaller pour ce seul changement.
+
 ## 23/11/2026 — Étape 1 : ouvrir et analyser un fichier depuis la commande
 
 - `chopper /chemin/absolu/fichier.wav` ouvre la fenêtre puis passe la piste au

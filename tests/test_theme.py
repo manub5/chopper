@@ -1,7 +1,8 @@
 import pytest
 from PySide6.QtCore import QCoreApplication, QEvent, Qt
 from PySide6.QtGui import QColor, QPalette
-from PySide6.QtWidgets import QWidget
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QComboBox, QDialog, QLineEdit, QSpinBox, QWidget
 
 
 @pytest.fixture
@@ -95,6 +96,82 @@ def test_repeated_force_choice_does_not_emit_or_loop(manager, qapp):
     assert changes == [True]
 
 
+def test_dark_widget_style_is_local_and_removed_in_light(qapp, tmp_path, monkeypatch, loaded_track):
+    from chopper.core.cache import AnalysisCache
+    from chopper.core.settings import Settings
+    from chopper.gui.main_window import MainWindow
+    from chopper.gui.settings_dialog import SettingsDialog
+
+    settings = Settings(force_dark=True, auto_play=False)
+    original = QPalette(qapp.palette())
+    window = MainWindow(settings, AnalysisCache(tmp_path / "cache.sqlite"))
+    checked = []
+
+    def inspect_dialog(dialog):
+        field = dialog.findChild(QLineEdit)
+        spin = dialog.findChild(QSpinBox)
+        dropdown = dialog.findChild(QComboBox)
+        assert field is not None and spin is not None and dropdown is not None
+        assert field.styleSheet() and spin.styleSheet()
+        assert field.palette().color(QPalette.ColorRole.Text) == QColor("#ECEDEF")
+        assert spin.palette().color(QPalette.ColorRole.ButtonText) == QColor("#ECEDEF")
+        field.selectAll()
+        QTest.keyClicks(field, "sample folder")
+        assert field.text() == "sample folder"
+        start = spin.value()
+        QTest.keyClick(spin, Qt.Key.Key_Down)
+        assert spin.value() == start - 1
+        dialog.show()
+        dropdown.showPopup()
+        qapp.processEvents()
+        view_palette = dropdown.view().palette()
+        text = luminance(view_palette.color(QPalette.ColorRole.Text))
+        background = luminance(view_palette.color(QPalette.ColorRole.Base))
+        high, low = sorted((text, background), reverse=True)
+        assert (high + 0.05) / (low + 0.05) >= 4.5
+        view = dropdown.view()
+        row = view.visualRect(dropdown.model().index(1, 0))
+        image = view.viewport().grab().toImage()
+        y = round(row.center().y() * image.devicePixelRatio())
+        assert luminance(image.pixelColor(image.width() - 5, y)) < 0.12
+        dropdown.hidePopup()
+        window.theme_manager.set_force_dark(False)
+        assert not field.styleSheet()
+        assert dialog.palette().color(QPalette.ColorRole.Window) != QColor("#202225")
+        window.theme_manager.set_force_dark(True)
+        checked.append(True)
+        return QDialog.DialogCode.Rejected
+
+    monkeypatch.setattr(SettingsDialog, "exec", inspect_dialog)
+    try:
+        system_scheme(qapp, Qt.ColorScheme.Light)
+        window._on_track_analyzed(loaded_track)
+        window.show()
+        qapp.processEvents()
+        combo = window.length_combo
+        assert combo.styleSheet()
+        assert window.whole_track_button.palette().color(
+            QPalette.ColorGroup.Active, QPalette.ColorRole.ButtonText
+        ) == QColor("#ECEDEF")
+        assert window.whole_track_button.palette().color(
+            QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText
+        ) == QColor("#BAC0C8")
+        window._on_settings_clicked()
+        assert checked == [True]
+        start = combo.currentIndex()
+        assert combo.isEnabled()
+        QTest.keyClick(combo, Qt.Key.Key_Down)
+        assert combo.currentIndex() == start + 1
+        assert qapp.palette() == original
+        system_scheme(qapp, Qt.ColorScheme.Light)
+        window.theme_manager.set_force_dark(False)
+        assert not combo.styleSheet()
+        assert window.palette().color(QPalette.ColorRole.Window) == QColor("#F3F4F5")
+        assert qapp.palette() == original
+    finally:
+        window.close()
+
+
 def test_window_graphs_and_table_follow_theme_without_losing_state(qapp, tmp_path, loaded_track, monkeypatch):
     import sounddevice as sd
 
@@ -128,6 +205,9 @@ def test_window_graphs_and_table_follow_theme_without_losing_state(qapp, tmp_pat
         palette = window.theme_manager.palette
         assert window.palette().color(QPalette.ColorRole.Window) == QColor(palette.background)
         assert window.waveform_view.backgroundBrush().color() == QColor(palette.surface)
+        pen = window.waveform_view._waveform_item.opts["pen"]
+        contrast = (luminance(pen.color()) + 0.05) / (luminance(QColor(palette.surface)) + 0.05)
+        assert contrast >= 4.5
         assert window.sample_lanes.palette().color(QPalette.ColorRole.Base) == QColor(palette.surface)
         assert window.candidates_panel.table.palette().color(QPalette.ColorRole.Text) == QColor(palette.text)
         assert window.preview_player is player
