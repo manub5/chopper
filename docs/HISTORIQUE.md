@@ -6,6 +6,17 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 25/11/2026 — Albums et pistes dans la bibliothèque de session
+
+- **File → Add album…** ajoute les dossiers en bas de la bibliothèque, chemin
+  visible et défilement disponible, sans lancer d’analyse. Les ajouts ne sont pas
+  enregistrés dans les préférences ; le choix du dossier principal reste distinct.
+- **File → Open track…** et `chopper <fichier>` utilisent la même analyse. Une
+  piste seule ajoutée après analyse réussie affiche son nom, sans ancien album
+  ciblé. La forme d’onde et les échantillons restent limités à une piste chargée.
+- Tests : albums homonymes, doublons, dossier déjà présent replacé en bas,
+  ouverture différée des enfants, annulation, WAV corrompu et commande CLI.
+
 ## 25/11/2026 — Plus de place pour la liste des échantillons
 
 - Répartition verticale : moitié de la part de la forme d’onde et deux tiers de

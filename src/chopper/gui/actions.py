@@ -22,6 +22,8 @@ from PySide6.QtWidgets import (
 
 _SPECS = (
     ("open_library", "Open library…", "Ctrl+O", "File", False),
+    ("add_album", "Add album…", "", "File", False),
+    ("open_track", "Open track…", "", "File", False),
     ("analyze_album", "Analyze album", "", "File", False),
     ("settings", "Settings…", "Ctrl+,", "File", False),
     ("quit", "Quit", "Ctrl+Q", "File", False),

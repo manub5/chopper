@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem, QWidget
+from PySide6.QtCore import QItemSelectionModel, QSignalBlocker, Qt, Signal
+from PySide6.QtWidgets import QHeaderView, QTreeWidget, QTreeWidgetItem, QTreeWidgetItemIterator, QWidget
 
 from chopper.core.audio_io import AUDIO_EXTENSIONS
 
@@ -21,18 +21,70 @@ class LibraryPanel(QTreeWidget):
     """
 
     track_selected = Signal(Path)
-    folder_selected = Signal(Path)
+    folder_selected = Signal(object)  # Path or None
     load_failed = Signal(Path, str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._session_entries: dict[Path, bool] = {}
         self.setHeaderHidden(True)
+        self.header().setStretchLastSection(False)
+        self.header().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.itemSelectionChanged.connect(self._on_selection_changed)
         self.itemExpanded.connect(self._on_item_expanded)
 
     def set_root(self, root: Path) -> None:
         self.clear()
         self._populate_level(self.invisibleRootItem(), root)
+        for path, is_album in self._session_entries.items():
+            self._append_entry(path, is_album=is_album)
+
+    def add_album(self, path: Path) -> None:
+        self._add_session_entry(path, is_album=True)
+
+    def add_track(self, path: Path) -> None:
+        self._add_session_entry(path, is_album=False)
+
+    def _add_session_entry(self, path: Path, *, is_album: bool) -> None:
+        path = path.absolute()
+        if path not in self._session_entries:
+            self._session_entries[path] = is_album
+            self._append_entry(path, is_album=is_album)
+
+    def _append_entry(self, path: Path, *, is_album: bool) -> None:
+        iterator = QTreeWidgetItemIterator(self)
+        while (item := iterator.value()) is not None:
+            if item.data(0, _PATH_ROLE) == path and (not is_album or item.parent() is None):
+                if is_album:
+                    item.setText(0, str(path))
+                    item.setToolTip(0, str(path))
+                    index = self.indexOfTopLevelItem(item)
+                    if index < self.topLevelItemCount() - 1:
+                        expanded = item.isExpanded()
+                        selected = self.selectedItems()
+                        current = self.currentItem()
+                        with QSignalBlocker(self):
+                            self.takeTopLevelItem(index)
+                            self.addTopLevelItem(item)
+                            item.setExpanded(expanded)
+                            if current is not None:
+                                self.setCurrentItem(current, 0, QItemSelectionModel.SelectionFlag.NoUpdate)
+                            for selected_item in selected:
+                                selected_item.setSelected(True)
+                return
+            iterator += 1
+        self._create_entry(self.invisibleRootItem(), path, is_folder=is_album, show_path=is_album)
+
+    @staticmethod
+    def _create_entry(
+        parent: QTreeWidgetItem, path: Path, *, is_folder: bool, show_path: bool = False
+    ) -> None:
+        item = QTreeWidgetItem(parent, [str(path) if show_path else path.name])
+        item.setData(0, _PATH_ROLE, path)
+        if show_path:
+            item.setToolTip(0, str(path))
+        if is_folder:
+            QTreeWidgetItem(item, [_LOADING_PLACEHOLDER])
 
     def _populate_level(self, parent_item: QTreeWidgetItem, folder: Path) -> None:
         """Ajoute uniquement les enfants directs de `folder` (un seul niveau)."""
@@ -51,10 +103,7 @@ class LibraryPanel(QTreeWidget):
                 continue  # entrée inaccessible (lien cassé, droit réseau...) : ignorée
 
             if is_dir:
-                item = QTreeWidgetItem(parent_item, [entry.name])
-                item.setData(0, _PATH_ROLE, entry)
-                # Enfant provisoire : le vrai contenu n'est lu qu'à l'ouverture du dossier.
-                QTreeWidgetItem(item, [_LOADING_PLACEHOLDER])
+                self._create_entry(parent_item, entry, is_folder=True)
             else:
                 try:
                     # entry.exists() suit les liens symboliques : un lien cassé
@@ -64,8 +113,7 @@ class LibraryPanel(QTreeWidget):
                 except OSError:
                     continue
                 if is_audio:
-                    item = QTreeWidgetItem(parent_item, [entry.name])
-                    item.setData(0, _PATH_ROLE, entry)
+                    self._create_entry(parent_item, entry, is_folder=False)
 
     def _on_item_expanded(self, item: QTreeWidgetItem) -> None:
         if item.childCount() != 1:
@@ -81,11 +129,16 @@ class LibraryPanel(QTreeWidget):
     def _on_selection_changed(self) -> None:
         items = self.selectedItems()
         if not items:
+            self.folder_selected.emit(None)
             return
-        path: Path | None = items[0].data(0, _PATH_ROLE)
+        item = items[0]
+        path: Path | None = item.data(0, _PATH_ROLE)
         if path is None:
+            self.folder_selected.emit(None)
             return
         if path.is_dir():
             self.folder_selected.emit(path)
         else:
+            parent = item.parent()
+            self.folder_selected.emit(parent.data(0, _PATH_ROLE) if parent is not None else None)
             self.track_selected.emit(path)

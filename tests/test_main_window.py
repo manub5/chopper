@@ -119,6 +119,7 @@ def test_command_line_file_uses_normal_analysis_and_displays_waveform(
     assert stopped.value.code == 0
     assert len(progress) == 1 and progress[0] == (f"Analyzing {path.stem}…", True, False)
     assert window.sample_state.loaded_track.analysis.track.path == path
+    assert window.library_panel.topLevelItem(0).text(0) == path.name
     assert path.stem in window.track_label.text()
     assert "120.0 BPM" in window.track_label.text()
     assert not window._analysis_busy and window.library_panel.isEnabled()
@@ -163,6 +164,55 @@ def test_corrupt_external_file_reports_worker_error_without_crashing(qapp, make_
     assert str(path) in window.status_bar.currentMessage()
     assert not window._analysis_busy and window.library_panel.isEnabled()
     assert window.sample_state.loaded_track is None
+    assert window.library_panel.topLevelItemCount() == 0
+
+
+def test_open_track_action_loads_only_one_track_and_clears_album_target(
+    qapp, make_window, tmp_path, monkeypatch
+):
+    window = make_window(auto_play=False)
+    album, paths = _make_library(tmp_path)
+    window.library_panel.set_root(tmp_path)
+    window.library_panel.topLevelItem(0).setSelected(True)
+    assert window._current_folder == album
+    pending = iter([str(paths[0]), str(paths[1]), str(paths[1]), ""])
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args: (next(pending), ""))
+    analyzed = []
+
+    def analyze(track, settings, cache):
+        analyzed.append(track.path)
+        return _fake_analyze_track(track, settings, cache)
+
+    monkeypatch.setattr(workers, "analyze_track", analyze)
+    action = window.action_registry.actions["open_track"]
+    for path in (paths[0], paths[1], paths[1]):
+        action.trigger()
+        assert not action.isEnabled()
+        action.trigger()  # Disabled while the previous analysis is still running.
+        _pump_until(lambda: window._thread is None)
+        assert window.sample_state.loaded_track.analysis.track.path == path
+    action.trigger()  # Cancel the chooser.
+    assert analyzed == [paths[0], paths[1], paths[1]]
+    assert window._current_folder is None
+    assert not window.analyze_album_button.isEnabled()
+    assert window.library_panel.topLevelItemCount() == 3
+    assert window.library_panel.topLevelItem(2).text(0) == paths[1].name
+
+
+def test_add_album_action_appends_without_loading_audio_or_saving_settings(
+    qapp, make_window, tmp_path, monkeypatch
+):
+    window = make_window()
+    album, _ = _make_library(tmp_path)
+    pending = iter([str(album), ""])
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args: next(pending))
+    action = window.action_registry.actions["add_album"]
+    action.trigger()
+    action.trigger()
+    assert window.library_panel.topLevelItemCount() == 1
+    assert str(album) in window.library_panel.topLevelItem(0).text(0)
+    assert window._thread is None and window.sample_state.loaded_track is None
+    assert window.settings.library_root is None and not (tmp_path / "settings.toml").exists()
 
 
 def test_shared_layout_title_and_auto_persistence(qapp, make_window, monkeypatch, loaded_track):

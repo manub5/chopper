@@ -71,6 +71,7 @@ class MainWindow(QMainWindow):
         self.cache = cache if cache is not None else AnalysisCache(default_cache_path())
 
         self._current_track: Track | None = None
+        self._opening_external_track = False
         self._current_folder: Path | None = None
         self._thread: QThread | None = None
         self._analysis_busy = False
@@ -191,6 +192,8 @@ class MainWindow(QMainWindow):
         self.action_registry = ActionRegistry(self, right_panel)
         actions = self.action_registry.actions
         actions["open_library"].triggered.connect(self._on_open_library_clicked)
+        actions["add_album"].triggered.connect(self._on_add_album_clicked)
+        actions["open_track"].triggered.connect(self._on_open_track_clicked)
         actions["settings"].triggered.connect(self._on_settings_clicked)
         actions["analyze_album"].triggered.connect(self._on_analyze_album_clicked)
         actions["quit"].triggered.connect(self.close)
@@ -238,7 +241,18 @@ class MainWindow(QMainWindow):
         save_settings(self.settings)
         self.library_panel.set_root(Path(directory))
 
-    def _on_folder_selected(self, folder: Path) -> None:
+    def _on_add_album_clicked(self) -> None:
+        directory = QFileDialog.getExistingDirectory(self, "Add album folder")
+        if directory:
+            self.library_panel.add_album(Path(directory))
+
+    def _on_open_track_clicked(self) -> None:
+        extensions = " ".join(f"*{suffix}" for suffix in sorted(audio_io.AUDIO_EXTENSIONS))
+        filename, _ = QFileDialog.getOpenFileName(self, "Open track", "", f"Audio files ({extensions})")
+        if filename:
+            self.open_file(Path(filename))
+
+    def _on_folder_selected(self, folder: Path | None) -> None:
         self._current_folder = folder
         self._sync_actions()
 
@@ -256,11 +270,14 @@ class MainWindow(QMainWindow):
             # Check readability without decoding or changing the source audio.
             with path.open("rb"):
                 pass
-            self._on_track_selected(path)
+            self._start_track_analysis(path, external=True)
         except (OSError, ValueError, audio_io.AudioLoadError) as error:
             self.status_bar.showMessage(f"Could not open {path}: {error}", 10000)
 
     def _on_track_selected(self, path: Path) -> None:
+        self._start_track_analysis(path)
+
+    def _start_track_analysis(self, path: Path, *, external: bool = False) -> None:
         if self._is_analysis_running():
             # Une analyse (piste ou album) est déjà en cours : la bibliothèque est
             # désactivée pendant ce temps (voir _set_busy), donc ce cas ne devrait
@@ -274,6 +291,10 @@ class MainWindow(QMainWindow):
         if not self.selection_controller.authorize_transition("track", include_region=True):
             return
         track = audio_io.read_track(path)
+        self._opening_external_track = external
+        if external:
+            self.library_panel.clearSelection()
+            self._current_folder = None
         self.selection_controller.reset()
         self.sample_state.clear()
         self.track_label.clear()
@@ -293,6 +314,9 @@ class MainWindow(QMainWindow):
         self.selection_controller.reset()
         self._set_busy(False)
         analysis = result.analysis
+        if self._opening_external_track:
+            self._opening_external_track = False
+            self.library_panel.add_track(analysis.track.path)
         samples, sample_rate = result.samples, result.sample_rate
         candidates = list(result.candidates)
 
@@ -309,6 +333,7 @@ class MainWindow(QMainWindow):
         )
 
     def _on_track_failed(self, message: str) -> None:
+        self._opening_external_track = False
         self._set_busy(False)
         self.status_bar.showMessage(f"Analysis failed: {message}", 8000)
 
@@ -409,6 +434,8 @@ class MainWindow(QMainWindow):
             "analyze_album": self._current_folder is not None and not locked,
             "settings": not locked,
             "open_library": not locked,
+            "add_album": not locked,
+            "open_track": not locked,
             "play": state.can_preview and not locked,
             "stop": state.has_playback
             or controller.window is not None

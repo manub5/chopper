@@ -95,6 +95,10 @@ argument, startup is unchanged. Before installing the global command, use
 `uv run chopper "/absolute/path/to/track.wav"` from the project folder.
 
 1. Choose **Open library…** and browse to an album or track, including a mounted NAS.
+   In the **File** menu, use **Add album…** to append album folders to the library
+   for this session, or **Open track…** to analyze one audio file directly. Albums
+   show their folder path; standalone tracks show only their filename. Adding an
+   album does not start analysis. Only one track feeds the waveform and sample list.
 2. Select a track to analyze it, or select an album folder and use **Analyze album**.
 3. Look through **1-bar**, **½-bar** and **¼-bar loops**, plus **One-shots**.
    Chopper offers up to eight samples per category by default, configurable from

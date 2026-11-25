@@ -68,6 +68,68 @@ def test_expanding_twice_does_not_duplicate_children(qapp, tmp_path):
     assert album_a_item.childCount() == 1
 
 
+def test_added_albums_append_in_order_with_paths_and_lazy_children(qapp, tmp_path):
+    root = tmp_path / "library"
+    root.mkdir()
+    _make_library(root)
+    panel = LibraryPanel()
+    panel.set_root(root)
+    albums = [tmp_path / name / "Album" for name in ("second", "first")]
+    tracks = []
+    for album in albums:
+        album.mkdir(parents=True)
+        track = album / "track.wav"
+        track.touch()
+        tracks.append(track)
+    selected = []
+    panel.folder_selected.connect(selected.append)
+    for album in (*albums, albums[0]):
+        panel.add_album(album)
+    assert panel.topLevelItemCount() == 4
+    for index, (album, track) in enumerate(zip(albums, tracks, strict=True), 2):
+        item = panel.topLevelItem(index)
+        assert str(album) in item.text(0)
+        assert item.child(0).text(0) == _LOADING_PLACEHOLDER
+        panel.expandItem(item)
+        assert item.child(0).text(0) == track.name
+    assert not selected
+    panel.resize(250, 75)
+    panel.show()
+    qapp.processEvents()
+    assert panel.verticalScrollBar().maximum() > 0
+    panel.close()
+
+
+def test_standalone_track_shows_basename_and_does_not_select_on_add(qapp, tmp_path):
+    panel = LibraryPanel()
+    track = tmp_path / "Solo.wav"
+    track.touch()
+    selected = []
+    panel.track_selected.connect(selected.append)
+    panel.add_track(track)
+    panel.add_track(track)
+    assert not selected
+    assert panel.topLevelItemCount() == 1
+    item = panel.topLevelItem(0)
+    assert item.text(0) == "Solo.wav"
+    item.setSelected(True)
+    assert selected == [track]
+
+
+def test_adding_an_album_already_in_root_moves_it_to_end_without_duplicates(qapp, tmp_path):
+    _make_library(tmp_path)
+    panel = LibraryPanel()
+    panel.set_root(tmp_path)
+    album = tmp_path / "AlbumA"
+    panel.add_album(album)
+    panel.add_album(album)
+    for _ in range(2):
+        assert panel.topLevelItemCount() == 2
+        assert panel.topLevelItem(0).text(0) == "AlbumB"
+        assert panel.topLevelItem(1).text(0) == str(album)
+        panel.set_root(tmp_path)
+
+
 def test_selecting_a_track_emits_track_selected(qapp, tmp_path):
     _make_library(tmp_path)
     panel = LibraryPanel()
