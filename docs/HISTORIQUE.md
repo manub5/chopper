@@ -36,6 +36,9 @@ dans pre-commit et la préécoute ne joue plus en boucle.
   ciblé. La forme d’onde et les échantillons restent limités à une piste chargée.
 - Tests : albums homonymes, doublons, dossier déjà présent replacé en bas,
   ouverture différée des enfants, annulation, WAV corrompu et commande CLI.
+- Revue finale : une piste ouverte seule reste en un seul exemplaire au premier
+  niveau, que son album ait été déplié avant ou après l’ouverture. Cela ne change
+  pas le contenu du dossier ni les pistes traitées par l’analyse d’album.
 
 ## 25/11/2026 — Plus de place pour la liste des échantillons
 

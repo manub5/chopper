@@ -114,6 +114,10 @@ argument, startup is unchanged. Before installing the global command, use
    sample using its `⠿` handle. To export just one sample, right-click its row
    or rectangle and choose **Export**. Source audio is never modified.
 
+Choose an export folder where only you and applications you trust can write.
+The exporter avoids name collisions between ordinary exports, but is not designed
+to protect against other users changing files in a shared writable folder.
+
 On the first export or attempted drag, choose your **sample folder**. There is
 no forced Documents folder or setup prompt at startup. The path is remembered
 and can be changed in **Settings**. After setting it up during the first drag,

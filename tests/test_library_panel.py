@@ -1,10 +1,34 @@
 from pathlib import Path
 
+import pytest
 from PySide6.QtWidgets import QTreeWidgetItem
 
 from chopper.gui.library_panel import LibraryPanel
 
 _LOADING_PLACEHOLDER = "…"
+
+
+@pytest.mark.parametrize("expand_first", [False, True])
+def test_standalone_import_is_unique_regardless_of_album_expansion(qapp, tmp_path, expand_first):
+    _make_library(tmp_path)
+    panel = LibraryPanel()
+    panel.set_root(tmp_path)
+    album = _find_top_level(panel, "AlbumA")
+    path = tmp_path / "AlbumA" / "01 - Track One.wav"
+    if expand_first:
+        panel.expandItem(album)
+    panel.add_track(path)
+    for _ in range(2):
+        album = _find_top_level(panel, "AlbumA")
+        panel.expandItem(album)
+        assert album.childCount() == 0
+        standalone = _find_top_level(panel, path.name)
+        folders = []
+        panel.folder_selected.connect(folders.append)
+        standalone.setSelected(True)
+        assert folders == [None]
+        panel.folder_selected.disconnect(folders.append)
+        panel.set_root(tmp_path)
 
 
 def _make_library(root: Path) -> None:

@@ -54,7 +54,7 @@ class LibraryPanel(QTreeWidget):
     def _append_entry(self, path: Path, *, is_album: bool) -> None:
         iterator = QTreeWidgetItemIterator(self)
         while (item := iterator.value()) is not None:
-            if item.data(0, _PATH_ROLE) == path and (not is_album or item.parent() is None):
+            if item.data(0, _PATH_ROLE) == path and item.parent() is None:
                 if is_album:
                     item.setText(0, str(path))
                     item.setToolTip(0, str(path))
@@ -73,7 +73,21 @@ class LibraryPanel(QTreeWidget):
                                 selected_item.setSelected(True)
                 return
             iterator += 1
+        if not is_album:
+            # A standalone import has a single root entry, even if its folder was expanded first.
+            self._remove_nested_track_entries(path)
         self._create_entry(self.invisibleRootItem(), path, is_folder=is_album, show_path=is_album)
+
+    def _remove_nested_track_entries(self, path: Path) -> None:
+        matches = []
+        iterator = QTreeWidgetItemIterator(self)
+        while (item := iterator.value()) is not None:
+            parent = item.parent()
+            if parent is not None and item.data(0, _PATH_ROLE) == path:
+                matches.append((parent, item))
+            iterator += 1
+        for parent, item in matches:
+            parent.removeChild(item)
 
     @staticmethod
     def _create_entry(
@@ -112,7 +126,7 @@ class LibraryPanel(QTreeWidget):
                     is_audio = entry.suffix.lower() in AUDIO_EXTENSIONS and entry.exists()
                 except OSError:
                     continue
-                if is_audio:
+                if is_audio and self._session_entries.get(entry.absolute()) is not False:
                     self._create_entry(parent_item, entry, is_folder=False)
 
     def _on_item_expanded(self, item: QTreeWidgetItem) -> None:
