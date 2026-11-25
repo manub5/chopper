@@ -6,6 +6,17 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 25/11/2026 — Export au clic droit dans les deux vues
+
+- **Export** vise la ligne ou le rectangle sous le clic, sans sélectionner ni
+  marquer l’échantillon et sans lancer de préécoute. Réutilise le dossier et
+  le format d’export existants, avec un nom distinct si un fichier existe déjà.
+- Aucun export sur une zone vide, après annulation du menu, si l’échantillon
+  a disparu entre-temps ou si une opération bloque l’interface. Les exports
+  groupés et le glisser-déposer restent inchangés.
+- Tests Qt hors écran : menu réel dans les deux vues, défilement, contenu du
+  WAV exporté et conservation du premier fichier lors d’un nouvel export.
+
 ## 25/11/2026 — Albums et pistes dans la bibliothèque de session
 
 - **File → Add album…** ajoute les dossiers en bas de la bibliothèque, chemin

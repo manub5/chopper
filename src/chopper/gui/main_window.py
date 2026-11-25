@@ -207,6 +207,8 @@ class MainWindow(QMainWindow):
         actions["export_marked"].triggered.connect(lambda: self._on_export_requested("marked"))
         actions["export_all"].triggered.connect(lambda: self._on_export_requested("all"))
         self.candidates_panel.export_requested.connect(lambda mode: actions[f"export_{mode}"].trigger())
+        self.candidates_panel.sample_export_requested.connect(self._on_sample_export_requested)
+        self.sample_lanes.sample_export_requested.connect(self._on_sample_export_requested)
         self.action_registry.bind_button(open_library_button, "open_library")
         self.action_registry.bind_button(settings_button, "settings")
         self.action_registry.bind_button(self.analyze_album_button, "analyze_album")
@@ -573,6 +575,18 @@ class MainWindow(QMainWindow):
         if self.selection_controller.result_window is None:
             return False
         return self._export_candidates(tuple(item.candidate for item in self.sample_state.items))
+
+    def _on_sample_export_requested(self, item_id: int) -> None:
+        if (
+            self._closing
+            or self._analysis_busy
+            or self._is_analysis_running()
+            or self.selection_controller.locked
+        ):
+            return
+        item = next((item for item in self.sample_state.items if item.id == item_id), None)
+        if item is not None:
+            self._export_candidates((item.candidate,))
 
     def _export_candidates(self, candidates: tuple[Candidate, ...]) -> bool:
         loaded = self.sample_state.loaded_track

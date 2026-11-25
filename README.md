@@ -107,7 +107,8 @@ argument, startup is unchanged. Before installing the global command, use
 4. Click a sample to select it. With **Auto-preview** enabled, it plays once.
    **Ctrl+click** marks or unmarks a sample without selecting or playing it.
 5. Use **Export marked** or **Export all** for the displayed track, or drag a
-   sample using its `⠿` handle. Source audio is never modified.
+   sample using its `⠿` handle. To export just one sample, right-click its row
+   or rectangle and choose **Export**. Source audio is never modified.
 
 On the first export or attempted drag, choose your **sample folder**. There is
 no forced Documents folder or setup prompt at startup. The path is remembered

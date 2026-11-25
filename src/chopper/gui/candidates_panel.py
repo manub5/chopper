@@ -1,12 +1,13 @@
 """Compact sample table, projecting the shared state without owning audio."""
 
 from PySide6.QtCore import QPoint, Qt, Signal
-from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtGui import QContextMenuEvent, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QHBoxLayout,
     QHeaderView,
+    QMenu,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -22,6 +23,7 @@ from chopper.gui.theme import LIGHT, ThemePalette
 class SampleTable(QTableWidget):
     sample_clicked = Signal(int, bool)
     handle_drag_requested = Signal(int)
+    sample_export_requested = Signal(int)
 
     def __init__(self, rows: int = 0, columns: int = 0, parent: QWidget | None = None) -> None:
         super().__init__(rows, columns, parent)
@@ -31,8 +33,10 @@ class SampleTable(QTableWidget):
     def mousePressEvent(self, event) -> None:
         self._handle_press = None
         index = self.indexAt(event.position().toPoint())
-        if index.isValid() and index.column() == 4 and event.button() != Qt.MouseButton.LeftButton:
-            # Handle interactions must never fall through to native row selection.
+        if event.button() == Qt.MouseButton.RightButton or (
+            index.isValid() and index.column() == 4 and event.button() != Qt.MouseButton.LeftButton
+        ):
+            # Never let a context click select or preview a different sample.
             event.accept()
             return
         if event.button() == Qt.MouseButton.LeftButton and index.isValid():
@@ -71,11 +75,27 @@ class SampleTable(QTableWidget):
 
     def mouseReleaseEvent(self, event) -> None:
         self._handle_press = None
+        if event.button() == Qt.MouseButton.RightButton:
+            event.accept()
+            return
         super().mouseReleaseEvent(event)
+
+    def contextMenuEvent(self, event: QContextMenuEvent) -> None:
+        index = self.indexAt(event.pos())
+        cell = self.item(index.row(), 0) if index.isValid() else None
+        if not self.isEnabled() or cell is None:
+            return
+        item_id = cell.data(Qt.ItemDataRole.UserRole)
+        event.accept()
+        menu = QMenu()
+        action = menu.addAction("Export")
+        if menu.exec(event.globalPos()) == action:
+            self.sample_export_requested.emit(item_id)
 
 
 class CandidatesPanel(QWidget):
     export_requested = Signal(str)
+    sample_export_requested = Signal(int)
     drag_requested = Signal(int)
 
     def __init__(self, state: SampleState, parent: QWidget | None = None):
@@ -101,6 +121,7 @@ class CandidatesPanel(QWidget):
             self.table.setColumnWidth(column, width)
         self.table.sample_clicked.connect(state.click)
         self.table.handle_drag_requested.connect(self.drag_requested.emit)
+        self.table.sample_export_requested.connect(self.sample_export_requested.emit)
         self.table.currentCellChanged.connect(self._navigate)
         self.export_marked_button = QPushButton()
         self.export_all_button = QPushButton()

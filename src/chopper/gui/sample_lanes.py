@@ -1,8 +1,8 @@
 """Scrollable sample rows mapped to the waveform's actual time-to-pixel transform."""
 
-from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QPainter, QPen
-from PySide6.QtWidgets import QAbstractScrollArea, QApplication, QWidget
+from PySide6.QtCore import QPointF, QRectF, Qt, Signal
+from PySide6.QtGui import QColor, QContextMenuEvent, QPainter, QPen
+from PySide6.QtWidgets import QAbstractScrollArea, QApplication, QMenu, QWidget
 
 from chopper.gui.lane_layout import CATEGORIES, LanePlacement, layout_samples
 from chopper.gui.presentation import format_time, sample_type_label
@@ -15,6 +15,8 @@ _HEADER_HEIGHT = 24
 
 
 class SampleLanesView(QAbstractScrollArea):
+    sample_export_requested = Signal(int)
+
     def __init__(self, state: SampleState, parent: QWidget | None = None):
         super().__init__(parent)
         self.state = state
@@ -166,6 +168,16 @@ class SampleLanesView(QAbstractScrollArea):
         return next(
             (p.item_id for p in self._placements if self.sample_rect(p.item_id).contains(point)), None
         )
+
+    def contextMenuEvent(self, event: QContextMenuEvent) -> None:
+        item_id = self._hit(QPointF(event.pos()))
+        if not self.isEnabled() or item_id is None:
+            return
+        event.accept()
+        menu = QMenu()
+        action = menu.addAction("Export")
+        if menu.exec(event.globalPos()) == action:
+            self.sample_export_requested.emit(item_id)
 
     def mousePressEvent(self, event) -> None:
         if (

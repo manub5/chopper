@@ -5,7 +5,10 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 import soundfile as sf
-from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox
+from PySide6.QtCore import QPoint, Qt, QTimer
+from PySide6.QtGui import QContextMenuEvent
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QApplication, QDialog, QFileDialog, QMenu, QMessageBox
 
 from chopper.core import settings as settings_module
 from chopper.core.cache import AnalysisCache
@@ -78,6 +81,89 @@ def test_window_starts_with_album_analysis_disabled(qapp, make_window, tmp_path)
     window = make_window()
     assert window.windowTitle() == "Chopper"
     assert window.analyze_album_button.isEnabled() is False
+
+
+@pytest.mark.parametrize("view_name", ["table", "lanes"])
+@pytest.mark.parametrize("scenario", ["export", "empty", "cancel", "stale", "busy"])
+def test_context_export_targets_the_clicked_sample(
+    qapp, make_window, tmp_path, loaded_track, view_name, scenario
+):
+    window = make_window(export_dir=str(tmp_path))
+    window._on_track_analyzed(loaded_track)
+    state = window.sample_state
+    active, target = state.items
+    state.navigate(active.id)
+    state.toggle_mark(active.id)
+    played = []
+    state.play_requested.connect(lambda *args: played.append(args))
+    window.show()
+    qapp.processEvents()
+    if view_name == "table":
+        view = window.candidates_panel.table
+        view.setColumnWidth(0, 1200)
+        qapp.processEvents()
+        scrollbar = view.horizontalScrollBar()
+        assert scrollbar.maximum() > 0
+        scrollbar.setValue(scrollbar.maximum())
+        position = view.visualItemRect(view.item(1, 3)).center()
+    else:
+        view = window.sample_lanes
+        view.reveal(target.id)
+        position = view.sample_rect(target.id).center().toPoint()
+    viewport = view.viewport()
+    if scenario == "empty":
+        position = QPoint(0, viewport.height() - 1)
+    assert viewport.rect().contains(position)
+    opened = []
+
+    def choose():
+        menu = QApplication.activePopupWidget()
+        if not isinstance(menu, QMenu):
+            return
+        opened.append([action.text() for action in menu.actions()])
+        if scenario == "stale":
+            state.replace_candidates(loaded_track.candidates)
+        if scenario == "busy":
+            window._set_busy(True)
+            window._sync_actions()
+        menu.setActiveAction(menu.actions()[0])
+        QTest.keyClick(menu, Qt.Key.Key_Escape if scenario == "cancel" else Qt.Key.Key_Return)
+
+    def right_click():
+        timer = QTimer(window)
+        timer.setSingleShot(True)
+        timer.timeout.connect(choose)
+        timer.start(0)
+        try:
+            QTest.mouseClick(viewport, Qt.MouseButton.RightButton, pos=position)
+            if timer.isActive():
+                # Offscreen Qt may not synthesize the platform context-menu event.
+                qapp.sendEvent(
+                    viewport,
+                    QContextMenuEvent(
+                        QContextMenuEvent.Reason.Mouse, position, viewport.mapToGlobal(position)
+                    ),
+                )
+        finally:
+            timer.stop()
+
+    right_click()
+    assert opened == ([] if scenario == "empty" else [["Export"]])
+    assert not played
+    if scenario != "stale":
+        assert state.active_id == active.id and state.marked_ids == {active.id}
+    files = list(tmp_path.glob("*.wav"))
+    if scenario != "export":
+        assert not files
+        return
+    assert len(files) == 1
+    original = files[0].read_bytes()
+    data, rate = sf.read(files[0])
+    assert rate == 1000
+    np.testing.assert_allclose(data, loaded_track.samples[1000:1200], atol=2 / 2**24)
+    right_click()
+    assert len(list(tmp_path.glob("*.wav"))) == 2
+    assert files[0].read_bytes() == original
 
 
 def test_command_line_file_uses_normal_analysis_and_displays_waveform(
