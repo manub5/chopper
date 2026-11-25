@@ -14,6 +14,7 @@ def test_defaults():
     assert settings.export_format == "wav"
     assert settings.loop_lengths_bars == (0.25, 0.5, 1.0)
     assert settings.gpu_mode == "auto"
+    assert settings.candidates_per_track == 8
 
 
 def test_save_then_load_roundtrip(tmp_path):
@@ -23,7 +24,7 @@ def test_save_then_load_roundtrip(tmp_path):
         export_dir="/musique/export",
         export_format="flac",
         loop_lengths_bars=(0.5, 1.0),
-        candidates_per_track=5,
+        candidates_per_track=64,
         max_one_shot_seconds=1.5,
         gpu_mode="cpu",
     )
@@ -31,6 +32,7 @@ def test_save_then_load_roundtrip(tmp_path):
     save_settings(original, path)
     loaded = load_settings(path)
 
+    assert loaded.candidates_per_track == 64
     assert loaded == original
 
 
@@ -77,7 +79,7 @@ def test_loading_legacy_file_is_read_only_and_migration_is_stable(tmp_path):
     migrated = load_settings(path)
     assert path.read_text() == before
     assert migrated.loop_lengths_bars == (0.25, 0.5, 1.0)
-    assert migrated.candidates_per_track == 8
+    assert migrated.candidates_per_track == 50
     assert Settings.from_dict(migrated.to_dict()) == migrated
 
 
@@ -118,7 +120,7 @@ def test_v2_lengths_restore_all_once(lengths, version, tmp_path):
         save_settings(loaded, path)
 
 
-@pytest.mark.parametrize("value, expected", [(0, 1), (-10, 1), (3, 3), (50, 8)])
+@pytest.mark.parametrize("value, expected", [(0, 1), (-10, 1), (3, 3), (50, 50), (65, 64)])
 def test_category_count_is_bounded(value, expected):
     assert Settings(candidates_per_track=value).candidates_per_track == expected
 

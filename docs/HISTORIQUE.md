@@ -6,6 +6,19 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 25/11/2026 — Plus de place pour la liste des échantillons
+
+- Répartition verticale : moitié de la part de la forme d’onde et deux tiers de
+  celle des rectangles ; le tableau récupère l’espace libéré. À 1100 × 1100 hors
+  écran, hauteurs avant/après : 524 → 262, 174 → 116 et 175 → 495 px. À petite
+  taille les minimums préservent l’accès au tracé, aux rectangles et au tableau.
+- Toutes les colonnes sont redimensionnables et le tableau défile en largeur.
+  La limite du réglage passe à 64 échantillons par catégorie, défaut inchangé à
+  8 ; un ancien fichier indiquant une valeur valide est lu sans réécriture.
+- Vérifications : 181 tests ciblés et 811 sur la suite complète ; comparaison
+  Qt hors écran et inspection à taille normale et réduite. Fichiers audio et
+  configuration utilisateur non modifiés.
+
 ## 23/11/2026 — Étape 3 : thème sombre inspiré de Material Design 3
 
 - Palette anthracite, accent ambre, champs et boutons arrondis, marges internes

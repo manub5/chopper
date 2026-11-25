@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from chopper.core.settings import Settings
+from chopper.core.settings import MAX_SAMPLES_PER_CATEGORY, Settings
 
 
 class SettingsDialog(QDialog):
@@ -46,7 +46,7 @@ class SettingsDialog(QDialog):
             loop_lengths_row.addWidget(checkbox)
 
         self._candidates_per_track = QSpinBox()
-        self._candidates_per_track.setRange(1, 8)
+        self._candidates_per_track.setRange(1, MAX_SAMPLES_PER_CATEGORY)
         self._candidates_per_track.setValue(settings.candidates_per_track)
 
         self._max_one_shot_seconds = QDoubleSpinBox()

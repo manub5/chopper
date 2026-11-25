@@ -34,7 +34,7 @@ def test_settings_reads_back_edited_values(qapp):
         export_dir="/musique/export",
         export_format="flac",
         loop_lengths_bars=(0.5,),
-        candidates_per_track=8,
+        candidates_per_track=10,
         max_one_shot_seconds=3.5,
         gpu_mode="cpu",
     )
@@ -60,7 +60,9 @@ def test_loop_lengths_are_explicit_checkboxes(qapp):
         0.25: "¼ bar",
     }
     assert all(check.isChecked() for check in dialog._loop_length_checks.values())
-    assert dialog._candidates_per_track.maximum() == 8
+    assert dialog._candidates_per_track.maximum() == 64
+    dialog._candidates_per_track.setValue(64)
+    assert dialog.settings().candidates_per_track == 64
 
 
 def test_force_dark_control_updates_only_its_preference(qapp):

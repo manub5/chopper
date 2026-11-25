@@ -14,6 +14,9 @@ APP_NAME = "chopper"
 _DEFAULT_LOOP_LENGTHS_BARS = AUTO_LOOP_LENGTHS_BARS
 
 
+MAX_SAMPLES_PER_CATEGORY = 64
+
+
 @dataclass
 class Settings:
     library_root: str | None = None
@@ -29,7 +32,7 @@ class Settings:
 
     def __post_init__(self) -> None:
         count = self.candidates_per_track
-        self.candidates_per_track = max(1, min(8, count)) if type(count) is int else 8
+        self.candidates_per_track = max(1, min(MAX_SAMPLES_PER_CATEGORY, count)) if type(count) is int else 8
         values = self.loop_lengths_bars
         if isinstance(values, (tuple, list)):
             valid = {float(value) for value in values if is_loop_length(value)}

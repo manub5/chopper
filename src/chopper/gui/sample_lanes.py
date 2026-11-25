@@ -31,7 +31,7 @@ class SampleLanesView(QAbstractScrollArea):
         self.setFrameShape(QAbstractScrollArea.Shape.NoFrame)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.setMinimumHeight(100)
+        self.setMinimumHeight(_HEADER_HEIGHT + _ROW_HEIGHT + 6)
         self.viewport().setMouseTracking(True)
         self.verticalScrollBar().valueChanged.connect(lambda _value: self.viewport().update())
         state.changed.connect(self._sync)

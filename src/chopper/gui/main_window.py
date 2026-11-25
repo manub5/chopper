@@ -167,9 +167,10 @@ class MainWindow(QMainWindow):
         self.selection_status_label.setWordWrap(True)
         right_layout.addWidget(self.selection_label)
         right_layout.addWidget(self.selection_status_label)
-        right_layout.addWidget(self.waveform_view, 3)
-        right_layout.addWidget(self.sample_lanes, 1)
-        right_layout.addWidget(self.candidates_panel, 1)
+        # Keep half of the former waveform share and two thirds of the lanes share.
+        right_layout.addWidget(self.waveform_view, 9)
+        right_layout.addWidget(self.sample_lanes, 4)
+        right_layout.addWidget(self.candidates_panel, 17)
         right_layout.addWidget(self.progress_bar)
 
         splitter = QSplitter()

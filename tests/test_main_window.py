@@ -180,10 +180,32 @@ def test_shared_layout_title_and_auto_persistence(qapp, make_window, monkeypatch
     assert window.auto_play_checkbox.parent() is window.analyze_album_button.parent()
     assert window.auto_play_checkbox.geometry().right() < window.analyze_album_button.geometry().left()
     assert window.library_panel.geometry().left() == 0
-    assert window.waveform_view.height() > window.candidates_panel.height()
     window.auto_play_checkbox.click()
     assert window.sample_state.auto_play is False
     assert saved == [False]
+
+
+def test_sample_workspace_prioritizes_table_height(qapp, make_window, loaded_track):
+    window = make_window(auto_play=False)
+    window._on_track_analyzed(loaded_track)
+    window.resize(1100, 1100)
+    window.show()
+    qapp.processEvents()
+    waveform, lanes, table = (
+        widget.height() for widget in (window.waveform_view, window.sample_lanes, window.candidates_panel)
+    )
+    total = waveform + lanes + table
+    # Previously 3:1:1; halve the first share and reduce the second by one third.
+    assert waveform / total == pytest.approx(0.30, abs=0.02)
+    assert lanes / total == pytest.approx(2 / 15, abs=0.02)
+    assert table / total == pytest.approx(17 / 30, abs=0.02)
+
+    window.resize(600, 420)
+    qapp.processEvents()
+    sample_table = window.candidates_panel.table
+    assert sample_table.viewport().height() >= sample_table.rowHeight(0)
+    assert window.sample_lanes.verticalScrollBar().maximum() > 0
+    assert sample_table.horizontalScrollBar().maximum() > 0
 
 
 def test_title_and_status_show_tempo_with_one_decimal(qapp, make_window, loaded_track):

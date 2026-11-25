@@ -3,6 +3,7 @@ from dataclasses import replace
 import pytest
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QHeaderView
 
 from chopper.gui.candidates_panel import CandidatesPanel
 from chopper.gui.sample_state import SampleState
@@ -50,6 +51,22 @@ def test_table_formats_tempo_and_times_with_millisecond_carry(qapp, loaded_track
     assert panel.table.item(0, 2).text() == "01:01.235"
     assert panel.table.item(0, 3).text() == "01:00.000"
     panel.close()
+
+
+def test_all_sample_columns_can_be_resized(qapp, loaded_track):
+    panel, _ = make_panel(loaded_track)
+    header = panel.table.horizontalHeader()
+    try:
+        for column in range(header.count()):
+            assert header.sectionResizeMode(column) == QHeaderView.ResizeMode.Interactive
+            initial = header.sectionSize(column)
+            header.resizeSection(column, initial + 20)
+            assert header.sectionSize(column) == initial + 20
+            header.resizeSection(column, initial)
+            assert header.sectionSize(column) == initial
+        assert panel.table.visualItemRect(panel.table.item(0, 4)).width() > 0
+    finally:
+        panel.close()
 
 
 def test_quarter_bar_label_and_duration(qapp, loaded_track):

@@ -91,14 +91,14 @@ class CandidatesPanel(QWidget):
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.verticalHeader().hide()
         self.table.verticalHeader().setDefaultSectionSize(26)
-        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.table.horizontalHeader().setSectionsClickable(True)
         self.table.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
         self.table.horizontalHeader().setSortIndicatorShown(True)
         self.table.horizontalHeader().sortIndicatorChanged.connect(self._sort)
-        for column, width in enumerate((0, 90, 90, 100, 36)):
-            if column:
-                self.table.setColumnWidth(column, width)
+        for column, width in enumerate((240, 90, 90, 100, 36)):
+            self.table.setColumnWidth(column, width)
         self.table.sample_clicked.connect(state.click)
         self.table.handle_drag_requested.connect(self.drag_requested.emit)
         self.table.currentCellChanged.connect(self._navigate)
