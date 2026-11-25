@@ -128,22 +128,47 @@ def draw(window, start=2.1, end=16.1):
 
 def chop(window, length=2.0):
     window.selection_controller.set_length(length)
-    assert window.selection_controller.request_chop()
+    if not window.selection_controller.busy:
+        assert window.selection_controller.request_chop()
     assert window._thread is not None and window._worker is not None
     wait_until(lambda: window._thread is None)
     assert not window.selection_controller.busy
+
+
+def test_length_combo_rechops_and_refreshes_both_views_without_dialog(ui):
+    window, policy, received, loaded = ui
+    policy["choice"] = "CANCEL"
+    draw(window)
+    window.chop_selection_button.click()
+    assert window.selection_controller.busy
+    wait_until(lambda: window._thread is None)
+    old_items = window.sample_state.items
+
+    window.length_combo.setCurrentIndex(window.length_combo.findData(2.0))
+    assert window.selection_controller.busy
+    assert window.sample_state.items is old_items
+    assert not window.length_combo.isEnabled()
+    wait_until(lambda: window._thread is None)
+
+    state = window.sample_state
+    assert state.loaded_track.samples is loaded.samples
+    assert {i.candidate.bars for i in state.items if i.candidate.type is CandidateType.LOOP} == {2.0}
+    assert len(state.items) == window.candidates_panel.table.rowCount()
+    assert len(state.items) == len(window.sample_lanes._placements)
+    assert not policy["choices"] and not received
+    assert window.length_combo.isEnabled()
 
 
 @pytest.mark.parametrize("length", [2.0, 4.0])
 def test_draw_c_real_worker_updates_both_views_and_exports_original_audio(ui, tmp_path, length):
     window, policy, received, loaded = ui
     window.auto_play_checkbox.setChecked(True)
+    window.selection_controller.set_length(length)
     draw(window)
     assert window.selection_controller.window == (2.0, 16.0)
     assert len(received) == 1
     np.testing.assert_array_equal(received[0][0], loaded.samples[2000:16000])
     assert received[0][1] == 1000
-    window.selection_controller.set_length(length)
     view = window.waveform_view
     original_plot = view._waveform_item
     view.setXRange(1.0, 17.0, padding=0)
@@ -184,7 +209,7 @@ def test_draw_c_real_worker_updates_both_views_and_exports_original_audio(ui, tm
     }
 
 
-@pytest.mark.parametrize("transition", ["escape", "outside", "whole", "chop", "track", "album", "close"])
+@pytest.mark.parametrize("transition", ["escape", "outside", "whole", "track", "album", "close"])
 @pytest.mark.parametrize("decision", ["CANCEL", "EXPORT"])
 def test_cancelled_or_failed_export_blocks_all_destructive_transitions(
     ui, tmp_path, monkeypatch, transition, decision
@@ -213,8 +238,6 @@ def test_cancelled_or_failed_export_blocks_all_destructive_transitions(
         QApplication.processEvents()
     elif transition == "whole":
         controller.request_whole_track()
-    elif transition == "chop":
-        controller.request_chop()
     elif transition == "track":
         window._on_track_selected(tmp_path / "other.wav")
     elif transition == "album":

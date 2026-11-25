@@ -81,6 +81,10 @@ uv run chopper
 
 ## Find and export samples
 
+Use **Chop selection** to find samples in the selected range. Changing **Length**
+automatically searches that range again without a replacement prompt. The previous
+results stay visible until the search succeeds; exported files are not changed.
+
 To open a track directly from another program or a terminal, pass its absolute
 path (quote paths containing spaces):
 

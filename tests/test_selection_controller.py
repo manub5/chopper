@@ -98,7 +98,6 @@ def test_empty_results_still_confirm_but_cannot_export(qapp, loaded_track):
     controller, state, policy, choices, exports, requests = setup_controller(loaded_track)
     controller.set_selection((0.2, 0.8))
     controller.set_length(4.0)
-    controller.request_chop()
     assert controller.apply_result(result_for(state, requests[-1]))
     assert state.items == () and controller.result_window == (0.2, 0.8)
     policy["decision"] = SelectionDecision.CANCEL
@@ -107,15 +106,39 @@ def test_empty_results_still_confirm_but_cannot_export(qapp, loaded_track):
     assert not exports
 
 
-def test_adjusting_selection_keeps_old_result_bounds_until_chop(qapp, loaded_track):
+def test_length_change_rechops_current_selection_and_preserves_results_on_failure(qapp, loaded_track):
     controller, state, _, _, _, requests = with_results(loaded_track)
     old_items, marks = state.items, state.marked_ids
     controller.set_selection((0.2, 0.8))
+    assert len(requests) == 1
     controller.set_length(4.0)
     assert controller.result_window == (0.0, 3.0) and controller.result_length_bars == 1.0
     assert controller.window == (0.2, 0.8) and controller.length_bars == 4.0
-    assert state.items is old_items and state.marked_ids == marks and len(requests) == 1
-    assert "Selection changed" in controller.status_message
+    assert state.items is old_items and state.marked_ids == marks
+    assert len(requests) == 2 and requests[-1][1:] == ((0.2, 0.8), 4.0)
+    assert controller.fail(requests[-1][0], "search failed")
+    assert state.items is old_items and state.marked_ids == marks
+    controller.set_length(4.0)
+    assert len(requests) == 2
+
+
+def test_length_without_selection_only_sets_next_length(qapp, loaded_track):
+    controller, _, _, _, _, requests = setup_controller(loaded_track)
+    controller.set_length(2.0)
+    assert controller.length_bars == 2.0 and not requests
+
+
+def test_second_chop_replaces_results_without_confirmation(qapp, loaded_track):
+    from chopper.gui.selection_dialog import SelectionDecision
+
+    controller, state, policy, choices, exports, requests = with_results(loaded_track)
+    policy["decision"] = SelectionDecision.CANCEL
+    old_items = state.items
+    assert controller.request_chop()
+    assert len(requests) == 2 and not choices and not exports
+    assert state.items is old_items
+    assert controller.apply_result(result_for(state, requests[-1]))
+    assert state.items is not old_items
 
 
 @pytest.mark.parametrize("mismatch", ["id", "window", "length", "audio", "analysis", "rate"])

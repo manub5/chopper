@@ -6,6 +6,15 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 25/11/2026 — Redécoupe automatique de la sélection
+
+- **Chop selection** remplace les résultats manuels sans confirmation. Un changement
+  de **Length** relance la recherche sur la sélection courante ; sans sélection,
+  il règle seulement la prochaine découpe. Une valeur inchangée ne relance rien.
+- Réutilise l’audio et l’analyse en mémoire, sans travail concurrent. En cas
+  d’échec, les résultats et marques précédents restent en place. Les autres
+  confirmations et les fichiers déjà exportés restent inchangés.
+
 ## 25/11/2026 — Export au clic droit dans les deux vues
 
 - **Export** vise la ligne ou le rectangle sous le clic, sans sélectionner ni

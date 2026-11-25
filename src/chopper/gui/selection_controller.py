@@ -86,7 +86,11 @@ class SelectionController(QObject):
             return
         if not is_loop_length(bars):
             raise ValueError("Unsupported manual loop length.")
+        if bars == self._length_bars:
+            return
         self._length_bars = float(bars)
+        if self.request_chop():
+            return
         self._update_status()
         self.changed.emit()
 
@@ -137,7 +141,7 @@ class SelectionController(QObject):
     def request_chop(self) -> bool:
         if self.locked or self._window is None or self.state.loaded_track is None:
             return False
-        return self.authorize_transition("chop") and self._begin(self._window, self._length_bars)
+        return self._begin(self._window, self._length_bars)
 
     def request_whole_track(self) -> bool:
         if self.locked or (self._window is None and self._result_window is None):
