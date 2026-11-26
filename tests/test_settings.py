@@ -196,7 +196,7 @@ def test_failed_save_preserves_existing_file_and_cleans_temporary(tmp_path, monk
     with pytest.raises(OSError, match="unavailable"):
         save_settings(Settings(export_dir=str(tmp_path / "samples")), path)
     assert path.read_bytes() == before
-    assert list(tmp_path.iterdir()) == [path]
+    assert set(tmp_path.iterdir()) == {path, tmp_path / ".settings.toml.lock"}
 
 
 def test_save_creates_parent_but_no_sample_directory(tmp_path):
@@ -297,3 +297,15 @@ def test_broken_settings_symlink_reports_error_instead_of_defaults(isolated_xdg,
         load_settings(path if location == "explicit" else None)
     assert path.is_symlink() and path.readlink() == target
     assert not target.exists()
+
+
+def test_stale_settings_updates_preserve_distinct_fields(tmp_path):
+    from dataclasses import replace
+
+    path = tmp_path / "settings.toml"
+    first = load_settings(path)
+    second = load_settings(path)
+    save_settings(replace(first, auto_play=False), path, previous=first)
+    save_settings(replace(second, force_dark=True), path, previous=second)
+    assert not load_settings(path).auto_play
+    assert load_settings(path).force_dark

@@ -39,6 +39,7 @@ def make_window(tmp_path, monkeypatch):
     provoquer un plantage natif au lieu d'une simple erreur Python."""
     created: list[MainWindow] = []
     monkeypatch.setattr(settings_module, "default_settings_path", lambda: tmp_path / "settings.toml")
+    monkeypatch.setattr(settings_module, "_legacy_settings_path", lambda: tmp_path / "legacy.toml")
 
     def confirm_folder_setup(box):
         assert box.windowTitle() == "Choose your sample folder"
@@ -285,9 +286,7 @@ def test_open_track_action_loads_only_one_track_and_clears_album_target(
     assert window.library_panel.topLevelItem(2).text(0) == paths[1].name
 
 
-def test_add_album_action_appends_without_loading_audio_or_saving_settings(
-    qapp, make_window, tmp_path, monkeypatch
-):
+def test_add_album_action_appends_and_only_remembers_its_dialog(qapp, make_window, tmp_path, monkeypatch):
     window = make_window()
     album, _ = _make_library(tmp_path)
     pending = iter([str(album), ""])
@@ -298,7 +297,52 @@ def test_add_album_action_appends_without_loading_audio_or_saving_settings(
     assert window.library_panel.topLevelItemCount() == 1
     assert str(album) in window.library_panel.topLevelItem(0).text(0)
     assert window._thread is None and window.sample_state.loaded_track is None
-    assert window.settings.library_root is None and not (tmp_path / "settings.toml").exists()
+    assert load_settings().library_root is None
+    assert load_settings().dialog_locations == {"album": str(album)}
+
+
+def test_dialog_locations_are_independent_and_survive_reopening(qapp, make_window, tmp_path, monkeypatch):
+    library, album, track, export = [tmp_path / key for key in ("library", "album", "track", "export")]
+    for folder in (library, album, track, export):
+        folder.mkdir()
+    window = make_window()
+    choices = iter(map(str, (library, album, export)))
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args: next(choices))
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args: (str(track / "song.wav"), ""))
+    monkeypatch.setattr(window, "open_file", lambda path: None)
+    window._on_open_library_clicked()
+    window._on_add_album_clicked()
+    window._on_open_track_clicked()
+    assert window._ensure_export_directory() == export
+    settings = load_settings()
+    assert settings.dialog_locations == {
+        "library": str(library),
+        "album": str(album),
+        "track": str(track),
+        "export": str(export),
+    }
+    settings.export_dir = None
+    settings_module.save_settings(settings)
+    album.rmdir()
+    reopened = MainWindow(settings, AnalysisCache(tmp_path / "second.sqlite"))
+    starts = []
+    monkeypatch.setattr(
+        QFileDialog, "getExistingDirectory", lambda parent, title, start: starts.append(start) or ""
+    )
+    monkeypatch.setattr(
+        QFileDialog, "getOpenFileName", lambda parent, title, start, formats: (starts.append(start) or "", "")
+    )
+    before = settings_module.default_settings_path().read_bytes()
+    try:
+        reopened._on_open_library_clicked()
+        reopened._on_add_album_clicked()
+        reopened._on_open_track_clicked()
+        assert reopened._ensure_export_directory() is None
+        assert starts == [str(library), "", str(track), str(export)]
+        assert reopened.settings.export_dir is None
+        assert settings_module.default_settings_path().read_bytes() == before
+    finally:
+        reopened.close()
 
 
 def test_open_path_adds_album_without_loading_track(qapp, make_window, tmp_path, loaded_track):
@@ -411,7 +455,7 @@ def test_shared_layout_title_and_auto_persistence(qapp, make_window, monkeypatch
     qapp.processEvents()
     saved = []
     monkeypatch.setattr(
-        main_window_module, "save_settings", lambda settings: saved.append(settings.auto_play)
+        main_window_module, "save_settings", lambda settings, **kwargs: saved.append(settings.auto_play)
     )
     window._on_track_analyzed(loaded_track)
     assert loaded_track.analysis.track.title in window.track_label.text()
@@ -625,7 +669,7 @@ def test_auto_preference_survives_settings_dialog(qapp, make_window, monkeypatch
     monkeypatch.setattr(QDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
     saved = []
     monkeypatch.setattr(
-        main_window_module, "save_settings", lambda settings: saved.append(settings.auto_play)
+        main_window_module, "save_settings", lambda settings, **kwargs: saved.append(settings.auto_play)
     )
     window._on_settings_clicked()
     assert window.sample_state.auto_play is False
@@ -919,7 +963,9 @@ def test_settings_dialog_accepted_updates_and_saves_settings(qapp, make_window, 
     monkeypatch.setattr(QDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
     monkeypatch.setattr("chopper.gui.settings_dialog.SettingsDialog.settings", lambda self: new_settings)
     saved = []
-    monkeypatch.setattr(main_window_module, "save_settings", saved.append)
+    monkeypatch.setattr(
+        main_window_module, "save_settings", lambda settings, **kwargs: saved.append(settings)
+    )
 
     window._on_settings_clicked()
 
@@ -934,7 +980,9 @@ def test_settings_dialog_toggles_theme_without_resetting_audio_or_preferences(
     window._on_track_analyzed(loaded_track)
     original_player = window.preview_player
     saved = []
-    monkeypatch.setattr(main_window_module, "save_settings", saved.append)
+    monkeypatch.setattr(
+        main_window_module, "save_settings", lambda settings, **kwargs: saved.append(settings)
+    )
 
     def accept_dark(dialog):
         dialog._force_dark.setChecked(True)
@@ -1052,7 +1100,9 @@ def test_cancelled_export_does_not_write_or_update_settings(
     window._on_track_analyzed(loaded_track)
     monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args: "")
     saved = []
-    monkeypatch.setattr(main_window_module, "save_settings", saved.append)
+    monkeypatch.setattr(
+        main_window_module, "save_settings", lambda settings, **kwargs: saved.append(settings)
+    )
     window._on_export_requested("all")
     assert window.settings.export_dir is None
     assert saved == []
@@ -1183,7 +1233,7 @@ def test_export_dir_preference_enables_handles_without_writing(
     updated = Settings(export_dir=str(destination))
     monkeypatch.setattr(QDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
     monkeypatch.setattr("chopper.gui.settings_dialog.SettingsDialog.settings", lambda self: updated)
-    monkeypatch.setattr(main_window_module, "save_settings", lambda *args: None)
+    monkeypatch.setattr(main_window_module, "save_settings", lambda *args, **kwargs: None)
     window._on_settings_clicked()
     assert window.candidates_panel.table.item(0, 4).flags() & Qt.ItemFlag.ItemIsEnabled
     assert not destination.exists()

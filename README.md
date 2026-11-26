@@ -109,6 +109,12 @@ Chopper window. A drop only adds library references for this session: it never
 moves or copies the originals, replaces the active track, or starts analysis.
 Mounted NAS folders work like local folders; remote URLs are not imported.
 
+The library, album, track and sample-folder pickers each remember their last
+confirmed folder. Canceling a picker does not change it. Each Chopper window
+has its own active track. Windows can work in parallel; changes to different
+preferences are preserved, and the last save wins if both change the same
+preference. Open windows do not reload preferences automatically.
+
 1. Choose **Open library…** and browse to an album or track, including a mounted NAS.
    In the **File** menu, use **Add album…** to append album folders to the library
    for this session, or **Open track…** to analyze one audio file directly. Albums

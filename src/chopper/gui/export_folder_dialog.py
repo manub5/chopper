@@ -5,7 +5,7 @@ from pathlib import Path
 from PySide6.QtWidgets import QFileDialog, QMessageBox, QWidget
 
 
-def choose_export_folder(parent: QWidget) -> Path | None:
+def choose_export_folder(parent: QWidget, start: str = "") -> Path | None:
     box = QMessageBox(parent)
     box.setWindowTitle("Choose your sample folder")
     box.setText(
@@ -19,5 +19,5 @@ def choose_export_folder(parent: QWidget) -> Path | None:
     box.exec()
     if box.clickedButton() != choose:
         return None
-    directory = QFileDialog.getExistingDirectory(parent, "Choose your sample folder")
+    directory = QFileDialog.getExistingDirectory(parent, "Choose your sample folder", start)
     return Path(directory) if directory else None

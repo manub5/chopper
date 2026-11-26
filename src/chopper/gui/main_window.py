@@ -277,22 +277,35 @@ class MainWindow(QMainWindow):
     # --- bibliothèque ---------------------------------------------------
 
     def _on_open_library_clicked(self) -> None:
-        directory = QFileDialog.getExistingDirectory(self, "Library folder")
+        directory = QFileDialog.getExistingDirectory(
+            self, "Library folder", self.settings.dialog_start("library")
+        )
         if not directory:
             return
-        self.settings.library_root = directory
-        save_settings(self.settings)
+        updated = replace(self.settings, library_root=directory)
+        updated.remember_dialog("library", Path(directory))
+        self._save_preferences(updated)
         self.library_panel.set_root(Path(directory))
 
     def _on_add_album_clicked(self) -> None:
-        directory = QFileDialog.getExistingDirectory(self, "Add album folder")
+        directory = QFileDialog.getExistingDirectory(
+            self, "Add album folder", self.settings.dialog_start("album")
+        )
         if directory:
+            updated = replace(self.settings)
+            updated.remember_dialog("album", Path(directory))
+            self._save_preferences(updated)
             self.open_path(Path(directory))
 
     def _on_open_track_clicked(self) -> None:
         extensions = " ".join(f"*{suffix}" for suffix in sorted(audio_io.AUDIO_EXTENSIONS))
-        filename, _ = QFileDialog.getOpenFileName(self, "Open track", "", f"Audio files ({extensions})")
+        filename, _ = QFileDialog.getOpenFileName(
+            self, "Open track", self.settings.dialog_start("track"), f"Audio files ({extensions})"
+        )
         if filename:
+            updated = replace(self.settings)
+            updated.remember_dialog("track", Path(filename).parent)
+            self._save_preferences(updated)
             self.open_file(Path(filename))
 
     def _on_folder_selected(self, folder: Path | None) -> None:
@@ -512,6 +525,10 @@ class MainWindow(QMainWindow):
 
     # --- paramètres -------------------------------------------------------
 
+    def _save_preferences(self, updated: Settings) -> None:
+        save_settings(updated, previous=self.settings)
+        self.settings = updated
+
     def _on_settings_clicked(self) -> None:
         dialog = SettingsDialog(self.settings, self)
         palette = self.theme_manager.palette
@@ -519,10 +536,11 @@ class MainWindow(QMainWindow):
             dialog.setPalette(palette.to_qpalette())
         palette.apply_control_styles(dialog)
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            self.settings = dialog.settings()
-            self.auto_play_checkbox.setChecked(self.settings.auto_play)
+            self._save_preferences(dialog.settings())
+            with QSignalBlocker(self.auto_play_checkbox):
+                self.auto_play_checkbox.setChecked(self.settings.auto_play)
+            self.sample_state.set_auto_play(self.settings.auto_play)
             self.theme_manager.set_force_dark(self.settings.force_dark)
-            save_settings(self.settings)
 
     def _apply_theme(self) -> None:
         palette = self.theme_manager.palette
@@ -571,8 +589,7 @@ class MainWindow(QMainWindow):
 
     def _on_auto_play_toggled(self, enabled: bool) -> None:
         self.sample_state.set_auto_play(enabled)
-        self.settings.auto_play = enabled
-        save_settings(self.settings)
+        self._save_preferences(replace(self.settings, auto_play=enabled))
 
     def _play_sample(self, item_id: int, token: int) -> None:
         loaded = self.sample_state.loaded_track
@@ -656,16 +673,16 @@ class MainWindow(QMainWindow):
     def _ensure_export_directory(self) -> Path | None:
         if self.settings.export_dir:
             return Path(self.settings.export_dir)
-        directory = choose_export_folder(self)
+        directory = choose_export_folder(self, self.settings.dialog_start("export"))
         if directory is None:
             return None
         updated = replace(self.settings, export_dir=str(directory))
+        updated.remember_dialog("export", directory)
         try:
-            save_settings(updated)
+            self._save_preferences(updated)
         except Exception as exc:  # noqa: BLE001 - report persistence failures before writing any audio
             self.status_bar.showMessage(f"Could not save the sample folder: {exc}", 10000)
             return None
-        self.settings = updated
         return directory
 
     def _on_export_requested(self, mode: str) -> None:

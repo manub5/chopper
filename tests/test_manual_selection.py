@@ -465,9 +465,9 @@ def test_settings_save_failure_during_confirmed_export_preserves_manual_results(
     items, marks = state.items, state.marked_ids
     policy["choice"] = "EXPORT"
     window.settings.export_dir = None
-    monkeypatch.setattr(main_module, "choose_export_folder", lambda parent: tmp_path / "new-exports")
+    monkeypatch.setattr(main_module, "choose_export_folder", lambda parent, start: tmp_path / "new-exports")
 
-    def cannot_save(settings):
+    def cannot_save(settings, **kwargs):
         raise OSError("settings read-only")
 
     monkeypatch.setattr(main_module, "save_settings", cannot_save)

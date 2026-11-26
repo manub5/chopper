@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -94,14 +95,20 @@ class SettingsDialog(QDialog):
         return row
 
     def _browse_library_root(self) -> None:
-        directory = QFileDialog.getExistingDirectory(self, "Library folder")
+        directory = QFileDialog.getExistingDirectory(
+            self, "Library folder", self._initial_settings.dialog_start("library")
+        )
         if directory:
             self._library_root.setText(directory)
+            self._initial_settings.remember_dialog("library", Path(directory))
 
     def _browse_export_dir(self) -> None:
-        directory = QFileDialog.getExistingDirectory(self, "Sample folder")
+        directory = QFileDialog.getExistingDirectory(
+            self, "Sample folder", self._initial_settings.dialog_start("export")
+        )
         if directory:
             self._export_dir.setText(directory)
+            self._initial_settings.remember_dialog("export", Path(directory))
 
     def accept(self) -> None:
         if not any(check.isChecked() for check in self._loop_length_checks.values()):

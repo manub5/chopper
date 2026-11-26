@@ -6,6 +6,17 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 26/11/2026 — Mémoire des sélecteurs et instances indépendantes
+
+- Bibliothèque, ajout d’album, ouverture de piste et choix du dossier d’export
+  mémorisent chacun le dernier dossier accepté. Annuler ne change rien et un
+  emplacement devenu inaccessible n’est pas proposé. Le souvenir du sélecteur
+  d’export ne configure pas à lui seul une destination d’export.
+- Les fenêtres sauvegardent uniquement les réglages modifiés. Lorsque deux
+  instances modifient le même champ, la dernière sauvegarde l’emporte ; les
+  fenêtres déjà ouvertes ne sont pas actualisées automatiquement. Les tests à
+  deux processus couvrent aussi le cache et deux exports de même nom.
+
 ## 26/11/2026 — Ouvrir et ajouter depuis le gestionnaire de fichiers
 
 - L’action contextuelle Dolphin optionnelle annonce ses types audio et les dossiers, et transmet
