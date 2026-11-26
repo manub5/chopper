@@ -45,6 +45,15 @@ class LibraryPanel(QTreeWidget):
     def add_track(self, path: Path) -> None:
         self._add_session_entry(path, is_album=False)
 
+    def add_dropped_path(self, path: Path, *, is_album: bool) -> None:
+        path = path.absolute()
+        iterator = QTreeWidgetItemIterator(self)
+        while (item := iterator.value()) is not None:
+            if item.data(0, _PATH_ROLE) == path:
+                return
+            iterator += 1
+        self._add_session_entry(path, is_album=is_album)
+
     def _add_session_entry(self, path: Path, *, is_album: bool) -> None:
         path = path.absolute()
         if path not in self._session_entries:
@@ -117,7 +126,8 @@ class LibraryPanel(QTreeWidget):
                 continue  # entrée inaccessible (lien cassé, droit réseau...) : ignorée
 
             if is_dir:
-                self._create_entry(parent_item, entry, is_folder=True)
+                if parent_item is self.invisibleRootItem() or entry.absolute() not in self._session_entries:
+                    self._create_entry(parent_item, entry, is_folder=True)
             else:
                 try:
                     # entry.exists() suit les liens symboliques : un lien cassé

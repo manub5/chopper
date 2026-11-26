@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QObject, Qt, QThread, Slot
-from PySide6.QtGui import QPalette
+from PySide6.QtCore import QEvent, QObject, QSignalBlocker, Qt, QThread, Slot
+from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QPalette
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -105,6 +105,7 @@ class MainWindow(QMainWindow):
         super().__init__(parent)
         self.setWindowTitle("Chopper")
         self.resize(1100, 700)
+        self.setAcceptDrops(True)
 
         self.settings = settings if settings is not None else load_settings()
         self.cache = cache if cache is not None else AnalysisCache(default_cache_path())
@@ -286,7 +287,7 @@ class MainWindow(QMainWindow):
     def _on_add_album_clicked(self) -> None:
         directory = QFileDialog.getExistingDirectory(self, "Add album folder")
         if directory:
-            self.library_panel.add_album(Path(directory))
+            self.open_path(Path(directory))
 
     def _on_open_track_clicked(self) -> None:
         extensions = " ".join(f"*{suffix}" for suffix in sorted(audio_io.AUDIO_EXTENSIONS))
@@ -300,6 +301,77 @@ class MainWindow(QMainWindow):
 
     def _on_library_load_failed(self, folder: Path, message: str) -> None:
         self.status_bar.showMessage(f"Could not read {folder}: {message}", 8000)
+
+    def open_path(self, path: Path) -> None:
+        """Add a folder as an album, or open a file through the normal analysis pipeline."""
+        try:
+            path = path.expanduser().absolute()
+            if path.is_dir():
+                self.library_panel.add_album(path)
+                return
+        except (OSError, ValueError) as error:
+            self.status_bar.showMessage(f"Could not open {path}: {error}", 10000)
+            return
+        self.open_file(path)
+
+    @staticmethod
+    def _can_copy_urls(event: QDropEvent) -> bool:
+        # Ignore our own sample drags: their WAVs are temporary, not library sources.
+        return (
+            event.source() is None
+            and bool(event.possibleActions() & Qt.DropAction.CopyAction)
+            and event.mimeData().hasUrls()
+        )
+
+    def dragEnterEvent(self, event: QDragEnterEvent) -> None:
+        self.dragMoveEvent(event)
+
+    def dragMoveEvent(self, event: QDragMoveEvent) -> None:
+        if self._can_copy_urls(event):
+            event.setDropAction(Qt.DropAction.CopyAction)
+            event.accept()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event: QDropEvent) -> None:
+        if not self._can_copy_urls(event):
+            event.ignore()
+            return
+        accepted = set()
+        unsupported = 0
+        # Moving an already-listed nested track to the session list must not select a track.
+        with QSignalBlocker(self.library_panel):
+            for url in event.mimeData().urls():
+                if not url.isLocalFile() or url.host() not in {"", "localhost"}:
+                    unsupported += 1
+                    continue
+                path = Path(url.path() if url.host() else url.toLocalFile())
+                if path in accepted:
+                    continue
+                try:
+                    if not path.is_absolute():
+                        unsupported += 1
+                        continue
+                    if path.is_dir():
+                        self.library_panel.add_dropped_path(path, is_album=True)
+                    elif path.suffix.lower() in audio_io.AUDIO_EXTENSIONS and path.is_file():
+                        self.library_panel.add_dropped_path(path, is_album=False)
+                    else:
+                        unsupported += 1
+                        continue
+                except (OSError, ValueError):
+                    unsupported += 1
+                    continue
+                accepted.add(path)
+        if unsupported:
+            self.status_bar.showMessage(
+                f"Skipped {unsupported} unsupported or unavailable drop item(s).", 8000
+            )
+        if accepted:
+            event.setDropAction(Qt.DropAction.CopyAction)
+            event.accept()
+        else:
+            event.ignore()
 
     # --- analyse d'une piste ---------------------------------------------
 

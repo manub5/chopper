@@ -17,7 +17,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager, nullcontext
 from pathlib import Path
 
-from install_desktop import desktop_entry
+from install_desktop import desktop_entry, dolphin_service_entry
 
 RECEIPT_NAME = ".chopper-install.json"
 
@@ -94,7 +94,9 @@ def _validate_receipt(data: object, project: Path) -> dict:
     ):
         raise ValueError("Foreign or invalid Chopper installation receipt.")
     for role, record in data["artifacts"].items():
-        if role not in {"global-command", "menu", "icon", "desktop"} or not isinstance(record, dict):
+        if role not in {"global-command", "menu", "icon", "desktop", "dolphin-service"} or not isinstance(
+            record, dict
+        ):
             raise ValueError("Invalid receipt artifact role.")
         is_link = role == "global-command"
         expected = {
@@ -133,6 +135,7 @@ def _validate_receipt(data: object, project: Path) -> dict:
                 and (destination.name != "chopper.desktop" or destination.parent.name != "applications")
             )
             or (role == "desktop" and destination.name != "chopper.desktop")
+            or (role == "dolphin-service" and destination.parts[-3:] != _DOLPHIN_SERVICE.parts)
             or (
                 role == "icon"
                 and tuple(destination.parts[-5:]) != ("icons", "hicolor", "scalable", "apps", "chopper.svg")
@@ -511,6 +514,9 @@ def _report_path(home: Path, initial_path: str, destination: Path) -> None:
         print(f"Warning: another command shadows Chopper in the initial PATH: {selected}")
 
 
+_DOLPHIN_SERVICE = Path("kio/servicemenus/chopper-open.desktop")
+
+
 def install_integrations(launcher: Path, *, initial_path: str) -> int:
     launcher = _absolute(launcher).resolve(strict=True)
     desktop_entry(launcher)
@@ -530,6 +536,10 @@ def install_integrations(launcher: Path, *, initial_path: str) -> int:
         desktop_dir / "chopper.desktop",
         project,
         "Create or update the executable KDE Desktop shortcut there?",
+    )
+    dolphin_service = data_home / _DOLPHIN_SERVICE
+    want_dolphin = _confirm(
+        dolphin_service, project, "Install the Open with Chopper action for Dolphin there?"
     )
     with _project_lock(project):
         icon = _install_icon_locked(launcher, data_home) if want_icon else None
@@ -553,6 +563,11 @@ def install_integrations(launcher: Path, *, initial_path: str) -> int:
             print(f"Desktop shortcut installed: {installed}")
         else:
             print("Desktop shortcut skipped. No Desktop folder was created.")
+        if want_dolphin:
+            installed = _install_file(
+                launcher, "dolphin-service", dolphin_service, dolphin_service_entry(launcher).encode(), 0o755
+            )
+            print(f"Dolphin action installed: {installed}")
     return 0
 
 

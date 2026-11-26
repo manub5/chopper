@@ -36,17 +36,22 @@ la hauteur en mode platine.
   peuvent analyser et exporter en parallèle : pas de corruption du cache ou
   des préférences, ni d’écrasement des exports ordinaires. Si nécessaire, corriger
   uniquement les conflits observés. Une seule piste active par fenêtre.
-- Déclarer Chopper comme application compatible avec les dossiers et les types
-  audio pris en charge, sans le définir comme application par défaut. Le menu
-  **Open With** de Dolphin lance une piste ou ouvre un dossier comme album ;
-  ouvrir un album l’ajoute à la bibliothèque sans l’analyser automatiquement.
-  Mettre à jour les raccourcis reconnus par l’installateur sans écraser les entrées
-  étrangères. Aucun changement automatique des associations utilisateur.
+- Proposer dans le menu contextuel de Dolphin l’action **Open with Chopper**,
+  traduite **Ouvrir avec Chopper** en français. Ce n’est pas une entrée du
+  sous-menu système **Ouvrir avec** : les types audio et dossier ne sont déclarés
+  que pour l’action Dolphin, jamais comme associations d’application. Le sous-menu
+  standard a été écarté car son inscription peut changer le choix implicite du
+  système, même sans écrire dans les préférences. L’action ouvre une seule cible
+  locale : analyser une piste ou ajouter un dossier comme album sans analyse.
+  Son installation est facultative et tracée ; ne pas écraser d’entrée étrangère
+  ni modifier d’associations utilisateur.
 - Accepter le dépôt de fichiers audio et de dossiers locaux, NAS montés compris,
   et les ajouter en bas de la bibliothèque sans déplacer ni copier les originaux.
   Le dépôt ajoute des entrées, ne remplace pas la piste active ; ignorer les
-  doublons et signaler les éléments non pris en charge. Les pistes seules
-  affichent leur nom ; les albums gardent leur chemin visible.
+  doublons, y compris les entrées imbriquées déjà visibles, et signaler les
+  éléments non pris en charge. Un dossier ajouté en bas avant que sa branche
+  soit dépliée ne doit pas réapparaître sous cette branche. Les pistes seules
+  affichent leur nom ; les albums ajoutés en bas gardent leur chemin visible.
 - Mémoriser entre les lancements le dernier emplacement accepté, séparément pour
   chaque usage de dialogue (bibliothèque, album, piste, export). L’annulation ne
   modifie rien. Si l’emplacement n’est plus disponible, revenir au comportement

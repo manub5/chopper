@@ -92,11 +92,22 @@ path (quote paths containing spaces):
 chopper "/absolute/path/to/track.wav"
 ```
 
-This starts the same analysis as selecting the track in the library, with the
+For an album, pass the folder path instead: `chopper "/absolute/path/to/My Album"`.
+It appears in the session library without starting analysis.
+
+Opening a track starts the same analysis as selecting it in the library, with the
 usual status indication; the waveform appears when analysis finishes. Missing
 or unreadable files are reported in the window without closing it. Without an
 argument, startup is unchanged. Before installing the global command, use
 `uv run chopper "/absolute/path/to/track.wav"` from the project folder.
+
+If you enable the optional Dolphin action during setup, right-click a supported
+audio file or folder and choose **Open with Chopper** from Dolphin’s context menu.
+It is separate from the standard **Open With** submenu and does not change the
+default application. You can also drop files and folders onto the
+Chopper window. A drop only adds library references for this session: it never
+moves or copies the originals, replaces the active track, or starts analysis.
+Mounted NAS folders work like local folders; remote URLs are not imported.
 
 1. Choose **Open library…** and browse to an album or track, including a mounted NAS.
    In the **File** menu, use **Add album…** to append album folders to the library

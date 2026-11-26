@@ -6,6 +6,15 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 26/11/2026 — Ouvrir et ajouter depuis le gestionnaire de fichiers
+
+- L’action contextuelle Dolphin optionnelle annonce ses types audio et les dossiers, et transmet
+  un chemin local à Chopper. Un dossier s’ajoute comme album sans analyse ; une
+  piste ouverte explicitement garde le même parcours d’analyse.
+- Le dépôt ajoute uniquement des références de session, sans doublon, sans
+  déplacer les originaux ni remplacer la piste active. Les éléments non locaux
+  ou non pris en charge sont signalés. Les associations par défaut ne sont pas modifiées.
+
 ## 26/11/2026 — Panneaux redimensionnables et clic neutre sur la forme d’onde
 
 - La bibliothèque se redimensionne en largeur ; la forme d’onde, les rectangles

@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -93,6 +94,38 @@ def test_main_without_file_keeps_startup_idle(monkeypatch):
     with pytest.raises(SystemExit) as stopped:
         app_module.main([])
     assert stopped.value.code == 0 and shown == [True]
+
+
+@pytest.mark.parametrize("name", ["Track with spaces.wav", "Album with spaces"])
+def test_startup_routes_local_target_after_show(monkeypatch, tmp_path, name):
+    monkeypatch.chdir(tmp_path)
+    path = Path(name)
+    if path.suffix:
+        path.touch()
+    else:
+        path.mkdir()
+    events = []
+    pending = []
+
+    def run():
+        pending.pop()()
+        return 0
+
+    monkeypatch.setattr(
+        app_module, "QApplication", lambda args: SimpleNamespace(arguments=lambda: args, exec=run)
+    )
+    monkeypatch.setattr(
+        app_module, "QTimer", SimpleNamespace(singleShot=lambda delay, fn: pending.append(fn))
+    )
+    monkeypatch.setattr(
+        app_module,
+        "build_window",
+        lambda: SimpleNamespace(show=lambda: events.append("shown"), open_path=events.append),
+    )
+    with pytest.raises(SystemExit) as stopped:
+        app_module.main([name])
+    assert stopped.value.code == 0
+    assert events == ["shown", tmp_path / name]
 
 
 def test_qt_options_are_consumed_before_optional_file_parsing(tmp_path):

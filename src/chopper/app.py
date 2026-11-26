@@ -52,13 +52,13 @@ def main(argv: list[str] | None = None) -> None:
     app = QApplication(sys.argv if argv is None else [sys.argv[0], *argv])
     # Qt consumes its own switches before we interpret the remaining arguments.
     parser = argparse.ArgumentParser(prog="chopper", description="Find, preview and export audio samples.")
-    parser.add_argument("file", nargs="?", type=Path, help="Audio file to open and analyze")
+    parser.add_argument("path", nargs="?", type=Path, help="Audio file to analyze or album folder to add")
     args = parser.parse_args(app.arguments()[1:])
-    initial_path = args.file.expanduser().absolute() if args.file is not None else None
+    initial_path = args.path.expanduser().absolute() if args.path is not None else None
     window = build_window()
     window.show()
     if initial_path is not None:
-        QTimer.singleShot(0, lambda: window.open_file(initial_path))
+        QTimer.singleShot(0, lambda: window.open_path(initial_path))
     sys.exit(app.exec())
 
 

@@ -61,6 +61,36 @@ def test_declining_all_integrations_creates_no_home_or_receipt(installation, ans
     assert "skipped" in result.stdout.lower()
 
 
+def test_dolphin_action_is_opt_in_and_tracked(installation, monkeypatch):
+    launcher, _, data = installation
+    destination = data / "kio/servicemenus/chopper-open.desktop"
+    assert cli(installation, answers="n\nn\nn\n").returncode == 0
+    assert not destination.exists()
+    result = cli(installation, answers="n\nn\nn\ny\n")
+    assert result.returncode == 0, result.stderr
+    original = destination.read_bytes()
+    assert b"Type=Service\n" in original and b" %f\n" in original
+    assert destination.stat().st_mode & 0o777 == 0o755
+    tool = integration_tool(monkeypatch)
+    assert tool.load_receipt(launcher.parent)["artifacts"]["dolphin-service"]["path"] == str(destination)
+    inode = destination.stat().st_ino
+    assert cli(installation, answers="n\nn\nn\ny\n").returncode == 0
+    assert destination.stat().st_ino == inode
+    monkeypatch.setattr("builtins.input", lambda *args: "y")
+    assert tool.uninstall_integrations(launcher.parent) == 0
+    assert not destination.exists()
+
+
+def test_dolphin_action_never_replaces_foreign_file(installation):
+    _, _, data = installation
+    destination = data / "kio/servicemenus/chopper-open.desktop"
+    destination.parent.mkdir(parents=True)
+    destination.write_text("foreign entry")
+    destination.chmod(0o755)
+    assert cli(installation, answers="n\nn\nn\ny\n").returncode != 0
+    assert destination.read_text() == "foreign entry"
+
+
 def test_link_receipt_records_identity_and_reinstall_is_idempotent(installation, monkeypatch):
     launcher, home, _ = installation
     tool = integration_tool(monkeypatch)
@@ -211,24 +241,22 @@ def test_existing_path_and_shadowed_command_are_reported(installation, tmp_path)
 
 def test_legacy_menu_adoption_tolerates_access_time_updates(installation):
     launcher, _, data = installation
-    # Let the existing helper create the exact historical entry first.
-    result = subprocess.run(
-        [sys.executable, str(SCRIPTS / "install_desktop.py"), "--launcher", str(launcher)],
-        input="y\n",
-        text=True,
-        capture_output=True,
-        check=False,
-        timeout=10,
-        env={**os.environ, "XDG_DATA_HOME": str(data)},
-    )
-    assert result.returncode == 0, result.stderr
+    # The historical Exec field escapes both dollar signs and field-code markers.
+    quoted = str(launcher).replace("$", r"\\$").replace("%", "%%")
     entry = data / "applications/chopper.desktop"
-    before = entry.read_bytes()
+    entry.parent.mkdir(parents=True)
+    entry.write_text(
+        "[Desktop Entry]\nType=Application\nName=Chopper\n"
+        "Comment=Find, preview and export loops and one-shots\n"
+        f'Exec=env -- "{quoted}"\n'
+        "Icon=audio-x-generic\nTerminal=false\nCategories=AudioVideo;Audio;\nX-Chopper-Generated=true\n"
+    )
+    entry.chmod(0o644)
     status = entry.stat()
     os.utime(entry, ns=(1, status.st_mtime_ns))
     result = cli(installation, answers="y\nn\n")
     assert result.returncode == 0, result.stderr
-    assert entry.read_bytes() == before
+    assert f'Exec=env -- "{quoted}"' in entry.read_text().splitlines()
     assert (launcher.parent / ".chopper-install.json").is_file()
 
 
@@ -396,7 +424,7 @@ def test_all_integrations_share_icon_and_desktop_content(installation, tmp_path)
 def test_invalid_xdg_desktop_never_creates_a_fallback(installation, tmp_path, output, status):
     _, home, data = installation
     path = xdg_tool(tmp_path, home if output == "HOME" else output, status=status)
-    result = cli(installation, answers="n\nn\nn\ny\n", path=path)
+    result = cli(installation, answers="n\nn\nn\nn\n", path=path)
     assert result.returncode == 0, result.stderr
     assert "Desktop shortcut unavailable" in result.stdout
     assert not home.exists() and not data.exists()
@@ -629,7 +657,7 @@ def test_whole_installation_blocks_interleaved_uninstall(installation, tmp_path,
     assert tool.install_integrations(launcher, initial_path="/usr/bin:/bin") == 0
     assert len(attempts) == 1 and attempts[0].returncode != 0
     receipt = tool.load_receipt(launcher.parent)
-    assert set(receipt["artifacts"]) == {"menu", "icon", "global-command", "desktop"}
+    assert set(receipt["artifacts"]) == {"menu", "icon", "global-command", "desktop", "dolphin-service"}
     assert all(tool._stamp(Path(record["path"])) == record for record in receipt["artifacts"].values())
 
 

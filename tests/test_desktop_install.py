@@ -1,3 +1,4 @@
+import configparser
 import importlib.util
 import os
 import shutil
@@ -60,6 +61,22 @@ def test_desktop_entry_identifies_audio_app_and_quotes_launcher(launcher):
     ):
         assert field in entry.splitlines()
     assert f'Exec=env -- "{launcher}"' in entry.splitlines()
+    assert "MimeType=" not in entry
+    action = configparser.ConfigParser(interpolation=None)
+    action.read_string(desktop_tool().dolphin_service_entry(launcher))
+    group = action["Desktop Entry"]
+    assert group["Type"] == "Service"
+    assert group["X-KDE-RequiredNumberOfUrls"] == "1" and group["X-KDE-Protocols"] == "file"
+    assert {
+        "inode/directory",
+        "audio/vnd.wave",
+        "audio/flac",
+        "audio/ogg",
+        "audio/x-aiff",
+        "audio/mpeg",
+        "audio/mp4",
+        "audio/aac",
+    } <= set(group["MimeType"].split(";"))
 
 
 def test_icon_path_is_absolute_and_uses_desktop_string_escaping(launcher, tmp_path):
@@ -108,6 +125,105 @@ def test_desktop_entry_launches_exact_special_path_with_real_consumer(tmp_path, 
     while not output.exists() and time.monotonic() < deadline:
         time.sleep(0.01)
     assert output.read_text() == "launched\n"
+
+
+@pytest.mark.parametrize("name", ["Track with spaces.wav", "Album with spaces"])
+def test_dolphin_service_passes_local_path(tmp_path, launcher, name):
+    gio = shutil.which("gio")
+    if gio is None:
+        pytest.skip("GLib Desktop Entry launcher unavailable")
+    launcher.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$CHOPPER_PROBE_OUTPUT"\n')
+    target = tmp_path / name
+    if target.suffix:
+        target.touch()
+    else:
+        target.mkdir()
+    entry = tmp_path / "probe.desktop"
+    service = configparser.ConfigParser(interpolation=None)
+    service.read_string(desktop_tool().dolphin_service_entry(launcher))
+    command = service["Desktop Action openChopper"]["Exec"]
+    assert command.endswith(" %f")
+    # Exercise the generated Exec field with GLib without registering the service as an app.
+    entry.write_text(f"[Desktop Entry]\nType=Application\nName=Probe\nExec={command}\n")
+    output = tmp_path / "probe-output"
+    env = {
+        **os.environ,
+        "HOME": str(tmp_path / "home"),
+        "XDG_CONFIG_HOME": str(tmp_path / "config"),
+        "XDG_DATA_HOME": str(tmp_path / "data"),
+        "DBUS_SESSION_BUS_ADDRESS": "unix:path=/nonexistent-chopper-test-bus",
+        "GIO_USE_VFS": "local",
+        "CHOPPER_PROBE_OUTPUT": str(output),
+    }
+    result = subprocess.run(
+        [gio, "launch", str(entry), str(target)],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+    )
+    assert result.returncode == 0, result.stderr
+    deadline = time.monotonic() + 3
+    while not output.exists() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert output.read_text().splitlines() == [str(target)]
+
+
+def test_dolphin_action_preserves_default_handlers(tmp_path, launcher):
+    gio = shutil.which("gio")
+    update = shutil.which("update-desktop-database")
+    if gio is None or update is None:
+        pytest.skip("GLib MIME tooling unavailable")
+    system = tmp_path / "system/applications"
+    system.mkdir(parents=True)
+    (system / "original.desktop").write_text(
+        "[Desktop Entry]\nType=Application\nName=Original\nExec=/bin/true %f\n"
+        "MimeType=inode/directory;audio/vnd.wave;\n"
+    )
+    env = {
+        **os.environ,
+        "LC_ALL": "C",
+        "HOME": str(tmp_path / "home"),
+        "XDG_CONFIG_HOME": str(tmp_path / "config"),
+        "XDG_CONFIG_DIRS": str(tmp_path / "system-config"),
+        "XDG_DATA_HOME": str(tmp_path / "data"),
+        "XDG_DATA_DIRS": str(system.parent),
+    }
+    subprocess.run([update, str(system)], env=env, check=True, timeout=10)
+
+    def defaults():
+        return [
+            subprocess.check_output([gio, "mime", mime], env=env, text=True, timeout=10).splitlines()[0]
+            for mime in ("inode/directory", "audio/vnd.wave")
+        ]
+
+    before = defaults()
+    assert all(line.endswith(": original.desktop") for line in before)
+    tool = desktop_tool()
+    menu = tool.install_desktop(launcher, tmp_path / "data")
+    service = tmp_path / "data/kio/servicemenus/chopper-open.desktop"
+    service.parent.mkdir(parents=True)
+    service.write_text(tool.dolphin_service_entry(launcher))
+    service.chmod(0o755)
+    subprocess.run([update, str(menu.parent)], env=env, check=True, timeout=10)
+    assert defaults() == before
+    assert not (tmp_path / "config").exists()
+
+
+def test_install_does_not_change_default_mime_associations(tmp_path, launcher, monkeypatch):
+    config = tmp_path / "config"
+    config.mkdir()
+    defaults = config / "mimeapps.list"
+    original = (
+        b"[Default Applications]\ninode/directory=org.kde.dolphin.desktop;\naudio/x-wav=player.desktop;\n"
+    )
+    defaults.write_bytes(original)
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(config))
+    desktop_tool().install_desktop(launcher, tmp_path / "data")
+    assert defaults.read_bytes() == original
+    assert list(config.iterdir()) == [defaults]
 
 
 @pytest.mark.parametrize("with_icon", [False, True])

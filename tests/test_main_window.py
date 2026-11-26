@@ -5,8 +5,8 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 import soundfile as sf
-from PySide6.QtCore import QPoint, QPointF, Qt, QTimer
-from PySide6.QtGui import QContextMenuEvent
+from PySide6.QtCore import QMimeData, QPoint, QPointF, Qt, QTimer, QUrl
+from PySide6.QtGui import QContextMenuEvent, QDragEnterEvent, QDragMoveEvent, QDropEvent
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QDialog, QFileDialog, QMenu, QMessageBox, QSplitter
 
@@ -299,6 +299,110 @@ def test_add_album_action_appends_without_loading_audio_or_saving_settings(
     assert str(album) in window.library_panel.topLevelItem(0).text(0)
     assert window._thread is None and window.sample_state.loaded_track is None
     assert window.settings.library_root is None and not (tmp_path / "settings.toml").exists()
+
+
+def test_open_path_adds_album_without_loading_track(qapp, make_window, tmp_path, loaded_track):
+    window = make_window(auto_play=False)
+    window._on_track_analyzed(loaded_track)
+    album = tmp_path / "Local album"
+    album.mkdir()
+    window.open_path(album)
+    assert window.library_panel.topLevelItem(0).text(0) == str(album)
+    assert window.sample_state.loaded_track is loaded_track and window._thread is None
+
+
+@pytest.mark.parametrize("allow_copy", [True, False])
+@pytest.mark.parametrize("over_waveform", [True, False])
+def test_media_drop_adds_references_without_replacing_active_track(
+    qapp, make_window, tmp_path, loaded_track, allow_copy, over_waveform
+):
+    window = make_window(auto_play=False)
+    window._on_track_analyzed(loaded_track)
+    library, active_folder = tmp_path / "library", tmp_path / "library" / "Current"
+    active_folder.mkdir(parents=True)
+    window.library_panel.set_root(library)
+    album = tmp_path / "New album"
+    album.mkdir()
+    track = tmp_path / "New track.WAV"
+    sf.write(track, np.zeros(1024), 8000)
+    original = track.read_bytes()
+    unsupported = tmp_path / "notes.txt"
+    unsupported.write_text("notes")
+    mime = QMimeData()
+    mime.setUrls(
+        [
+            QUrl.fromLocalFile(str(track)),
+            QUrl.fromLocalFile(str(album)),
+            QUrl.fromLocalFile(str(track)),
+            QUrl.fromLocalFile(str(unsupported)),
+            QUrl("smb://nas/share/track.wav"),
+        ]
+    )
+    actions = Qt.DropAction.MoveAction
+    if allow_copy:
+        actions |= Qt.DropAction.CopyAction
+    window.show()
+    qapp.processEvents()
+    area = window.waveform_view if over_waveform else window.library_panel
+    point = area.mapTo(window, area.rect().center())
+    target = window.windowHandle()
+    assert target is not None
+    args = actions, mime, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.ShiftModifier
+    enter = QDragEnterEvent(point, *args)
+    move = QDragMoveEvent(point, *args)
+    drop = QDropEvent(QPointF(point), *args)
+    QApplication.sendEvent(target, enter)
+    QApplication.sendEvent(target, move)
+    QApplication.sendEvent(target, drop)
+    assert enter.isAccepted() is move.isAccepted() is drop.isAccepted() is allow_copy
+    if allow_copy:
+        assert drop.dropAction() == Qt.DropAction.CopyAction
+        assert "2 unsupported" in window.status_bar.currentMessage()
+    assert window.sample_state.loaded_track is loaded_track and window._thread is None
+    tree = window.library_panel
+    assert [tree.topLevelItem(i).text(0) for i in range(tree.topLevelItemCount())] == (
+        ["Current", track.name, str(album)] if allow_copy else ["Current"]
+    )
+    assert track.read_bytes() == original and album.is_dir()
+
+
+@pytest.mark.parametrize("expanded", [True, False])
+def test_drop_nested_album_only_appears_once(qapp, make_window, tmp_path, expanded):
+    root = tmp_path / "Library"
+    album = root / "Artist" / "Album"
+    album.mkdir(parents=True)
+    track = album / "Track.wav"
+    track.touch()
+    window = make_window(auto_play=False)
+    tree = window.library_panel
+    tree.set_root(root)
+    artist = tree.topLevelItem(0)
+    if expanded:
+        artist.setExpanded(True)
+        nested = artist.child(0)
+        nested.setExpanded(True)
+        selected = nested.child(0)
+        tree.blockSignals(True)
+        tree.setCurrentItem(selected)
+        tree.blockSignals(False)
+    mime = QMimeData()
+    mime.setUrls([QUrl.fromLocalFile(str(album)), *([QUrl.fromLocalFile(str(track))] if expanded else [])])
+    event = QDropEvent(
+        QPointF(10, 10),
+        Qt.DropAction.CopyAction,
+        mime,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    window.dropEvent(event)
+    assert event.isAccepted()
+    artist.setExpanded(True)
+    if expanded:
+        assert tree.topLevelItemCount() == 1 and artist.childCount() == 1
+        assert tree.currentItem() is selected and selected.isSelected()
+    else:
+        assert tree.topLevelItemCount() == 2 and artist.childCount() == 0
+        assert tree.topLevelItem(1).text(0) == str(album)
 
 
 def test_shared_layout_title_and_auto_persistence(qapp, make_window, monkeypatch, loaded_track):
