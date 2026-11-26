@@ -105,11 +105,11 @@ def test_scores_ignore_nonfinite_audio_outside_window(stereo):
     np.testing.assert_array_equal(samples, before)
 
 
-def test_one_shot_silence_blocks_stop_at_window_end():
+def test_one_shot_keeps_silence_until_window_end():
     samples = np.r_[np.ones(20), np.zeros(5), np.full(5, 100.0)]
     shots = find_one_shot_candidates(samples, 1000, (0.0,), window=(0.0, 0.025))
     assert len(shots) == 1
-    assert shots[0].end_seconds == 0.020
+    assert shots[0].end_seconds == 0.025
 
 
 def test_cut_smoothness_does_not_reach_before_search_window():
@@ -122,17 +122,20 @@ def test_cut_smoothness_does_not_reach_before_search_window():
     assert all(np.isfinite(candidate.score) for candidate in loops)
 
 
-def test_none_window_keeps_legacy_silence_scan():
+def test_one_shot_uses_configured_duration_without_window():
     samples = np.r_[np.ones(20), np.zeros(5), np.full(5, 100.0)]
-    shots = find_one_shot_candidates(
-        samples, 1000, (0.0,), max_duration_seconds=0.025, silence_threshold_ratio=0.0001
-    )
+    shots = find_one_shot_candidates(samples, 1000, (0.0,), duration_seconds=0.025)
     assert len(shots) == 1 and shots[0].end_seconds == 0.025
 
 
 def test_one_shot_at_end_is_excluded_and_last_shot_is_clipped():
     shots = find_one_shot_candidates(np.ones(6000), 1000, (1.0, 2.0, 3.7, 4.0, 5.0), window=(2.0, 4.0))
-    assert [(c.start_seconds, c.end_seconds) for c in shots] == [(2.0, 3.7), (3.7, 4.0)]
+    assert [(c.start_seconds, c.end_seconds) for c in shots] == [(2.0, 4.0), (3.7, 4.0)]
+
+
+def test_automatic_search_can_include_long_loops():
+    loops = find_loop_candidates(np.ones(10000), 1000, 120, (0.0, 2.0, 4.0), lengths_bars=(2, 4))
+    assert {c.bars for c in loops} == {2, 4}
 
 
 def test_loop_uses_global_bar_metadata_for_short_window():

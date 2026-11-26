@@ -62,7 +62,7 @@ def ui(qapp, loaded_track, tmp_path, monkeypatch):
             auto_play=False,
             export_dir=str(tmp_path / "exports"),
             candidates_per_track=2,
-            max_one_shot_seconds=0.2,
+            one_shot_duration_seconds=0.2,
         ),
         AnalysisCache(tmp_path / "cache.sqlite"),
     )

@@ -36,7 +36,13 @@ from chopper.gui.actions import ActionRegistry
 from chopper.gui.candidates_panel import CandidatesPanel
 from chopper.gui.export_folder_dialog import choose_export_folder
 from chopper.gui.library_panel import LibraryPanel
-from chopper.gui.presentation import CandidateSearchResult, LoadedTrack, Window, format_time
+from chopper.gui.presentation import (
+    LOOP_LENGTH_CHOICES,
+    CandidateSearchResult,
+    LoadedTrack,
+    Window,
+    format_time,
+)
 from chopper.gui.preview_player import PreviewPlayer
 from chopper.gui.sample_drag import start_file_drag
 from chopper.gui.sample_lanes import SampleLanesView
@@ -182,13 +188,7 @@ class MainWindow(QMainWindow):
         selection_bar = QHBoxLayout()
         selection_bar.addWidget(QLabel("Length"))
         self.length_combo = QComboBox()
-        for label, bars in (
-            ("¼ bar", 0.25),
-            ("½ bar", 0.5),
-            ("1 bar", 1.0),
-            ("2 bars", 2.0),
-            ("4 bars", 4.0),
-        ):
+        for bars, label in LOOP_LENGTH_CHOICES:
             self.length_combo.addItem(label, bars)
         self.length_combo.setCurrentIndex(2)
         self.length_combo.currentIndexChanged.connect(

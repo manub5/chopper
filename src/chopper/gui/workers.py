@@ -59,7 +59,7 @@ def analyze_track(
         samples,
         sample_rate,
         analysis.onset_times,
-        max_duration_seconds=settings.max_one_shot_seconds,
+        duration_seconds=settings.one_shot_duration_seconds,
         max_candidates=settings.candidates_per_track,
     )
     all_candidates = sorted(loops + shots, key=lambda c: c.score, reverse=True)
@@ -96,7 +96,7 @@ def search_candidates(
         loaded.samples,
         loaded.sample_rate,
         analysis.onset_times,
-        max_duration_seconds=settings.max_one_shot_seconds,
+        duration_seconds=settings.one_shot_duration_seconds,
         max_candidates=settings.candidates_per_track,
         window=window,
     )

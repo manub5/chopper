@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from chopper.core.settings import MAX_SAMPLES_PER_CATEGORY, Settings
+from chopper.gui.presentation import LOOP_LENGTH_CHOICES
 
 
 class SettingsDialog(QDialog):
@@ -40,7 +41,7 @@ class SettingsDialog(QDialog):
 
         self._loop_length_checks: dict[float, QCheckBox] = {}
         loop_lengths_row = QHBoxLayout()
-        for length, label in ((1.0, "1 bar"), (0.5, "½ bar"), (0.25, "¼ bar")):
+        for length, label in LOOP_LENGTH_CHOICES:
             checkbox = QCheckBox(label)
             checkbox.setChecked(length in settings.loop_lengths_bars)
             self._loop_length_checks[length] = checkbox
@@ -50,10 +51,10 @@ class SettingsDialog(QDialog):
         self._candidates_per_track.setRange(1, MAX_SAMPLES_PER_CATEGORY)
         self._candidates_per_track.setValue(settings.candidates_per_track)
 
-        self._max_one_shot_seconds = QDoubleSpinBox()
-        self._max_one_shot_seconds.setRange(0.1, 30.0)
-        self._max_one_shot_seconds.setSingleStep(0.1)
-        self._max_one_shot_seconds.setValue(settings.max_one_shot_seconds)
+        self._one_shot_duration_seconds = QDoubleSpinBox()
+        self._one_shot_duration_seconds.setRange(0.1, 30.0)
+        self._one_shot_duration_seconds.setSingleStep(0.1)
+        self._one_shot_duration_seconds.setValue(settings.one_shot_duration_seconds)
 
         self._gpu_mode = QComboBox()
         self._gpu_mode.addItem("Automatic", "auto")
@@ -71,7 +72,7 @@ class SettingsDialog(QDialog):
         form.addRow("Export format", self._export_format)
         form.addRow("Loop lengths", loop_lengths_row)
         form.addRow("Samples per category", self._candidates_per_track)
-        form.addRow("Max. one-shot length (s)", self._max_one_shot_seconds)
+        form.addRow("One-shot duration (s)", self._one_shot_duration_seconds)
         form.addRow("Processing device", self._gpu_mode)
         form.addRow("Appearance", self._force_dark)
 
@@ -127,7 +128,7 @@ class SettingsDialog(QDialog):
             export_format=self._export_format.currentText(),
             loop_lengths_bars=lengths,
             candidates_per_track=self._candidates_per_track.value(),
-            max_one_shot_seconds=self._max_one_shot_seconds.value(),
+            one_shot_duration_seconds=self._one_shot_duration_seconds.value(),
             gpu_mode=self._gpu_mode.currentData(),
             force_dark=self._force_dark.isChecked(),
         )

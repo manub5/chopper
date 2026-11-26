@@ -4,6 +4,8 @@ import numpy as np
 import pytest
 import soundfile as sf
 from PySide6.QtCore import QEventLoop, QTimer
+from PySide6.QtTest import QSignalSpy
+from shiboken6 import isValid
 
 from chopper.core.cache import AnalysisCache
 from chopper.core.models import Analysis, Candidate, CandidateType, Track
@@ -402,7 +404,7 @@ def memory_track(loaded_track, monkeypatch):
 @pytest.mark.parametrize("length", [0.25, 0.5, 1.0, 2.0, 4.0])
 def test_memory_search_only_uses_selected_length_and_settings_limits(memory_track, length):
     before = memory_track.samples.copy()
-    settings = Settings(candidates_per_track=2, max_one_shot_seconds=0.2)
+    settings = Settings(candidates_per_track=2, one_shot_duration_seconds=0.2)
     found, message = workers.search_candidates(memory_track, settings, window=(2.0, 18.0), length_bars=length)
     loops = [c for c in found if c.type is CandidateType.LOOP]
     shots = [c for c in found if c.type is CandidateType.ONE_SHOT]
@@ -418,7 +420,7 @@ def test_memory_search_only_uses_selected_length_and_settings_limits(memory_trac
 
 
 def test_whole_track_search_uses_automatic_settings_not_previous_manual_length(memory_track):
-    settings = Settings(loop_lengths_bars=(0.25, 1.0), candidates_per_track=2, max_one_shot_seconds=0.2)
+    settings = Settings(loop_lengths_bars=(0.25, 1.0), candidates_per_track=2, one_shot_duration_seconds=0.2)
     workers.search_candidates(memory_track, settings, window=(2.0, 18.0), length_bars=4.0)
     found, _ = workers.search_candidates(memory_track, settings)
     loops = [c for c in found if c.type is CandidateType.LOOP]
@@ -432,7 +434,10 @@ def test_whole_track_search_uses_automatic_settings_not_previous_manual_length(m
 def test_short_selection_still_finds_the_two_cached_onsets(loaded_track):
     loaded = replace(loaded_track, analysis=replace(loaded_track.analysis, onset_times=(0.1, 0.3)))
     found, message = workers.search_candidates(
-        loaded, Settings(candidates_per_track=2, max_one_shot_seconds=0.2), window=(0.0, 0.6), length_bars=4.0
+        loaded,
+        Settings(candidates_per_track=2, one_shot_duration_seconds=0.2),
+        window=(0.0, 0.6),
+        length_bars=4.0,
     )
     assert len(found) == 2 and all(c.type is CandidateType.ONE_SHOT for c in found)
     assert all(0.0 <= c.start_seconds < c.end_seconds <= 0.6 for c in found)
@@ -480,10 +485,10 @@ def test_memory_search_rejects_inconsistent_request(memory_track, window, length
 
 
 def test_worker_snapshot_and_result_keep_request_identity_and_original_audio(qapp, memory_track):
-    settings = Settings(candidates_per_track=2, max_one_shot_seconds=0.2)
+    settings = Settings(candidates_per_track=2, one_shot_duration_seconds=0.2)
     worker = workers.CandidateSearchWorker(41, memory_track, settings, window=(2.0, 18.0), length_bars=2.0)
     settings.candidates_per_track = 1
-    settings.max_one_shot_seconds = 0.01
+    settings.one_shot_duration_seconds = 0.01
     results, errors = [], []
     worker.finished.connect(results.append)
     worker.failed.connect(errors.append)
@@ -497,7 +502,7 @@ def test_worker_snapshot_and_result_keep_request_identity_and_original_audio(qap
     assert max(
         c.duration_seconds for c in result.loaded.candidates if c.type is CandidateType.ONE_SHOT
     ) == pytest.approx(0.2)
-    assert settings.candidates_per_track == 1 and settings.max_one_shot_seconds == 0.01
+    assert settings.candidates_per_track == 1 and settings.one_shot_duration_seconds == 0.01
     with pytest.raises(FrozenInstanceError):
         result.request_id = 42
 
@@ -521,12 +526,12 @@ def test_candidate_worker_thread_really_finishes_on_result_or_error(qapp, memory
     worker = workers.CandidateSearchWorker(
         43, memory_track, Settings(), window=(0.0, 0.6), length_bars=None if invalid else 4.0
     )
-    results, errors, finished = [], [], []
+    results, errors = [], []
     worker.finished.connect(results.append)
     worker.failed.connect(errors.append)
     thread = workers.start_in_thread(worker)
     loop = QEventLoop()
-    thread.finished.connect(lambda: finished.append(True))
+    finished = QSignalSpy(thread.finished)
     thread.finished.connect(loop.quit)
     timeout = QTimer()
     timeout.setSingleShot(True)
@@ -535,10 +540,10 @@ def test_candidate_worker_thread_really_finishes_on_result_or_error(qapp, memory
     thread.start()
     loop.exec()
     timeout.stop()
-    if not finished:
+    if not finished.count() and isValid(thread):
         thread.quit()
         thread.wait(5000)
-    assert finished == [True], "Worker emitted no actual QThread.finished signal"
+    assert finished.count() == 1, "Worker emitted no actual QThread.finished signal"
     if invalid:
         assert len(errors) == 1 and "length" in errors[0].lower() and results == []
     else:

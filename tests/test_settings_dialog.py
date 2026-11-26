@@ -24,7 +24,7 @@ def test_settings_reads_back_edited_values(qapp):
     for length, checkbox in dialog._loop_length_checks.items():
         checkbox.setChecked(length == 0.5)
     dialog._candidates_per_track.setValue(10)
-    dialog._max_one_shot_seconds.setValue(3.5)
+    dialog._one_shot_duration_seconds.setValue(3.5)
     dialog._gpu_mode.setCurrentIndex(dialog._gpu_mode.findData("cpu"))
 
     result = dialog.settings()
@@ -35,7 +35,7 @@ def test_settings_reads_back_edited_values(qapp):
         export_format="flac",
         loop_lengths_bars=(0.5,),
         candidates_per_track=10,
-        max_one_shot_seconds=3.5,
+        one_shot_duration_seconds=3.5,
         gpu_mode="cpu",
     )
 
@@ -58,8 +58,14 @@ def test_loop_lengths_are_explicit_checkboxes(qapp):
         1.0: "1 bar",
         0.5: "½ bar",
         0.25: "¼ bar",
+        2.0: "2 bars",
+        4.0: "4 bars",
     }
-    assert all(check.isChecked() for check in dialog._loop_length_checks.values())
+    assert {length for length, check in dialog._loop_length_checks.items() if check.isChecked()} == {
+        0.25,
+        0.5,
+        1.0,
+    }
     assert dialog._candidates_per_track.maximum() == 64
     dialog._candidates_per_track.setValue(64)
     assert dialog.settings().candidates_per_track == 64
@@ -78,9 +84,9 @@ def test_force_dark_control_updates_only_its_preference(qapp):
 
 
 @pytest.mark.parametrize(
-    "lengths", [(0.25,), (0.5,), (1.0,), (0.25, 0.5), (0.25, 1.0), (0.5, 1.0), (0.25, 0.5, 1.0)]
+    "lengths", [(0.25,), (0.5,), (1.0,), (0.25, 0.5), (0.25, 1.0), (0.5, 1.0), (0.25, 0.5, 1.0), (2.0, 4.0)]
 )
-def test_all_seven_choices_reopen_without_losing_selection(qapp, lengths):
+def test_length_choices_reopen_without_losing_selection(qapp, lengths):
     dialog = SettingsDialog(Settings(loop_lengths_bars=lengths))
     assert {length for length, check in dialog._loop_length_checks.items() if check.isChecked()} == set(
         lengths
@@ -114,7 +120,7 @@ def test_settings_english_labels_and_automatic_device_roundtrip(qapp):
         "Export format",
         "Loop lengths",
         "Samples per category",
-        "Max. one-shot length (s)",
+        "One-shot duration (s)",
         "Processing device",
         "Appearance",
     } <= labels

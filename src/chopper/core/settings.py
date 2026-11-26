@@ -10,7 +10,7 @@ from tempfile import NamedTemporaryFile
 import tomli_w
 from platformdirs import user_cache_dir, user_config_dir
 
-from chopper.core.models import AUTO_LOOP_LENGTHS_BARS, is_loop_length
+from chopper.core.models import AUTO_LOOP_LENGTHS_BARS, LOOP_LENGTHS_BARS, is_loop_length
 
 APP_NAME = "chopper"
 _DEFAULT_LOOP_LENGTHS_BARS = AUTO_LOOP_LENGTHS_BARS
@@ -27,7 +27,7 @@ class Settings:
     loop_lengths_bars: tuple[float, ...] = _DEFAULT_LOOP_LENGTHS_BARS
     loop_lengths_version: int = 3
     candidates_per_track: int = 8
-    max_one_shot_seconds: float = 2.0
+    one_shot_duration_seconds: float = 2.0
     gpu_mode: str = "auto"  # "auto" ou "cpu"
     auto_play: bool = True
     force_dark: bool = False
@@ -65,7 +65,7 @@ class Settings:
         values = self.loop_lengths_bars
         if isinstance(values, (tuple, list)):
             valid = {float(value) for value in values if is_loop_length(value)}
-            self.loop_lengths_bars = tuple(value for value in AUTO_LOOP_LENGTHS_BARS if value in valid)
+            self.loop_lengths_bars = tuple(value for value in LOOP_LENGTHS_BARS if value in valid)
         else:
             self.loop_lengths_bars = ()
         if not self.loop_lengths_bars:
@@ -79,6 +79,9 @@ class Settings:
     @classmethod
     def from_dict(cls, data: dict) -> Settings:
         merged = {**cls().to_dict(), **data}
+        legacy_duration = merged.pop("max_one_shot_seconds", None)
+        if "one_shot_duration_seconds" not in data and type(legacy_duration) in (int, float):
+            merged["one_shot_duration_seconds"] = legacy_duration
         version = data.get("loop_lengths_version")
         if type(version) is not int or version < 3:
             merged["loop_lengths_bars"] = AUTO_LOOP_LENGTHS_BARS

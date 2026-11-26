@@ -62,7 +62,7 @@ def _click_track(n_clicks=4, interval_seconds=0.5, sample_rate=SAMPLE_RATE):
 def test_find_one_shot_candidates_one_per_onset_with_short_duration():
     signal, onset_times = _click_track(n_clicks=4, interval_seconds=0.5)
 
-    result = candidates.find_one_shot_candidates(signal, SAMPLE_RATE, onset_times, max_duration_seconds=0.4)
+    result = candidates.find_one_shot_candidates(signal, SAMPLE_RATE, onset_times, duration_seconds=0.4)
 
     assert len(result) == len(onset_times)
     for candidate in result:
@@ -108,7 +108,7 @@ def test_default_loops_quarter_half_and_one_bar_with_exact_durations():
     assert all(c.start_seconds in (0.0, 2.0, 4.0) for c in result)
 
 
-@pytest.mark.parametrize("bars", [2, 4, 8, 3, 0, -0.5, float("nan"), True])
+@pytest.mark.parametrize("bars", [8, 3, 0, -0.5, float("nan"), True])
 def test_engine_refuses_unsupported_loop_lengths(bars):
     with pytest.raises(ValueError):
         candidates.find_loop_candidates(np.ones(6000), 1000, 120, (0.0, 2.0), lengths_bars=(bars,))

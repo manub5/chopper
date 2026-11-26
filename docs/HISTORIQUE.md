@@ -6,6 +6,15 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 26/11/2026 — Longueurs de boucles et durée des one-shots
+
+- **Settings** et **Length** proposent les mêmes cinq longueurs. Les boucles
+  automatiques de 2 et 4 mesures restent désactivées par défaut.
+- Les prochains one-shots prennent la durée choisie à partir de chaque attaque,
+  même en cas de silence ou de nouvelle attaque, sans dépasser la piste ou la
+  sélection ni ajouter de silence. L’ancienne valeur est reprise à la lecture ;
+  les exports existants ne sont pas modifiés.
+
 ## 26/11/2026 — Mémoire des sélecteurs et instances indépendantes
 
 - Bibliothèque, ajout d’album, ouverture de piste et choix du dossier d’export

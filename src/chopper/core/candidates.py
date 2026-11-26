@@ -8,8 +8,7 @@ import numpy as np
 from chopper.core.models import AUTO_LOOP_LENGTHS_BARS, Candidate, CandidateType, is_loop_length
 
 DEFAULT_LOOP_LENGTHS_BARS = AUTO_LOOP_LENGTHS_BARS
-DEFAULT_MAX_ONE_SHOT_SECONDS = 2.0
-DEFAULT_SILENCE_THRESHOLD_RATIO = 0.1
+DEFAULT_ONE_SHOT_DURATION_SECONDS = 2.0
 
 
 def _rms(samples: np.ndarray) -> float:
@@ -94,8 +93,6 @@ def find_loop_candidates(
     """Rank complete loops inside an optional absolute-time search window."""
     if any(not is_loop_length(bars) for bars in lengths_bars):
         raise ValueError("Only ¼-bar, ½-bar, 1-bar, 2-bar and 4-bar loops are supported.")
-    if window is None and any(bars not in AUTO_LOOP_LENGTHS_BARS for bars in lengths_bars):
-        raise ValueError("2-bar and 4-bar loops require an explicit search window.")
     bounds = _search_bounds(samples, sample_rate, window) if window is not None else None
     bar_duration = _bar_duration(downbeat_times)
     if bar_duration is None or tempo_bpm <= 0:
@@ -150,58 +147,29 @@ def find_loop_candidates(
     return selected
 
 
-def _find_return_to_silence(
-    samples: np.ndarray,
-    sample_rate: int,
-    start: float,
-    limit: float,
-    threshold: float,
-    *,
-    clip_to_limit: bool = False,
-) -> float:
-    window = max(1, int(0.01 * sample_rate))  # fenêtres de 10 ms
-    start_index = round(start * sample_rate)
-    limit_index = round(limit * sample_rate)
-    index = start_index + window
-    while index < limit_index:
-        block_end = min(index + window, limit_index) if clip_to_limit else index + window
-        if _rms(samples[index:block_end]) <= threshold:
-            return index / sample_rate
-        index += window
-    return limit
-
-
 def find_one_shot_candidates(
     samples: np.ndarray,
     sample_rate: int,
     onset_times: tuple[float, ...],
     *,
-    max_duration_seconds: float = DEFAULT_MAX_ONE_SHOT_SECONDS,
-    silence_threshold_ratio: float = DEFAULT_SILENCE_THRESHOLD_RATIO,
+    duration_seconds: float = DEFAULT_ONE_SHOT_DURATION_SECONDS,
     max_candidates: int = 8,
     window: tuple[float, float] | None = None,
 ) -> list[Candidate]:
-    """Rank cached onsets without crossing an optional absolute-time search window."""
-    lower, upper, first_index, last_index = _search_bounds(samples, sample_rate, window)
-    region = samples[first_index:last_index]
-    overall_peak = float(np.max(np.abs(region))) if len(region) else 0.0
-    threshold = overall_peak * silence_threshold_ratio
+    """Rank fixed-duration excerpts starting at cached onsets, clipped at the search boundary."""
+    if not 0 < duration_seconds < float("inf"):
+        raise ValueError("One-shot duration must be positive and finite.")
+    lower, upper, _, _ = _search_bounds(samples, sample_rate, window)
 
     candidates: list[Candidate] = []
-    for i, start in enumerate(onset_times):
-        if window is not None and not lower <= start < upper:
+    for start in onset_times:
+        if not lower <= start < upper:
             continue
-        next_onset = onset_times[i + 1] if i + 1 < len(onset_times) else upper
-        limit = min(start + max_duration_seconds, next_onset, upper)
-        end = _find_return_to_silence(
-            samples, sample_rate, start, limit, threshold, clip_to_limit=window is not None
-        )
-        if end <= start:
-            continue
+        end = min(start + duration_seconds, upper)
 
         start_index = round(start * sample_rate)
         end_index = round(end * sample_rate)
-        if window is not None and end_index <= start_index:
+        if end_index <= start_index:
             continue
         score = _rms(samples[start_index:end_index])
 

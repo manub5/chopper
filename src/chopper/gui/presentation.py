@@ -4,9 +4,11 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from chopper.core.models import Analysis, Candidate, CandidateType, is_loop_length
+from chopper.core.models import LOOP_LENGTHS_BARS, Analysis, Candidate, CandidateType, is_loop_length
 
 Window = tuple[float, float]
+_BAR_LABELS = {0.25: "¼ bar", 0.5: "½ bar", 1.0: "1 bar", 2.0: "2 bars", 4.0: "4 bars"}
+LOOP_LENGTH_CHOICES = tuple((bars, _BAR_LABELS[bars]) for bars in LOOP_LENGTHS_BARS)
 
 
 def format_time(seconds: float) -> str:

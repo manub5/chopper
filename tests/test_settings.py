@@ -25,7 +25,7 @@ def test_save_then_load_roundtrip(tmp_path):
         export_format="flac",
         loop_lengths_bars=(0.5, 1.0),
         candidates_per_track=64,
-        max_one_shot_seconds=1.5,
+        one_shot_duration_seconds=1.5,
         gpu_mode="cpu",
     )
 
@@ -39,8 +39,8 @@ def test_save_then_load_roundtrip(tmp_path):
 @pytest.mark.parametrize(
     "old, expected",
     [
-        ([2, 4, 8], (0.25, 0.5, 1.0)),
-        ([1, 2, 4, 8], (1.0,)),
+        ([2, 4, 8], (2.0, 4.0)),
+        ([1, 2, 4, 8], (1.0, 2.0, 4.0)),
         ([0.5, 1, 0.5, 8], (0.5, 1.0)),
         ([True, "1/2", None, -1], (0.25, 0.5, 1.0)),
         ([], (0.25, 0.5, 1.0)),
@@ -309,3 +309,16 @@ def test_stale_settings_updates_preserve_distinct_fields(tmp_path):
     save_settings(replace(second, force_dark=True), path, previous=second)
     assert not load_settings(path).auto_play
     assert load_settings(path).force_dark
+
+
+def test_legacy_one_shot_duration_migrates_without_writing(tmp_path):
+    path = tmp_path / "settings.toml"
+    old = b"max_one_shot_seconds = 1.75\nloop_lengths_version = 3\nloop_lengths_bars = [0.5, 2.0, 4.0]\n"
+    path.write_bytes(old)
+    settings = load_settings(path)
+    assert settings.one_shot_duration_seconds == 1.75
+    assert settings.loop_lengths_bars == (0.5, 2.0, 4.0)
+    assert path.read_bytes() == old
+    save_settings(settings, path)
+    assert b"max_one_shot_seconds" not in path.read_bytes()
+    assert load_settings(path) == settings

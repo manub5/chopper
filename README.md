@@ -122,6 +122,11 @@ preference. Open windows do not reload preferences automatically.
    album does not start analysis. Only one track feeds the waveform and sample list.
 2. Select a track to analyze it, or select an album folder and use **Analyze album**.
 3. Look through **1-bar**, **½-bar** and **¼-bar loops**, plus **One-shots**.
+   In **Settings**, you can also enable **2-bar** and **4-bar** loops. **Length**
+   offers the same five choices for chopping a selection. **One-shot duration (s)**
+   sets how much audio to take from each detected attack, even across silence or
+   another attack. The excerpt is shortened only at the end of the track or
+   selection, with no padding. The previous maximum is reused as the new duration.
    Chopper offers up to eight samples per category by default, configurable from
    1 to 64 in **Settings** when the track supports them;
    short tracks or missing rhythmic information may yield fewer.
