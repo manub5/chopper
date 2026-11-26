@@ -12,6 +12,8 @@ dans pre-commit et la préécoute ne joue plus en boucle.
   et le tableau se partagent la hauteur au moyen de deux séparateurs. En petite
   fenêtre, les panneaux visibles ne peuvent pas être écrasés et les listes
   restent accessibles par défilement. Le zoom et l’alignement temporel sont conservés.
+- Si les rectangles sont masqués faute de résultats, déplacer le séparateur restant
+  ne leur fait plus perdre la hauteur réglée lorsqu’ils réapparaissent.
 - Un clic hors sélection ne demande plus le retour à la piste entière et ne
   modifie ni la sélection ni les résultats ou les marques. Il ne lance pas de
   préécoute. Les glissements et les actions explicites gardent leur comportement.

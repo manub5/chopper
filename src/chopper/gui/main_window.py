@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QThread, Slot
+from PySide6.QtCore import QEvent, QObject, Qt, QThread, Slot
 from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -52,6 +52,45 @@ from chopper.gui.workers import (
     TrackAnalysisWorker,
     start_in_thread,
 )
+
+
+class _SampleWorkspaceSplitter(QSplitter):
+    _INITIAL_SIZES = (270, 120, 510)
+
+    def __init__(self, waveform: QWidget, lanes: QWidget, table: QWidget) -> None:
+        super().__init__(Qt.Orientation.Vertical)
+        self._lanes = lanes
+        self._lane_height: int | None = None
+        self._moved_while_hidden = False
+        self.setChildrenCollapsible(False)
+        for view in (waveform, lanes, table):
+            self.addWidget(view)
+        for index in (1, 2):
+            self.handle(index).setCursor(Qt.CursorShape.SizeVerCursor)
+        self.setSizes(self._INITIAL_SIZES)
+        lanes.installEventFilter(self)
+        self.splitterMoved.connect(self._record_move)
+
+    def _record_move(self, _position: int, _index: int) -> None:
+        if self._lanes.isHidden():
+            self._moved_while_hidden = True
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if watched is self._lanes:
+            if event.type() == QEvent.Type.HideToParent:
+                self._lane_height = self._lanes.height()
+            elif event.type() == QEvent.Type.ShowToParent and self._moved_while_hidden:
+                self._moved_while_hidden = False
+                # Qt forgets the hidden child's allocation when the handle moves.
+                available = self.contentsRect().height() - 2 * self.handleWidth()
+                height = self._lane_height
+                if height is None:
+                    height = round(available * self._INITIAL_SIZES[1] / sum(self._INITIAL_SIZES))
+                wave, _, table = self.sizes()
+                rest = max(0, available - height)
+                wave_height = round(rest * wave / max(1, wave + table))
+                self.setSizes([wave_height, height, rest - wave_height])
+        return super().eventFilter(watched, event)
 
 
 class MainWindow(QMainWindow):
@@ -167,14 +206,9 @@ class MainWindow(QMainWindow):
         self.selection_status_label.setWordWrap(True)
         right_layout.addWidget(self.selection_label)
         right_layout.addWidget(self.selection_status_label)
-        sample_splitter = QSplitter(Qt.Orientation.Vertical)
-        sample_splitter.setChildrenCollapsible(False)
-        for view in (self.waveform_view, self.sample_lanes, self.candidates_panel):
-            sample_splitter.addWidget(view)
-        for index in (1, 2):
-            sample_splitter.handle(index).setCursor(Qt.CursorShape.SizeVerCursor)
-        # Start at the existing 9:4:17 allocation; subsequent sizes are user-controlled.
-        sample_splitter.setSizes([270, 120, 510])
+        sample_splitter = _SampleWorkspaceSplitter(
+            self.waveform_view, self.sample_lanes, self.candidates_panel
+        )
         right_layout.addWidget(sample_splitter, 1)
         right_layout.addWidget(self.progress_bar)
 

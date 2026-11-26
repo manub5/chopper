@@ -34,7 +34,7 @@
 - [x] Rouge : `test_workspace_splitters_resize_without_collapsing_views` déplace les séparateurs par événements Qt, vérifie les hauteurs/largeurs redistribuées, les curseurs `SizeVerCursor` et `SizeHorCursor`, et la disponibilité des trois vues en fenêtre compacte. Vérifier qu’une liste initialement vide peut redevenir utilisable après analyse. `test_click_outside_preserves_manual_results_without_dialog` vérifie la région, les résultats, les marques et l’absence de préécoute/confirmation. Vérifier le curseur sur les poignées et la remise au curseur normal. Remplacer les seules anciennes assertions qui imposaient une demande de retour après un clic.
 - [x] Lancer `uv run --no-sync pytest -q tests/test_main_window.py tests/test_waveform_selection.py tests/test_manual_selection.py tests/test_sample_lanes.py` : constater les nouveaux échecs attendus.
 - [x] Installer les séparateurs natifs Qt non rétractables, conserver la répartition verticale par défaut `9:4:17` hors contraintes minimales, vérifier les curseurs et retirer uniquement le déclenchement du retour sur clic hors sélection. Préserver le seuil de glissement et les actions explicites.
-- [ ] Relancer les tests ciblés et la suite ; contrôler l’alignement après redimensionnement. Commit `Rend les panneaux redimensionnables et préserve la sélection au clic`, puis attendre validation.
+- [x] Relancer les tests ciblés et la suite ; contrôler l’alignement après redimensionnement. Commit `Rend les panneaux redimensionnables et préserve la sélection au clic`, puis attendre validation.
 
 ### Task 2: Ouvrir et ajouter depuis le bureau
 

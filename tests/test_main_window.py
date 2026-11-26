@@ -386,6 +386,46 @@ def test_workspace_splitters_resize_without_collapsing_views(qapp, make_window, 
     assert lanes.sample_rect(sample.id).left() == pytest.approx(expected_x, abs=1)
 
 
+@pytest.mark.parametrize("first_analysis", [False, True])
+def test_moving_splitter_with_empty_results_preserves_lane_height(
+    qapp, make_window, loaded_track, first_analysis
+):
+    window = make_window(auto_play=False)
+    window.resize(1000, 630)
+    window.show()
+    qapp.processEvents()
+    lanes = window.sample_lanes
+    splitter = lanes.parentWidget()
+    assert isinstance(splitter, QSplitter)
+
+    def drag(index, dy):
+        handle = splitter.handle(index)
+        start = handle.rect().center()
+        QTest.mousePress(handle, Qt.MouseButton.LeftButton, pos=start)
+        QTest.mouseMove(handle, start + QPoint(0, dy))
+        QTest.mouseRelease(handle, Qt.MouseButton.LeftButton)
+        qapp.processEvents()
+
+    if not first_analysis:
+        window._on_track_analyzed(loaded_track)
+        qapp.processEvents()
+        drag(2, 40)
+        expected = lanes.height()
+        window.sample_state.replace_candidates(())
+        qapp.processEvents()
+    else:
+        expected = (splitter.height() - 2 * splitter.handleWidth()) * 4 / 30
+
+    assert lanes.isHidden()
+    before = splitter.sizes()[0]
+    drag(2, 60)
+    assert splitter.sizes()[0] > before
+    window._on_track_analyzed(loaded_track)
+    qapp.processEvents()
+    assert lanes.isVisible()
+    assert lanes.height() == pytest.approx(expected, abs=2)
+
+
 def test_title_and_status_show_tempo_with_one_decimal(qapp, make_window, loaded_track):
     from dataclasses import replace
 

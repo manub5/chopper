@@ -90,6 +90,14 @@ def test_column_edge_shows_resize_cursor_only_near_boundary(qapp, loaded_track):
         panel.close()
 
 
+def test_header_highlights_sections_for_selected_rows(qapp, loaded_track):
+    panel, _ = make_panel(loaded_track)
+    try:
+        assert panel.table.horizontalHeader().highlightSections()
+    finally:
+        panel.close()
+
+
 def test_quarter_bar_label_and_duration(qapp, loaded_track):
     candidate = replace(loaded_track.candidates[0], bars=0.25, end_seconds=0.25)
     panel, _state = make_panel(replace(loaded_track, candidates=(candidate,)))
