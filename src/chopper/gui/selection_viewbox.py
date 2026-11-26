@@ -6,7 +6,6 @@ from PySide6.QtCore import Qt, Signal
 
 class SelectionViewBox(pg.ViewBox):
     draw_requested = Signal(float, float, bool)
-    background_clicked = Signal(float)
     wheel_input = Signal(float, bool, float)
 
     def __init__(self) -> None:
@@ -31,8 +30,6 @@ class SelectionViewBox(pg.ViewBox):
 
     def mouseClickEvent(self, event) -> None:
         event.accept()
-        if self.selection_enabled and event.button() == Qt.MouseButton.LeftButton:
-            self.background_clicked.emit(self.mapSceneToView(event.scenePos()).x())
 
     def wheelEvent(self, event, axis=None) -> None:
         event.accept()

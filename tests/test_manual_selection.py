@@ -209,7 +209,25 @@ def test_draw_c_real_worker_updates_both_views_and_exports_original_audio(ui, tm
     }
 
 
-@pytest.mark.parametrize("transition", ["escape", "outside", "whole", "track", "album", "close"])
+def test_click_outside_preserves_manual_results_without_dialog(ui):
+    window, policy, received, _ = ui
+    draw(window)
+    chop(window)
+    state, controller = window.sample_state, window.selection_controller
+    state.mark_all()
+    old_items, marks, region = state.items, state.marked_ids, controller.window
+    view = window.waveform_view
+    point = QPointF(view.mapFromScene(view.getViewBox().mapViewToScene(QPointF(17.0, 0))))
+    mouse(view, QEvent.Type.MouseMove, point)
+    mouse(view, QEvent.Type.MouseButtonPress, point, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton)
+    mouse(view, QEvent.Type.MouseButtonRelease, point, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+    assert not policy["choices"] and not received and window._thread is None
+    assert controller.window == view.selection == region
+    assert state.items is old_items and state.marked_ids == marks
+
+
+@pytest.mark.parametrize("transition", ["escape", "whole", "track", "album", "close"])
 @pytest.mark.parametrize("decision", ["CANCEL", "EXPORT"])
 def test_cancelled_or_failed_export_blocks_all_destructive_transitions(
     ui, tmp_path, monkeypatch, transition, decision
@@ -228,14 +246,6 @@ def test_cancelled_or_failed_export_blocks_all_destructive_transitions(
     window._current_folder = tmp_path
     if transition == "escape":
         window.action_registry.actions["stop"].trigger()
-    elif transition == "outside":
-        view = window.waveform_view
-        point = QPointF(view.mapFromScene(view.getViewBox().mapViewToScene(QPointF(17.0, 0))))
-        mouse(view, QEvent.Type.MouseMove, point)
-        QApplication.processEvents()
-        mouse(view, QEvent.Type.MouseButtonPress, point, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton)
-        mouse(view, QEvent.Type.MouseButtonRelease, point, Qt.MouseButton.LeftButton)
-        QApplication.processEvents()
     elif transition == "whole":
         controller.request_whole_track()
     elif transition == "track":

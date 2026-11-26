@@ -126,15 +126,14 @@ def test_borders_and_body_share_snapping_and_completion(view, start, end, expect
     assert finished == [expected]
 
 
-def test_click_outside_requests_clear_without_removing_or_previewing(view):
+def test_click_outside_does_not_change_selection(view):
     view.set_selection((2.0, 4.0))
-    finished, cleared = [], []
+    finished = []
     view.selection_finished.connect(finished.append)
-    view.selection_clear_requested.connect(lambda: cleared.append(True))
     click(view, 3.0)
-    assert not finished and not cleared
+    assert not finished
     click(view, 7.0)
-    assert cleared == [True] and not finished
+    assert not finished
     assert view.selection == (2.0, 4.0)
     view.set_selection(None)
     assert view.selection is None and not finished
@@ -142,10 +141,16 @@ def test_click_outside_requests_clear_without_removing_or_previewing(view):
 
 def test_background_drag_replaces_region_instead_of_requesting_clear(view):
     view.set_selection((2.0, 4.0))
-    cleared = []
-    view.selection_clear_requested.connect(lambda: cleared.append(True))
     drag(view, 5.1, 7.7)
-    assert view.selection == (6.0, 8.0) and not cleared
+    assert view.selection == (6.0, 8.0)
+
+
+def test_selection_edges_use_horizontal_resize_cursor(view):
+    view.set_selection((2.0, 4.0))
+    for line in view._selection_region.lines:
+        assert line.cursor().shape() == Qt.CursorShape.SizeHorCursor
+    view.set_selection_enabled(False)
+    assert all(not line.hasCursor() for line in view._selection_region.lines)
 
 
 def test_programmatic_changes_never_finish_a_gesture(view):
@@ -186,12 +191,11 @@ def test_clear_invalidates_selection_and_ignores_gestures_without_audio(view):
 def test_disabled_selection_ignores_left_gestures_and_requests(view):
     view.set_selection((2.0, 4.0))
     view.set_selection_enabled(False)
-    finished, cleared = [], []
+    finished = []
     view.selection_finished.connect(finished.append)
-    view.selection_clear_requested.connect(lambda: cleared.append(True))
     drag(view, 1.1, 5.2)
     click(view, 7.0)
-    assert view.selection == (2.0, 4.0) and not finished and not cleared
+    assert view.selection == (2.0, 4.0) and not finished
 
 
 def test_middle_shift_wheel_and_zoom_change_x_only(view):

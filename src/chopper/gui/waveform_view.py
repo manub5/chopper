@@ -5,7 +5,7 @@ import math
 import numpy as np
 import pyqtgraph as pg
 from PySide6.QtCore import QEvent, QPointF, Qt, QTimer, Signal
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QCursor
 from PySide6.QtWidgets import QApplication, QWidget
 
 from chopper.core.models import Candidate
@@ -27,7 +27,6 @@ class WaveformView(pg.PlotWidget):
 
     selection_finished = Signal(object)
     selection_invalidated = Signal()
-    selection_clear_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         viewbox = SelectionViewBox()
@@ -47,11 +46,7 @@ class WaveformView(pg.PlotWidget):
         self._selection_enabled = True
         self._applying_region = False
         self._press_pos: QPointF | None = None
-        self._press_time = 0.0
-        self._press_selection: Window | None = None
-        self._inside_at_press = False
         self._raw_selection: Window | None = None
-        self._click_time: float | None = None
         self._dragging = False
         self._free = False
         self._native_source = ""
@@ -63,7 +58,6 @@ class WaveformView(pg.PlotWidget):
         self._finish_timer.setSingleShot(True)
         self._finish_timer.timeout.connect(self._finish_gesture)
         viewbox.draw_requested.connect(self._draw_region)
-        viewbox.background_clicked.connect(self._background_clicked)
         viewbox.wheel_input.connect(
             lambda delta, shift, center: self.navigate_wheel(delta, shift=shift, center=center)
         )
@@ -135,6 +129,11 @@ class WaveformView(pg.PlotWidget):
             self._cancel_gesture()
         if self._selection_region is not None:
             self._selection_region.setMovable(enabled)
+            for line in self._selection_region.lines:
+                if enabled:
+                    line.setCursor(QCursor(Qt.CursorShape.SizeHorCursor))
+                else:
+                    line.unsetCursor()
 
     def _display_region(self, window: Window | None) -> None:
         region = self._selection_region
@@ -176,10 +175,6 @@ class WaveformView(pg.PlotWidget):
             self._free = free
             self._raw_selection = (start, end)
             self._apply_raw_region()
-
-    def _background_clicked(self, seconds: float) -> None:
-        if self._press_pos is not None:
-            self._click_time = seconds
 
     def _native_region_changed(self, region) -> None:
         if self._applying_region or self._press_pos is None or not self._dragging:
@@ -224,14 +219,6 @@ class WaveformView(pg.PlotWidget):
             if self.getViewBox().sceneBoundingRect().contains(scene_point):
                 self._cancel_gesture()
                 self._press_pos = QPointF(event.position())
-                self._press_time = self.getViewBox().mapSceneToView(scene_point).x()
-                self._press_selection = self._selection
-                span = self.viewRange()[0][1] - self.viewRange()[0][0]
-                margin = 5 * span / max(self.getViewBox().width(), 1)
-                self._inside_at_press = self._selection is not None and (
-                    self._selection[0] - margin <= self._press_time <= self._selection[1] + margin
-                )
-                self._click_time = None
                 self._raw_selection = self._selection
         elif kind in (QEvent.Type.MouseMove, QEvent.Type.MouseButtonRelease) and self._press_pos is not None:
             self._free = bool(event.modifiers() & Qt.KeyboardModifier.AltModifier)
@@ -258,15 +245,7 @@ class WaveformView(pg.PlotWidget):
         else:
             # pyqtgraph can move items before Qt's application drag threshold.
             self._display_region(self._selection)
-            seconds = self._press_time if self._click_time is None else self._click_time
-            outside = (
-                self._press_selection is not None
-                and not self._inside_at_press
-                and not self._press_selection[0] <= seconds <= self._press_selection[1]
-            )
             self._press_pos = None
-            if outside:
-                self.selection_clear_requested.emit()
 
     def pan_horizontal(self, delta_seconds: float) -> None:
         if self._duration > 0:
@@ -314,6 +293,7 @@ class WaveformView(pg.PlotWidget):
         self._selection_region.sigRegionChangeFinished.connect(self._native_region_finished)
         for line in self._selection_region.lines:
             line.sigDragged.connect(self._line_dragged)
+        self.set_selection_enabled(self._selection_enabled)
         self._selection_region.hide()
         self.apply_theme(self._theme)
 

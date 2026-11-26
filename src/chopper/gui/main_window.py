@@ -93,7 +93,6 @@ class MainWindow(QMainWindow):
         self.selection_controller.search_requested.connect(self._start_candidate_search)
         self.waveform_view.selection_finished.connect(self.selection_controller.set_selection)
         self.waveform_view.selection_invalidated.connect(self.selection_controller.invalidate_selection)
-        self.waveform_view.selection_clear_requested.connect(self.selection_controller.request_whole_track)
         self.preview_player = PreviewPlayer(self)
         self.sample_state.play_requested.connect(self._play_sample)
         self.sample_state.range_play_requested.connect(self._play_range)
@@ -168,15 +167,22 @@ class MainWindow(QMainWindow):
         self.selection_status_label.setWordWrap(True)
         right_layout.addWidget(self.selection_label)
         right_layout.addWidget(self.selection_status_label)
-        # Keep half of the former waveform share and two thirds of the lanes share.
-        right_layout.addWidget(self.waveform_view, 9)
-        right_layout.addWidget(self.sample_lanes, 4)
-        right_layout.addWidget(self.candidates_panel, 17)
+        sample_splitter = QSplitter(Qt.Orientation.Vertical)
+        sample_splitter.setChildrenCollapsible(False)
+        for view in (self.waveform_view, self.sample_lanes, self.candidates_panel):
+            sample_splitter.addWidget(view)
+        for index in (1, 2):
+            sample_splitter.handle(index).setCursor(Qt.CursorShape.SizeVerCursor)
+        # Start at the existing 9:4:17 allocation; subsequent sizes are user-controlled.
+        sample_splitter.setSizes([270, 120, 510])
+        right_layout.addWidget(sample_splitter, 1)
         right_layout.addWidget(self.progress_bar)
 
         splitter = QSplitter()
+        splitter.setChildrenCollapsible(False)
         splitter.addWidget(self.library_panel)
         splitter.addWidget(right_panel)
+        splitter.handle(1).setCursor(Qt.CursorShape.SizeHorCursor)
         splitter.setStretchFactor(1, 1)
         splitter.setSizes([250, 850])
 

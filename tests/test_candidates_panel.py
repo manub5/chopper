@@ -69,6 +69,27 @@ def test_all_sample_columns_can_be_resized(qapp, loaded_track):
         panel.close()
 
 
+def test_column_edge_shows_resize_cursor_only_near_boundary(qapp, loaded_track):
+    panel, _ = make_panel(loaded_track)
+    header = panel.table.horizontalHeader()
+    target = header.viewport()
+    try:
+        qapp.processEvents()
+        y = target.height() // 2
+        edge = header.sectionViewportPosition(1) - 1
+        QTest.mouseMove(target, QPoint(edge, y))
+        assert target.cursor().shape() == Qt.CursorShape.SizeHorCursor
+        initial = header.sectionSize(0)
+        QTest.mousePress(target, Qt.MouseButton.LeftButton, pos=QPoint(edge, y))
+        QTest.mouseMove(target, QPoint(edge + 32, y))
+        QTest.mouseRelease(target, Qt.MouseButton.LeftButton, pos=QPoint(edge + 32, y))
+        assert header.sectionSize(0) == initial + 32
+        QTest.mouseMove(target, QPoint(header.sectionSize(0) // 2, y))
+        assert target.cursor().shape() == Qt.CursorShape.ArrowCursor
+    finally:
+        panel.close()
+
+
 def test_quarter_bar_label_and_duration(qapp, loaded_track):
     candidate = replace(loaded_track.candidates[0], bars=0.25, end_seconds=0.25)
     panel, _state = make_panel(replace(loaded_track, candidates=(candidate,)))

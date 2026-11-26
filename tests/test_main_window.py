@@ -5,10 +5,10 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 import soundfile as sf
-from PySide6.QtCore import QPoint, Qt, QTimer
+from PySide6.QtCore import QPoint, QPointF, Qt, QTimer
 from PySide6.QtGui import QContextMenuEvent
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QDialog, QFileDialog, QMenu, QMessageBox
+from PySide6.QtWidgets import QApplication, QDialog, QFileDialog, QMenu, QMessageBox, QSplitter
 
 from chopper.core import settings as settings_module
 from chopper.core.cache import AnalysisCache
@@ -342,6 +342,48 @@ def test_sample_workspace_prioritizes_table_height(qapp, make_window, loaded_tra
     assert sample_table.viewport().height() >= sample_table.rowHeight(0)
     assert window.sample_lanes.verticalScrollBar().maximum() > 0
     assert sample_table.horizontalScrollBar().maximum() > 0
+
+
+def test_workspace_splitters_resize_without_collapsing_views(qapp, make_window, loaded_track):
+    window = make_window(auto_play=False)
+    window.resize(1100, 900)
+    window.show()
+    qapp.processEvents()
+    assert window.sample_lanes.isHidden()
+    window._on_track_analyzed(loaded_track)
+    qapp.processEvents()
+    vertical = window.waveform_view.parentWidget()
+    horizontal = window.library_panel.parentWidget()
+    assert isinstance(vertical, QSplitter) and isinstance(horizontal, QSplitter)
+    window.waveform_view.setXRange(0.25, 2.5, padding=0)
+    zoom = window.waveform_view.viewRange()[0][:]
+    for splitter, index, delta, cursor in (
+        (vertical, 1, QPoint(0, 24), Qt.CursorShape.SizeVerCursor),
+        (vertical, 2, QPoint(0, -36), Qt.CursorShape.SizeVerCursor),
+        (horizontal, 1, QPoint(36, 0), Qt.CursorShape.SizeHorCursor),
+    ):
+        handle = splitter.handle(index)
+        start = handle.rect().center()
+        before = splitter.sizes()
+        assert handle.cursor().shape() == cursor
+        QTest.mousePress(handle, Qt.MouseButton.LeftButton, pos=start)
+        QTest.mouseMove(handle, start + delta)
+        QTest.mouseRelease(handle, Qt.MouseButton.LeftButton)
+        qapp.processEvents()
+        assert splitter.sizes() != before
+    window.resize(600, 420)
+    qapp.processEvents()
+    assert all(vertical.sizes()) and all(horizontal.sizes())
+    assert window.library_panel.viewport().cursor().shape() == Qt.CursorShape.ArrowCursor
+    assert window.waveform_view.viewRange()[0] == pytest.approx(zoom)
+    assert window.candidates_panel.table.rowCount() == len(loaded_track.candidates)
+    waveform, lanes = window.waveform_view, window.sample_lanes
+    sample = window.sample_state.items[0]
+    point = waveform.mapFromScene(
+        waveform.getViewBox().mapViewToScene(QPointF(sample.candidate.start_seconds, 0))
+    )
+    expected_x = lanes.viewport().mapFromGlobal(waveform.viewport().mapToGlobal(point)).x()
+    assert lanes.sample_rect(sample.id).left() == pytest.approx(expected_x, abs=1)
 
 
 def test_title_and_status_show_tempo_with_one_decimal(qapp, make_window, loaded_track):

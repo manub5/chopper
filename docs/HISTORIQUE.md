@@ -6,6 +6,16 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 26/11/2026 — Panneaux redimensionnables et clic neutre sur la forme d’onde
+
+- La bibliothèque se redimensionne en largeur ; la forme d’onde, les rectangles
+  et le tableau se partagent la hauteur au moyen de deux séparateurs. En petite
+  fenêtre, les panneaux visibles ne peuvent pas être écrasés et les listes
+  restent accessibles par défilement. Le zoom et l’alignement temporel sont conservés.
+- Un clic hors sélection ne demande plus le retour à la piste entière et ne
+  modifie ni la sélection ni les résultats ou les marques. Il ne lance pas de
+  préécoute. Les glissements et les actions explicites gardent leur comportement.
+
 ## 25/11/2026 — Redécoupe automatique de la sélection
 
 - **Chop selection** remplace les résultats manuels sans confirmation. Un changement

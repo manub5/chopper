@@ -1,7 +1,7 @@
 """Compact sample table, projecting the shared state without owning audio."""
 
 from PySide6.QtCore import QPoint, Qt, Signal
-from PySide6.QtGui import QContextMenuEvent, QIcon, QPixmap
+from PySide6.QtGui import QContextMenuEvent, QIcon, QMouseEvent, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -18,6 +18,22 @@ from PySide6.QtWidgets import (
 from chopper.gui.presentation import format_time, sample_type_label
 from chopper.gui.sample_state import SampleState
 from chopper.gui.theme import LIGHT, ThemePalette
+
+
+class _SampleHeader(QHeaderView):
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        super().mouseMoveEvent(event)
+        # Let Qt determine which boundaries are actually draggable.
+        if self.cursor().shape() == Qt.CursorShape.SplitHCursor:
+            self.setCursor(Qt.CursorShape.SizeHorCursor)
+
+    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
+        # Qt checks its own cursor to reset it after auto-sizing a section.
+        if self.cursor().shape() == Qt.CursorShape.SizeHorCursor:
+            self.setCursor(Qt.CursorShape.SplitHCursor)
+        super().mouseDoubleClickEvent(event)
+        if self.cursor().shape() == Qt.CursorShape.SplitHCursor:
+            self.setCursor(Qt.CursorShape.SizeHorCursor)
 
 
 class SampleTable(QTableWidget):
@@ -105,6 +121,7 @@ class CandidatesPanel(QWidget):
         self._item_ids: tuple[int, ...] = ()
         self._syncing = False
         self.table = SampleTable(0, 5)
+        self.table.setHorizontalHeader(_SampleHeader(Qt.Orientation.Horizontal, self.table))
         self.table.setHorizontalHeaderLabels(["Type", "BPM", "Length", "Position", "⠿"])
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
