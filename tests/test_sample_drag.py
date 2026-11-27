@@ -84,7 +84,8 @@ def test_only_handle_with_left_button_past_threshold_requests_drag(panel):
     plays = []
     panel.drag_requested.connect(requests.append)
     state.play_requested.connect(lambda *args: plays.append(args))
-    point = table.visualItemRect(table.item(1, 4)).center()
+    table.scrollToItem(table.item(1, 6))
+    point = table.visualItemRect(table.item(1, 6)).center()
     QTest.mouseClick(table.viewport(), Qt.MouseButton.LeftButton, pos=point)
     assert requests == []
     QTest.mousePress(table.viewport(), Qt.MouseButton.LeftButton, pos=point)
@@ -116,7 +117,8 @@ def test_right_click_on_handle_neither_selects_nor_starts_drag(panel):
     state.navigate(state.items[0].id)
     requests = []
     panel.drag_requested.connect(requests.append)
-    point = panel.table.visualItemRect(panel.table.item(1, 4)).center()
+    panel.table.scrollToItem(panel.table.item(1, 6))
+    point = panel.table.visualItemRect(panel.table.item(1, 6)).center()
     QTest.mouseClick(panel.table.viewport(), Qt.MouseButton.RightButton, pos=point)
     assert state.active_id == state.items[0].id
     assert not state.marked_ids and requests == []
@@ -127,8 +129,9 @@ def test_explicitly_disabled_handle_never_requests_drag(panel):
     table = panel.table
     requests = []
     panel.drag_requested.connect(requests.append)
-    assert not table.item(0, 4).flags() & Qt.ItemFlag.ItemIsEnabled
-    point = table.visualItemRect(table.item(0, 4)).center()
+    assert not table.item(0, 6).flags() & Qt.ItemFlag.ItemIsEnabled
+    table.scrollToItem(table.item(0, 6))
+    point = table.visualItemRect(table.item(0, 6)).center()
     QTest.mousePress(table.viewport(), Qt.MouseButton.LeftButton, pos=point)
     move_held(table, point + QPoint(40, 0))
     QTest.mouseRelease(table.viewport(), Qt.MouseButton.LeftButton, pos=point)
@@ -141,7 +144,7 @@ def test_handle_available_by_default_explains_first_use(qapp, loaded_track):
     state.load_track(loaded_track)
     panel = CandidatesPanel(state)
     try:
-        handle = panel.table.item(0, 4)
+        handle = panel.table.item(0, 6)
         assert handle.flags() & Qt.ItemFlag.ItemIsEnabled
         assert "choose" in handle.toolTip().lower() and "folder" in handle.toolTip().lower()
     finally:
@@ -151,10 +154,11 @@ def test_handle_available_by_default_explains_first_use(qapp, loaded_track):
 def test_sorted_table_drag_uses_identity_not_row(panel):
     table = panel.table
     table.sortItems(0, Qt.SortOrder.DescendingOrder)
-    item_id = table.item(0, 4).data(Qt.ItemDataRole.UserRole)
+    item_id = table.item(0, 6).data(Qt.ItemDataRole.UserRole)
     requests = []
     panel.drag_requested.connect(requests.append)
-    point = table.visualItemRect(table.item(0, 4)).center()
+    table.scrollToItem(table.item(0, 6))
+    point = table.visualItemRect(table.item(0, 6)).center()
     QTest.mousePress(table.viewport(), Qt.MouseButton.LeftButton, pos=point)
     move_held(table, point + QPoint(40, 0))
     QTest.mouseRelease(table.viewport(), Qt.MouseButton.LeftButton, pos=point)

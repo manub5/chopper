@@ -6,6 +6,14 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 27/11/2026 — Ajustement indépendant des bornes d’un sample
+
+- Deux valeurs numériques en millisecondes ajustent le début et la fin sans
+  changer la vitesse ni la hauteur. La durée et le rectangle reflètent le
+  nouvel extrait ; les éditions sont réinitialisées à la prochaine découpe.
+- Refus des bornes hors piste ou d’un extrait vide. La préécoute et les nouveaux
+  exports utilisent les nouvelles bornes ; les fichiers existants restent intacts.
+
 ## 26/11/2026 — Longueurs de boucles et durée des one-shots
 
 - **Settings** et **Length** proposent les mêmes cinq longueurs. Les boucles

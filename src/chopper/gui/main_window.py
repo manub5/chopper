@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 from pathlib import Path
+from typing import Literal
 
 from PySide6.QtCore import QEvent, QObject, QSignalBlocker, Qt, QThread, Slot
 from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QPalette
@@ -11,6 +13,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QMainWindow,
     QMessageBox,
@@ -266,6 +269,7 @@ class MainWindow(QMainWindow):
         self._sync_selection()
         self._sync_actions()
         self.candidates_panel.drag_requested.connect(self._on_drag_requested)
+        self.candidates_panel.boundary_edit_requested.connect(self._edit_sample_boundary)
 
         self.theme_manager = ThemeManager(force_dark=self.settings.force_dark, parent=self)
         self.theme_manager.changed.connect(self._apply_theme)
@@ -669,6 +673,41 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage(self.selection_controller.status_message, 8000)
 
     # --- export -------------------------------------------------------
+
+    def _edit_sample_boundary(self, item_id: int, boundary: Literal["start", "end"]) -> None:
+        if (
+            self._closing
+            or self._analysis_busy
+            or self._is_analysis_running()
+            or self.selection_controller.locked
+        ):
+            return
+        item = next((item for item in self.sample_state.items if item.id == item_id), None)
+        if item is None:
+            return
+        offset = item.start_offset_ms if boundary == "start" else item.end_offset_ms
+        title = "Start offset" if boundary == "start" else "End offset"
+        text, accepted = QInputDialog.getText(self, title, f"{title} (ms):", text=str(offset))
+        if (
+            not accepted
+            or self._closing
+            or self._analysis_busy
+            or self._is_analysis_running()
+            or self.selection_controller.locked
+        ):
+            return
+        value = text.strip()
+        try:
+            if not re.fullmatch(r"[+-]?[0-9]+", value):
+                raise ValueError
+            offset = int(value)
+        except ValueError:
+            self.status_bar.showMessage("Enter a whole number of milliseconds.", 8000)
+            return
+        try:
+            self.sample_state.set_boundary_offset(item_id, boundary, offset)
+        except ValueError as error:
+            self.status_bar.showMessage(str(error), 8000)
 
     def _ensure_export_directory(self) -> Path | None:
         if self.settings.export_dir:

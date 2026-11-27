@@ -3,10 +3,12 @@
 import math
 from dataclasses import replace
 from numbers import Real
+from typing import Literal
 
 from PySide6.QtCore import QObject, Signal, Slot
 
 from chopper.core.models import Candidate
+from chopper.core.sample_offset import adjust_candidate_bounds
 from chopper.gui.presentation import LoadedTrack, SampleItem, Window
 
 
@@ -93,6 +95,26 @@ class SampleState(QObject):
         self._active_id = None
         self._marked_ids = frozenset()
         self.changed.emit()
+
+    def set_boundary_offset(self, item_id: int, boundary: Literal["start", "end"], offset_ms: int) -> bool:
+        loaded = self._loaded_track
+        if loaded is None or item_id not in self._ids:
+            return False
+        index = next(index for index, item in enumerate(self._items) if item.id == item_id)
+        item = self._items[index]
+        start = offset_ms if boundary == "start" else item.start_offset_ms
+        end = offset_ms if boundary == "end" else item.end_offset_ms
+        candidate = adjust_candidate_bounds(
+            loaded.candidates[index], start, end, loaded.sample_rate, len(loaded.samples)
+        )
+        updated = SampleItem(item_id, candidate, start, end)
+        if updated == item:
+            return True
+        if item_id in (self._requested_id, self._playing_id):
+            self.stop()
+        self._items = (*self._items[:index], updated, *self._items[index + 1 :])
+        self.changed.emit()
+        return True
 
     def select_range(self, window: Window, *, auto_preview: bool = True) -> None:
         loaded = self._loaded_track

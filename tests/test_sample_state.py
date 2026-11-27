@@ -547,3 +547,44 @@ def test_range_and_replacement_without_loaded_audio_are_noops(qapp, loaded_track
     assert state.loaded_track is None and state.items == ()
     assert not state.can_preview and not state.has_playback
     assert events == {"play": [], "stop": [], "error": [], "range": []}
+
+
+def test_boundary_edits_keep_other_boundary_and_reset_on_recut(qapp, loaded_track):
+    from chopper.gui.sample_state import SampleState
+
+    state = SampleState(auto_play=False)
+    state.load_track(loaded_track)
+    sample = state.items[0]
+    original = sample.candidate
+    state.click(sample.id)
+    state.toggle_mark(sample.id)
+    assert state.set_boundary_offset(sample.id, "start", 20)
+    assert state.set_boundary_offset(sample.id, "end", -30)
+    assert state.set_boundary_offset(sample.id, "start", 0)
+    edited = state.items[0]
+    assert edited.candidate.start_seconds == original.start_seconds
+    assert edited.end_offset_ms == -30
+    assert state.loaded_track is loaded_track
+    assert state.active_id == sample.id and sample.id in state.marked_ids
+    state.replace_candidates(loaded_track.candidates)
+    assert state.items[0].end_offset_ms == 0
+    assert not state.set_boundary_offset(sample.id, "end", -30)
+
+
+def test_boundary_edit_stops_only_its_own_preview(qapp, loaded_track):
+    from chopper.gui.sample_state import SampleState
+
+    state = SampleState(auto_play=False)
+    state.load_track(loaded_track)
+    first, second = state.items
+    requests, stops = [], []
+    state.play_requested.connect(lambda item_id, token: requests.append((item_id, token)))
+    state.stop_requested.connect(lambda: stops.append(True))
+    state.click(first.id)
+    state.toggle_playback()
+    state.playback_started(requests[0][1])
+    assert state.set_boundary_offset(second.id, "end", -20)
+    assert state.playing_id == first.id and not stops
+    assert state.set_boundary_offset(first.id, "end", -20)
+    assert state.playing_id is None and stops == [True]
+    assert len(requests) == 1

@@ -1165,8 +1165,9 @@ def test_handle_drag_writes_durable_wav_before_qt_and_never_plays(
     monkeypatch.setattr(QDrag, "exec", platform_exec)
     assert not destination.exists()
     table = window.candidates_panel.table
+    table.scrollToItem(table.item(1, 6))
     QTest.mouseClick(
-        table.viewport(), Qt.MouseButton.LeftButton, pos=table.visualItemRect(table.item(1, 4)).center()
+        table.viewport(), Qt.MouseButton.LeftButton, pos=table.visualItemRect(table.item(1, 6)).center()
     )
     assert not destination.exists()
     for _ in range(2):
@@ -1193,7 +1194,7 @@ def test_missing_export_dir_keeps_handle_available_for_cancelable_setup(
     monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args: "")
     from PySide6.QtCore import Qt
 
-    assert window.candidates_panel.table.item(0, 4).flags() & Qt.ItemFlag.ItemIsEnabled
+    assert window.candidates_panel.table.item(0, 6).flags() & Qt.ItemFlag.ItemIsEnabled
     window.candidates_panel.drag_requested.emit(window.sample_state.items[0].id)
     assert window.settings.export_dir is None
     assert not (tmp_path / "settings.toml").exists()
@@ -1235,7 +1236,7 @@ def test_export_dir_preference_enables_handles_without_writing(
     monkeypatch.setattr("chopper.gui.settings_dialog.SettingsDialog.settings", lambda self: updated)
     monkeypatch.setattr(main_window_module, "save_settings", lambda *args, **kwargs: None)
     window._on_settings_clicked()
-    assert window.candidates_panel.table.item(0, 4).flags() & Qt.ItemFlag.ItemIsEnabled
+    assert window.candidates_panel.table.item(0, 6).flags() & Qt.ItemFlag.ItemIsEnabled
     assert not destination.exists()
 
 
@@ -1406,7 +1407,8 @@ def test_first_handle_gesture_sets_up_then_second_gesture_transfers_once(
 
     monkeypatch.setattr(QDrag, "exec", transfer)
     table = window.candidates_panel.table
-    point = table.visualItemRect(table.item(1, 4)).center()
+    table.scrollToItem(table.item(1, 6))
+    point = table.visualItemRect(table.item(1, 6)).center()
 
     def move(distance):
         position = point + QPoint(distance, 0)
@@ -1527,3 +1529,63 @@ def test_english_analysis_and_export_counts(
     assert window.status_bar.currentMessage().endswith(f"{count} {sample_word}")
     window._on_export_requested("all")
     assert window.status_bar.currentMessage() == f"Exported {count} {file_word}"
+
+
+def test_boundary_dialog_edit_updates_table_without_selecting_sample(
+    qapp, make_window, loaded_track, monkeypatch
+):
+    from PySide6.QtWidgets import QInputDialog
+
+    window = make_window(auto_play=False)
+    window._on_track_analyzed(loaded_track)
+    window.show()
+    table = window.candidates_panel.table
+    sample = window.sample_state.items[0]
+    before = window.sample_lanes.sample_rect(sample.id)
+    choices = iter([("+20", True), ("-30", True), ("0", False), ("999999", True)])
+    monkeypatch.setattr(QInputDialog, "getText", lambda *args, **kwargs: next(choices))
+    for column in (4, 5, 4, 5):
+        table.scrollToItem(table.item(0, column))
+        QTest.mouseDClick(
+            table.viewport(),
+            Qt.MouseButton.LeftButton,
+            pos=table.visualItemRect(table.item(0, column)).center(),
+        )
+    edited = window.sample_state.items[0]
+    assert (edited.start_offset_ms, edited.end_offset_ms) == (20, -30)
+    assert window.sample_state.active_id is None
+    assert table.item(0, 4).data(Qt.ItemDataRole.DisplayRole) == 20
+    assert table.item(0, 5).data(Qt.ItemDataRole.DisplayRole) == -30
+    assert window.sample_lanes.sample_rect(sample.id).width() < before.width()
+
+
+def test_adjusted_bounds_feed_preview_export_and_drag(qapp, make_window, tmp_path, loaded_track, monkeypatch):
+    from chopper.gui import preview_player
+
+    window = make_window(auto_play=False, export_dir=str(tmp_path))
+    window._on_track_analyzed(loaded_track)
+    state = window.sample_state
+    sample = state.items[1]
+    window._on_sample_export_requested(sample.id)
+    original = next(tmp_path.glob("*.wav"))
+    original_bytes = original.read_bytes()
+    assert state.set_boundary_offset(sample.id, "start", 20)
+    assert state.set_boundary_offset(sample.id, "end", -30)
+    played = []
+    monkeypatch.setattr(preview_player.sd, "play", lambda data, *args, **kwargs: played.append(data.copy()))
+    monkeypatch.setattr(preview_player.sd, "get_stream", lambda: SimpleNamespace(active=True))
+    monkeypatch.setattr(preview_player.sd, "stop", lambda **kwargs: None)
+    state.click(sample.id)
+    state.toggle_playback()
+    expected = loaded_track.samples[1020:1170]
+    assert len(played) == 1
+    np.testing.assert_allclose(played[0], expected)
+    window._on_sample_export_requested(sample.id)
+    monkeypatch.setattr(main_window_module, "start_file_drag", lambda *args: Qt.DropAction.CopyAction)
+    window._on_drag_requested(sample.id)
+    exports = [path for path in tmp_path.rglob("*.wav") if path != original]
+    assert len(exports) == 2 and original.read_bytes() == original_bytes
+    for path in exports:
+        data, rate = sf.read(path)
+        assert rate == loaded_track.sample_rate
+        np.testing.assert_allclose(data, expected, atol=2 / 2**24)

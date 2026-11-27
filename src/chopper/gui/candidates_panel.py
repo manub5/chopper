@@ -19,6 +19,9 @@ from chopper.gui.presentation import format_time, sample_type_label
 from chopper.gui.sample_state import SampleState
 from chopper.gui.theme import LIGHT, ThemePalette
 
+_BOUNDARY_COLUMNS = {4: "start", 5: "end"}
+_DRAG_COLUMN = 6
+
 
 class _SampleHeader(QHeaderView):
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
@@ -40,6 +43,15 @@ class SampleTable(QTableWidget):
     sample_clicked = Signal(int, bool)
     handle_drag_requested = Signal(int)
     sample_export_requested = Signal(int)
+    boundary_edit_requested = Signal(int, str)
+
+    def _request_boundary_edit(self, row: int, column: int) -> bool:
+        boundary = _BOUNDARY_COLUMNS.get(column)
+        cell = self.item(row, column)
+        if boundary is None or cell is None or not self.isEnabled():
+            return False
+        self.boundary_edit_requested.emit(cell.data(Qt.ItemDataRole.UserRole), boundary)
+        return True
 
     def __init__(self, rows: int = 0, columns: int = 0, parent: QWidget | None = None) -> None:
         super().__init__(rows, columns, parent)
@@ -50,14 +62,16 @@ class SampleTable(QTableWidget):
         self._handle_press = None
         index = self.indexAt(event.position().toPoint())
         if event.button() == Qt.MouseButton.RightButton or (
-            index.isValid() and index.column() == 4 and event.button() != Qt.MouseButton.LeftButton
+            index.isValid() and index.column() == _DRAG_COLUMN and event.button() != Qt.MouseButton.LeftButton
         ):
             # Never let a context click select or preview a different sample.
             event.accept()
             return
         if event.button() == Qt.MouseButton.LeftButton and index.isValid():
             event.accept()
-            if index.column() != 4:
+            if index.column() in _BOUNDARY_COLUMNS:
+                return
+            if index.column() != _DRAG_COLUMN:
                 self.setFocus()
                 cell = self.item(index.row(), 0)
                 if cell is not None:
@@ -66,14 +80,28 @@ class SampleTable(QTableWidget):
                         bool(event.modifiers() & Qt.KeyboardModifier.ControlModifier),
                     )
             elif self.drag_enabled:
-                cell = self.item(index.row(), 4)
+                cell = self.item(index.row(), _DRAG_COLUMN)
                 if cell is not None:
                     self._handle_press = (event.position().toPoint(), cell.data(Qt.ItemDataRole.UserRole))
             return
         super().mousePressEvent(event)
 
     def mouseDoubleClickEvent(self, event) -> None:
+        index = self.indexAt(event.position().toPoint())
+        if event.button() == Qt.MouseButton.LeftButton and self._request_boundary_edit(
+            index.row(), index.column()
+        ):
+            event.accept()
+            return
         self.mousePressEvent(event)
+
+    def keyPressEvent(self, event) -> None:
+        if event.key() == Qt.Key.Key_F2 and self._request_boundary_edit(
+            self.currentRow(), self.currentColumn()
+        ):
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
     def mouseMoveEvent(self, event) -> None:
         if self._handle_press is None or not self.drag_enabled:
@@ -113,6 +141,7 @@ class CandidatesPanel(QWidget):
     export_requested = Signal(str)
     sample_export_requested = Signal(int)
     drag_requested = Signal(int)
+    boundary_edit_requested = Signal(int, str)
 
     def __init__(self, state: SampleState, parent: QWidget | None = None):
         super().__init__(parent)
@@ -120,9 +149,11 @@ class CandidatesPanel(QWidget):
         self._theme = LIGHT
         self._item_ids: tuple[int, ...] = ()
         self._syncing = False
-        self.table = SampleTable(0, 5)
+        self.table = SampleTable(0, 7)
         self.table.setHorizontalHeader(_SampleHeader(Qt.Orientation.Horizontal, self.table))
-        self.table.setHorizontalHeaderLabels(["Type", "BPM", "Length", "Position", "⠿"])
+        self.table.setHorizontalHeaderLabels(
+            ["Type", "BPM", "Length", "Position", "Start offset (ms)", "End offset (ms)", "⠿"]
+        )
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -135,11 +166,12 @@ class CandidatesPanel(QWidget):
         self.table.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
         self.table.horizontalHeader().setSortIndicatorShown(True)
         self.table.horizontalHeader().sortIndicatorChanged.connect(self._sort)
-        for column, width in enumerate((240, 90, 90, 100, 36)):
+        for column, width in enumerate((240, 90, 90, 100, 122, 122, 36)):
             self.table.setColumnWidth(column, width)
         self.table.sample_clicked.connect(state.click)
         self.table.handle_drag_requested.connect(self.drag_requested.emit)
         self.table.sample_export_requested.connect(self.sample_export_requested.emit)
+        self.table.boundary_edit_requested.connect(self.boundary_edit_requested.emit)
         self.table.currentCellChanged.connect(self._navigate)
         self.export_marked_button = QPushButton()
         self.export_all_button = QPushButton()
@@ -190,19 +222,11 @@ class CandidatesPanel(QWidget):
                 self.table.setRowCount(0)
                 self.table.setRowCount(len(ids))
                 for row, item in enumerate(self.state.items):
-                    candidate = item.candidate
-                    values = (
-                        "",
-                        f"{candidate.bpm:.1f}" if candidate.bpm else "—",
-                        format_time(candidate.end_seconds - candidate.start_seconds),
-                        format_time(candidate.start_seconds),
-                        "⠿",
-                    )
-                    for column, value in enumerate(values):
-                        new_cell = QTableWidgetItem(value)
+                    for column in range(self.table.columnCount()):
+                        new_cell = QTableWidgetItem("⠿" if column == _DRAG_COLUMN else "")
                         new_cell.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
                         new_cell.setData(Qt.ItemDataRole.UserRole, item.id)
-                        if column in (1, 2, 3):
+                        if 0 < column < _DRAG_COLUMN:
                             new_cell.setTextAlignment(
                                 Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
                             )
@@ -214,7 +238,20 @@ class CandidatesPanel(QWidget):
                 if cell is None:
                     continue
                 item_id = cell.data(Qt.ItemDataRole.UserRole)
-                candidate = by_id[item_id].candidate
+                item = by_id[item_id]
+                candidate = item.candidate
+                for column, value in enumerate(
+                    (
+                        f"{candidate.bpm:.1f}" if candidate.bpm else "—",
+                        format_time(candidate.duration_seconds),
+                        format_time(candidate.start_seconds),
+                        item.start_offset_ms,
+                        item.end_offset_ms,
+                    ),
+                    start=1,
+                ):
+                    if (value_cell := self.table.item(row, column)) is not None:
+                        value_cell.setData(Qt.ItemDataRole.DisplayRole, value)
                 label = sample_type_label(candidate)
                 marks = "✓ " if item_id in self.state.marked_ids else ""
                 playing = "▶ " if item_id == self.state.playing_id else ""
@@ -224,7 +261,7 @@ class CandidatesPanel(QWidget):
                     self._theme.sample_color(candidate.type.value, marked=item_id in self.state.marked_ids)
                 )
                 cell.setIcon(QIcon(swatch))
-                handle = self.table.item(row, 4)
+                handle = self.table.item(row, _DRAG_COLUMN)
                 if handle is not None:
                     handle.setToolTip(
                         "Drag a permanent WAV copy. On first use, choose your sample folder, then drag again."
@@ -234,8 +271,15 @@ class CandidatesPanel(QWidget):
                     handle.setFlags(
                         Qt.ItemFlag.ItemIsEnabled if self.table.drag_enabled else Qt.ItemFlag.NoItemFlags
                     )
-                if item_id == self.state.active_id and self.table.currentRow() != row:
-                    self.table.setCurrentCell(row, 0)
+            header = self.table.horizontalHeader()
+            if header.sortIndicatorSection() >= 0:
+                self.table.sortItems(header.sortIndicatorSection(), header.sortIndicatorOrder())
+            for row in range(self.table.rowCount()):
+                cell = self.table.item(row, 0)
+                if cell is not None and cell.data(Qt.ItemDataRole.UserRole) == self.state.active_id:
+                    if self.table.currentRow() != row:
+                        self.table.setCurrentCell(row, 0)
+                    break
             if self.state.active_id is None:
                 self.table.setCurrentCell(-1, -1)
                 self.table.clearSelection()

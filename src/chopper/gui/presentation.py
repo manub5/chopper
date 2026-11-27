@@ -51,3 +51,5 @@ class CandidateSearchResult:
 class SampleItem:
     id: int
     candidate: Candidate
+    start_offset_ms: int = 0
+    end_offset_ms: int = 0

@@ -136,6 +136,12 @@ preference. Open windows do not reload preferences automatically.
    sample using its `⠿` handle. To export just one sample, right-click its row
    or rectangle and choose **Export**. Source audio is never modified.
 
+To trim or extend a sample without changing its pitch, double-click **Start
+offset (ms)** or **End offset (ms)** in the table. Negative values move that
+boundary earlier, positive values move it later, and `0` resets it. The other
+boundary stays put. Changes apply to preview and new exports only; a new chop
+or track clears them.
+
 Choose an export folder where only you and applications you trust can write.
 The exporter avoids name collisions between ordinary exports, but is not designed
 to protect against other users changing files in a shared writable folder.

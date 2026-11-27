@@ -28,9 +28,9 @@ def click(panel, row, column=0, control=False):
     )
 
 
-def test_table_has_five_noneditable_columns_and_initial_order(qapp, loaded_track):
+def test_table_has_seven_columns_and_initial_order(qapp, loaded_track):
     panel, state = make_panel(loaded_track)
-    assert panel.table.columnCount() == 5
+    assert panel.table.columnCount() == 7
     assert panel.table.rowCount() == 2
     assert panel.table.item(0, 0).data(Qt.ItemDataRole.UserRole) == state.items[0].id
     assert panel.table.item(0, 0).text() == "1-bar loop"
@@ -64,7 +64,7 @@ def test_all_sample_columns_can_be_resized(qapp, loaded_track):
             assert header.sectionSize(column) == initial + 20
             header.resizeSection(column, initial)
             assert header.sectionSize(column) == initial
-        assert panel.table.visualItemRect(panel.table.item(0, 4)).width() > 0
+        assert panel.table.visualItemRect(panel.table.item(0, 6)).width() > 0
     finally:
         panel.close()
 
@@ -153,7 +153,8 @@ def test_keyboard_navigation_does_not_play_or_mark(qapp, loaded_track):
 
 def test_handle_does_not_select_play_or_mark(qapp, loaded_track):
     panel, state = make_panel(loaded_track, True)
-    click(panel, 1, 4)
+    panel.table.scrollToItem(panel.table.item(1, 6))
+    click(panel, 1, 6)
     assert state.active_id is None
     assert state.playing_id is None
     assert not state.marked_ids
