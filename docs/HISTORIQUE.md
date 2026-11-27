@@ -6,6 +6,14 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 27/11/2026 — Material 3 en clair et en sombre
+
+- **Chop selection** et **Export marked** utilisent les boutons bleus pleins
+  dans les deux thèmes. Les commandes secondaires restent moins accentuées.
+- Les boucles et les one-shots se distinguent par le bleu et le vert, la
+  préécoute par le jaune. L’icône Chopper reprend le bleu, le rouge, le jaune
+  et le vert des icônes Google, tout en gardant sa forme d’onde.
+
 ## 27/11/2026 — Ajustement indépendant des bornes d’un sample
 
 - Deux valeurs numériques en millisecondes ajustent le début et la fin sans

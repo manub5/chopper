@@ -381,7 +381,9 @@ def test_svg_is_static_and_renders_at_small_sizes():
         assert element.tag.split("}")[-1] in {"svg", "rect", "path", "circle", "g", "title"}
         assert all(not key.lower().startswith("on") and "href" not in key for key in element.attrib)
         assert all("url(" not in value for value in element.attrib.values())
-    assert {"#292B2E", "#D99A64"} <= {value for node in root.iter() for value in node.attrib.values()}
+    assert {"#4285F4", "#EA4335", "#FBBC04", "#34A853"} <= {
+        value for node in root.iter() for value in node.attrib.values()
+    }
     renderer = QSvgRenderer(str(source))
     assert renderer.isValid()
     for size in (16, 32, 64):

@@ -20,6 +20,10 @@ class ThemePalette:
     loop: str = "#D99A64"
     shot: str = "#7F98A8"
     sample_text: str = "#15191D"
+    primary: str = "#0B57D0"
+    on_primary: str = "#FFFFFF"
+    control: str = "#E9EEF6"
+    outline: str = "#747775"
 
     def sample_color(self, category: str, *, marked: bool) -> QColor:
         color = QColor(self.loop if category == "loop" else self.shot)
@@ -27,26 +31,33 @@ class ThemePalette:
         return color
 
     def widget_style_sheet(self) -> str:
-        if not self.dark:
-            return ""
+        primary_hover = QColor(self.primary).darker(112).name() if not self.dark else "#C6DAFC"
+        primary_pressed = QColor(self.primary).darker(126).name() if not self.dark else "#D3E3FD"
         # Keep the waveform and sample lanes on their own palette-driven rendering path.
         return f"""
             QPushButton, QLineEdit, QComboBox, QAbstractSpinBox {{
-                background-color: #34383D;
+                background-color: {self.control};
                 color: {self.text};
-                border: 1px solid #777D85;
+                border: 1px solid {self.outline};
                 border-radius: 8px;
                 padding: 4px 8px;
             }}
-            QPushButton {{ border-radius: 12px; padding: 4px 12px; }}
-            QPushButton:hover {{ background-color: #40454C; }}
-            QPushButton:pressed {{ background-color: #4D453D; }}
+            QPushButton {{ border-radius: 14px; padding: 4px 12px; }}
+            QPushButton:hover {{ background-color: {self.selection}; }}
+            QPushButton:pressed {{ background-color: {self.selection}; border-color: {self.active}; }}
+            QPushButton[materialPrimary="true"]:enabled {{
+                background-color: {self.primary}; color: {self.on_primary};
+                border: 2px solid transparent; font-weight: 600; padding: 3px 11px;
+            }}
+            QPushButton[materialPrimary="true"]:enabled:hover {{ background-color: {primary_hover}; }}
+            QPushButton[materialPrimary="true"]:enabled:pressed {{ background-color: {primary_pressed}; }}
+            QPushButton[materialPrimary="true"]:enabled:focus {{ border-color: {self.on_primary}; }}
             QPushButton:focus, QLineEdit:focus, QComboBox:focus, QAbstractSpinBox:focus {{
                 border-color: {self.active};
             }}
             QPushButton:disabled, QLineEdit:disabled, QComboBox:disabled, QAbstractSpinBox:disabled {{
                 background-color: {self.surface};
-                border-color: #4B5057;
+                border-color: {self.outline};
                 color: {self.secondary};
             }}
             QAbstractSpinBox QLineEdit, QComboBox QLineEdit {{
@@ -65,7 +76,7 @@ class ThemePalette:
     def apply_control_styles(self, parent: QWidget) -> None:
         # A sheet on the window would interrupt Qt's palette inheritance for unrelated widgets.
         sheet = self.widget_style_sheet()
-        palette = self.to_qpalette() if self.dark else QPalette()
+        palette = self.to_qpalette()
         for kind in (QPushButton, QLineEdit, QComboBox, QAbstractSpinBox):
             for control in parent.findChildren(kind):
                 if isinstance(control, QLineEdit) and isinstance(
@@ -74,7 +85,7 @@ class ThemePalette:
                     continue
                 if control.styleSheet() != sheet:
                     control.setStyleSheet(sheet)
-                    control.setPalette(palette)
+                control.setPalette(palette)
 
     def to_qpalette(self) -> QPalette:
         palette = QPalette(QApplication.palette())
@@ -100,8 +111,34 @@ class ThemePalette:
         return palette
 
 
-LIGHT = ThemePalette(False, "#F3F4F5", "#E9ECEF", "#2B3035", "#59616A", "#405D7A", "#D3DFEA")
-DARK = ThemePalette(True, "#202225", "#282B2F", "#ECEDEF", "#BAC0C8", "#E7B47E", "#524539")
+LIGHT = ThemePalette(
+    False,
+    "#F8FAFD",
+    "#F0F4F9",
+    "#1F1F1F",
+    "#444746",
+    "#0B57D0",
+    "#D3E3FD",
+    playing="#FBBC04",
+    loop="#4285F4",
+    shot="#34A853",
+)
+DARK = ThemePalette(
+    True,
+    "#1F2024",
+    "#282B30",
+    "#ECEDEF",
+    "#BAC0C8",
+    "#A8C7FA",
+    "#344963",
+    playing="#FBBC04",
+    loop="#8AB4F8",
+    shot="#81C995",
+    primary="#A8C7FA",
+    on_primary="#062E6F",
+    control="#34383D",
+    outline="#8E918F",
+)
 
 
 class ThemeManager(QObject):

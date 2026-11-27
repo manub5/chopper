@@ -76,8 +76,12 @@ def test_palette_contrast_and_sample_states(manager, qapp, scheme):
             assert (high + 0.05) / (low + 0.05) >= 4.5
     loop = palette.sample_color("loop", marked=False)
     shot = palette.sample_color("shot", marked=False)
-    assert 15 <= loop.hue() <= 40
-    assert 190 <= shot.hue() <= 230
+    assert 200 <= loop.hue() <= 230
+    assert 125 <= shot.hue() <= 155
+    high, low = sorted(
+        (luminance(QColor(palette.primary)), luminance(QColor(palette.on_primary))), reverse=True
+    )
+    assert (high + 0.05) / (low + 0.05) >= 4.5
     marked = palette.sample_color("loop", marked=True)
     assert loop.hue() == marked.hue()
     assert marked.alpha() > loop.alpha()
@@ -96,7 +100,7 @@ def test_repeated_force_choice_does_not_emit_or_loop(manager, qapp):
     assert changes == [True]
 
 
-def test_dark_widget_style_is_local_and_removed_in_light(qapp, tmp_path, monkeypatch, loaded_track):
+def test_material_widget_style_is_local_in_both_themes(qapp, tmp_path, monkeypatch, loaded_track):
     from chopper.core.cache import AnalysisCache
     from chopper.core.settings import Settings
     from chopper.gui.main_window import MainWindow
@@ -136,8 +140,8 @@ def test_dark_widget_style_is_local_and_removed_in_light(qapp, tmp_path, monkeyp
         assert luminance(image.pixelColor(image.width() - 5, y)) < 0.12
         dropdown.hidePopup()
         window.theme_manager.set_force_dark(False)
-        assert not field.styleSheet()
-        assert dialog.palette().color(QPalette.ColorRole.Window) != QColor("#202225")
+        assert field.styleSheet()
+        assert dialog.palette().color(QPalette.ColorRole.Window) == QColor("#F8FAFD")
         window.theme_manager.set_force_dark(True)
         checked.append(True)
         return QDialog.DialogCode.Rejected
@@ -165,11 +169,46 @@ def test_dark_widget_style_is_local_and_removed_in_light(qapp, tmp_path, monkeyp
         assert qapp.palette() == original
         system_scheme(qapp, Qt.ColorScheme.Light)
         window.theme_manager.set_force_dark(False)
-        assert not combo.styleSheet()
-        assert window.palette().color(QPalette.ColorRole.Window) == QColor("#F3F4F5")
+        assert combo.styleSheet()
+        assert "#0B57D0" in window.chop_selection_button.styleSheet()
+        assert window.chop_selection_button.property("materialPrimary") is True
+        assert window.candidates_panel.export_marked_button.property("materialPrimary") is True
+        assert not window.whole_track_button.property("materialPrimary")
+        assert not window.candidates_panel.export_all_button.property("materialPrimary")
+        assert window.palette().color(QPalette.ColorRole.Window) == QColor("#F8FAFD")
         assert qapp.palette() == original
     finally:
         window.close()
+
+
+@pytest.mark.parametrize("dark", [False, True])
+def test_primary_button_fill_renders_only_when_enabled(manager, qapp, dark):
+    from PySide6.QtWidgets import QPushButton, QVBoxLayout, QWidget
+
+    system_scheme(qapp, Qt.ColorScheme.Dark if dark else Qt.ColorScheme.Light)
+    panel = QWidget()
+    layout = QVBoxLayout(panel)
+    primary = QPushButton("Chop selection")
+    secondary = QPushButton("Whole track")
+    primary.setProperty("materialPrimary", True)
+    layout.addWidget(primary)
+    layout.addWidget(secondary)
+    panel.resize(240, 110)
+    manager.palette.apply_control_styles(panel)
+    panel.show()
+    try:
+        qapp.processEvents()
+
+        def fill(button):
+            image = button.grab().toImage()
+            return image.pixelColor(image.width() // 8, image.height() // 2)
+
+        assert fill(primary) == QColor(manager.palette.primary)
+        assert fill(secondary) != QColor(manager.palette.primary)
+        primary.setEnabled(False)
+        assert fill(primary) != QColor(manager.palette.primary)
+    finally:
+        panel.close()
 
 
 def test_window_graphs_and_table_follow_theme_without_losing_state(qapp, tmp_path, loaded_track, monkeypatch):

@@ -562,7 +562,7 @@ def test_moving_splitter_with_empty_results_preserves_lane_height(
         window.sample_state.replace_candidates(())
         qapp.processEvents()
     else:
-        expected = (splitter.height() - 2 * splitter.handleWidth()) * 4 / 30
+        expected = max(lanes.minimumHeight(), (splitter.height() - 2 * splitter.handleWidth()) * 4 / 30)
 
     assert lanes.isHidden()
     before = splitter.sizes()[0]

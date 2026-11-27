@@ -174,6 +174,7 @@ class CandidatesPanel(QWidget):
         self.table.boundary_edit_requested.connect(self.boundary_edit_requested.emit)
         self.table.currentCellChanged.connect(self._navigate)
         self.export_marked_button = QPushButton()
+        self.export_marked_button.setProperty("materialPrimary", True)
         self.export_all_button = QPushButton()
         self.export_marked_button.clicked.connect(lambda: self.export_requested.emit("marked"))
         self.export_all_button.clicked.connect(lambda: self.export_requested.emit("all"))
