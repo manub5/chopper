@@ -405,6 +405,23 @@ def test_dialog_locations_are_independent_and_survive_reopening(qapp, make_windo
         reopened.close()
 
 
+def test_open_path_does_not_duplicate_an_existing_nested_album(qapp, make_window, tmp_path, loaded_track):
+    root = tmp_path / "Library"
+    album = root / "Artist" / "Album"
+    album.mkdir(parents=True)
+    window = make_window(auto_play=False)
+    window._on_track_analyzed(loaded_track)
+    tree = window.library_panel
+    tree.set_root(root)
+    artist = tree.topLevelItem(0)
+    artist.setExpanded(True)
+    original = artist.child(0)
+    window.open_path(album)
+    assert tree.topLevelItemCount() == 1
+    assert artist.child(0) is original
+    assert window.sample_state.loaded_track is loaded_track and window._thread is None
+
+
 def test_open_path_adds_album_without_loading_track(qapp, make_window, tmp_path, loaded_track):
     window = make_window(auto_play=False)
     window._on_track_analyzed(loaded_track)

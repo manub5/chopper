@@ -73,6 +73,8 @@ dans pre-commit et la préécoute ne joue plus en boucle.
 - Le dépôt ajoute uniquement des références de session, sans doublon, sans
   déplacer les originaux ni remplacer la piste active. Les éléments non locaux
   ou non pris en charge sont signalés. Les associations par défaut ne sont pas modifiées.
+- L’ouverture explicite d’un album déjà visible sous un dossier conserve son
+  entrée existante et ne lance aucune analyse.
 
 ## 26/11/2026 — Panneaux redimensionnables et clic neutre sur la forme d’onde
 

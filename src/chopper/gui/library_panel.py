@@ -40,19 +40,25 @@ class LibraryPanel(QTreeWidget):
             self._append_entry(path, is_album=is_album)
 
     def add_album(self, path: Path) -> None:
-        self._add_session_entry(path, is_album=True)
+        path = path.absolute()
+        if not self._contains_path(path, nested_only=True):
+            self._add_session_entry(path, is_album=True)
 
     def add_track(self, path: Path) -> None:
         self._add_session_entry(path, is_album=False)
 
     def add_dropped_path(self, path: Path, *, is_album: bool) -> None:
         path = path.absolute()
+        if not self._contains_path(path):
+            self._add_session_entry(path, is_album=is_album)
+
+    def _contains_path(self, path: Path, *, nested_only: bool = False) -> bool:
         iterator = QTreeWidgetItemIterator(self)
         while (item := iterator.value()) is not None:
-            if item.data(0, _PATH_ROLE) == path:
-                return
+            if item.data(0, _PATH_ROLE) == path and (not nested_only or item.parent() is not None):
+                return True
             iterator += 1
-        self._add_session_entry(path, is_album=is_album)
+        return False
 
     def _add_session_entry(self, path: Path, *, is_album: bool) -> None:
         path = path.absolute()
