@@ -139,7 +139,6 @@ if [[ ! -x "${DIR}/.venv/bin/chopper" ]]; then
     printf '%s\n' 'Chopper environment is missing. Run bash install.sh from the application folder.' >&2
     exit 1
 fi
-cd "${DIR}"
 exec "${DIR}/.venv/bin/chopper" "$@"
 EOF
     chmod +x "${LAUNCHER}"

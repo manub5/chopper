@@ -161,3 +161,58 @@ app.main(['-style', 'Fusion'])
         timeout=20,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        ["--start", "nan"],
+        ["--start", "2", "--end", "1"],
+        ["--bars", "3"],
+        ["--max-samples", "65"],
+        ["--one-shot-duration", "0"],
+    ],
+)
+def test_invalid_chop_options_stop_before_building_window(monkeypatch, tmp_path, options):
+    track = tmp_path / "Track.wav"
+    track.touch()
+    monkeypatch.setattr(app_module, "QApplication", lambda args: SimpleNamespace(arguments=lambda: args))
+    monkeypatch.setattr(app_module, "build_window", lambda: pytest.fail("Built a window for invalid options"))
+    with pytest.raises(SystemExit) as stopped:
+        app_module.main([str(track), *options])
+    assert stopped.value.code == 2
+
+
+def test_chop_options_route_relative_paths_and_reject_album(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    track = tmp_path / "Track with spaces.wav"
+    track.touch()
+    pending, received = [], []
+    monkeypatch.setattr(
+        app_module,
+        "QApplication",
+        lambda args: SimpleNamespace(
+            arguments=lambda: args,
+            exec=lambda: pending.pop()() or 0,
+        ),
+    )
+    monkeypatch.setattr(
+        app_module, "QTimer", SimpleNamespace(singleShot=lambda delay, fn: pending.append(fn))
+    )
+    monkeypatch.setattr(
+        app_module,
+        "build_window",
+        lambda: SimpleNamespace(
+            show=lambda: None,
+            open_file=lambda path, *, chop: received.append((path, chop)),
+        ),
+    )
+    with pytest.raises(SystemExit) as stopped:
+        app_module.main([track.name, "--start", "0.5", "--bars", "1/2", "--export-dir", "My exports"])
+    assert stopped.value.code == 0
+    path, chop = received.pop()
+    assert path == track and chop.start == 0.5 and chop.bars == 0.5
+    assert chop.export_dir == tmp_path / "My exports"
+    with pytest.raises(SystemExit) as stopped:
+        app_module.main([str(tmp_path), "--bars", "1"])
+    assert stopped.value.code == 2 and not received

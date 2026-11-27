@@ -85,8 +85,8 @@ Use **Chop selection** to find samples in the selected range. Changing **Length*
 automatically searches that range again without a replacement prompt. The previous
 results stay visible until the search succeeds; exported files are not changed.
 
-To open a track directly from another program or a terminal, pass its absolute
-path (quote paths containing spaces):
+To open a track directly from another program or a terminal, pass its path
+(quote paths containing spaces):
 
 ```bash
 chopper "/absolute/path/to/track.wav"
@@ -100,6 +100,21 @@ usual status indication; the waveform appears when analysis finishes. Missing
 or unreadable files are reported in the window without closing it. Without an
 argument, startup is unchanged. Before installing the global command, use
 `uv run chopper "/absolute/path/to/track.wav"` from the project folder.
+
+To show only samples from part of a track:
+
+```bash
+chopper "My track.wav" --start 12 --end 24 --bars 1/2 --one-shot-duration 0.25 --max-samples 4
+```
+
+Times are in seconds. If omitted, the range starts at zero and ends at the
+end of the track. `--bars` accepts `1/4`, `1/2`, `1`, `2`, or `4`; it sets the
+loop length without disabling one-shots. `--one-shot-duration` accepts 0.1–30
+seconds, and `--max-samples` accepts 1–64 per category. Omitted sample options
+use the current settings. Add `--export-dir "My samples"` to write the results
+automatically in the configured export format; without it, the command only
+shows results in the window. Relative paths are resolved from the directory
+where you run the command. None of these options changes your preferences.
 
 If you enable the optional Dolphin action during setup, right-click a supported
 audio file or folder and choose **Open with Chopper** from Dolphin’s context menu.

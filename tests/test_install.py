@@ -139,7 +139,7 @@ def test_installer_generates_chopper_and_launcher_preserves_arguments(installer_
         timeout=10,
     )
     assert Path(env["APP_CALLS"]).read_text().splitlines() == [
-        str(project),
+        str(tmp_path),
         "--test",
         "argument with spaces",
     ]
@@ -366,7 +366,7 @@ def test_global_symlink_launches_project_from_other_cwd(installer_sandbox, tmp_p
         timeout=10,
     )
     assert Path(env["APP_CALLS"]).read_text().splitlines() == [
-        str(project),
+        str(tmp_path),
         "--probe",
         "argument $ with % spaces",
     ]
@@ -389,7 +389,7 @@ def test_launcher_follows_symlink_chain_and_preserves_args(installer_sandbox, tm
         check=True,
         timeout=10,
     )
-    assert Path(env["APP_CALLS"]).read_text().splitlines() == [str(project), "arg with spaces", "x$y%z"]
+    assert Path(env["APP_CALLS"]).read_text().splitlines() == [str(tmp_path), "arg with spaces", "x$y%z"]
     assert Path(env["UV_CALLS"]).read_text() == ""
 
 
@@ -458,7 +458,7 @@ def test_real_git_pull_updates_command_menu_and_desktop_without_reinstall(instal
     git(project, "push", "-u", "origin", "main")
     assert run_installer(project, env, answers="y\ny\ny\ny\n").returncode == 0
     executable = project / ".venv/bin/chopper"
-    executable.write_text('#!/bin/sh\nexec "$TEST_PYTHON" probe.py\n')
+    executable.write_text('#!/bin/sh\nexec "$TEST_PYTHON" "$(dirname "$0")/../../probe.py"\n')
     executable.chmod(0o755)
     command = Path(env["HOME"]) / ".local/bin/chopper"
     menu = Path(env["XDG_DATA_HOME"]) / "applications/chopper.desktop"

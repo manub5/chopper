@@ -65,6 +65,17 @@ def test_mark_shortcut_toggles_only_active_and_is_not_ctrl_space(window):
     assert registry.actions["mark"].shortcut().toString() == "M"
 
 
+def test_shortcut_refresh_tolerates_destroyed_button(window):
+    from PySide6.QtCore import QCoreApplication, QEvent
+
+    button = window.chop_selection_button
+    button.deleteLater()
+    QCoreApplication.sendPostedEvents(button, QEvent.Type.DeferredDelete)
+    registry = window.action_registry
+    registry.set_available("chop_selection", False)
+    assert not registry.actions["chop_selection"].isEnabled()
+
+
 def test_space_and_escape_control_real_player_without_losing_marks(window):
     assert window.action_registry.actions["play"].isEnabled() is False
     state = window.sample_state

@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shiboken6 import isValid
 
 _SPECS = (
     ("open_library", "Open library…", "Ctrl+O", "File", False),
@@ -112,7 +113,8 @@ class ActionRegistry(QObject):
             enabled = self._available[name] and not modal and not (name in self._candidate_ids and editing)
             action.setEnabled(enabled)
             for button in self._buttons.get(name, ()):
-                button.setEnabled(enabled)
+                if isValid(button):
+                    button.setEnabled(enabled)
 
     def help_text(self) -> str:
         rows = []

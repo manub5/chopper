@@ -241,6 +241,66 @@ def test_external_file_errors_leave_window_usable(qapp, make_window, tmp_path, m
     assert window.sample_state.loaded_track is None
 
 
+@pytest.mark.parametrize("mode", ["display", "export", "out_of_bounds", "cancel"])
+def test_cli_chop_publishes_only_final_results_and_never_changes_settings(
+    qapp, make_window, tmp_path, monkeypatch, mode
+):
+    from chopper.app import _parse_arguments
+
+    source = tmp_path / "Source track.wav"
+    destination = tmp_path / "CLI exports"
+    configured = tmp_path / "Configured exports"
+    sf.write(source, np.linspace(-0.2, 0.2, 7000, dtype=np.float32), SAMPLE_RATE)
+    source_bytes = source.read_bytes()
+    window = make_window(auto_play=False, export_dir=str(configured))
+    settings_module.save_settings(window.settings)
+    settings_path = settings_module.default_settings_path()
+    preferences = settings_path.read_bytes()
+    monkeypatch.setattr(workers.rhythm, "resolve_device", lambda mode: "cpu")
+    monkeypatch.setattr(workers.rhythm, "analyze_rhythm", lambda *args, **kwargs: (120, (), (0, 2, 4, 6)))
+    monkeypatch.setattr(workers.onsets, "detect_onsets", lambda *args: (0.25, 2.75, 3.25, 6.25))
+    args = [
+        str(source),
+        "--start",
+        "2.5",
+        "--end",
+        "8" if mode == "out_of_bounds" else "5.5",
+        "--bars",
+        "1/2",
+        "--one-shot-duration",
+        "0.4",
+        "--max-samples",
+        "1",
+    ]
+    if mode != "display":
+        args.extend(["--export-dir", str(destination)])
+    if mode == "cancel":
+        monkeypatch.setattr(
+            window.selection_controller, "authorize_transition", lambda *args, **kwargs: False
+        )
+    path, chop = _parse_arguments(args)
+    published = []
+    window.sample_state.changed.connect(lambda: published.append(window.sample_state.loaded_track))
+    window.open_file(path, chop=chop)
+    _pump_until(lambda: window._thread is None, timeout_seconds=15)
+    assert not configured.exists()
+    assert settings_path.read_bytes() == preferences and source.read_bytes() == source_bytes
+    if mode in {"cancel", "out_of_bounds"}:
+        assert not any(published) and not destination.exists()
+        if mode == "out_of_bounds":
+            assert "Chop range" in window.status_bar.currentMessage()
+        return
+    final = window.sample_state.loaded_track
+    assert final is not None and all(result is final for result in published if result is not None)
+    loops = [item for item in final.candidates if item.type is CandidateType.LOOP]
+    shots = [item for item in final.candidates if item.type is CandidateType.ONE_SHOT]
+    assert [(loop.start_seconds, loop.end_seconds, loop.bars) for loop in loops] == [(4.0, 5.0, 0.5)]
+    assert len(shots) == 1 and shots[0].duration_seconds == pytest.approx(0.4)
+    assert 2.5 <= shots[0].start_seconds < shots[0].end_seconds <= 5.5
+    assert window.settings.candidates_per_track == 8
+    assert len(list(destination.glob("*.wav"))) == (2 if mode == "export" else 0)
+
+
 def test_corrupt_external_file_reports_worker_error_without_crashing(qapp, make_window, tmp_path):
     path = tmp_path / "corrupt.wav"
     path.write_bytes(b"not a WAV file")

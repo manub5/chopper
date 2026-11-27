@@ -6,6 +6,13 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 27/11/2026 — Découpe au lancement depuis le terminal
+
+- Le lanceur conserve le dossier d’appel pour les chemins relatifs. Les options
+  de découpe s’appliquent à la piste demandée sans modifier les préférences.
+- La plage est vérifiée sur l’audio décodé. Seuls les résultats finaux sont
+  affichés ; l’export automatique exige une destination explicite.
+
 ## 27/11/2026 — Material 3 en clair et en sombre
 
 - **Chop selection** et **Export marked** utilisent les boutons bleus pleins

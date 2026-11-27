@@ -58,6 +58,7 @@ from chopper.gui.waveform_view import WaveformView
 from chopper.gui.workers import (
     AlbumAnalysisWorker,
     CandidateSearchWorker,
+    ChopOptions,
     TrackAnalysisWorker,
     start_in_thread,
 )
@@ -393,7 +394,7 @@ class MainWindow(QMainWindow):
 
     # --- analyse d'une piste ---------------------------------------------
 
-    def open_file(self, path: Path) -> None:
+    def open_file(self, path: Path, *, chop: ChopOptions | None = None) -> None:
         """Open an external file through the normal library-selection pipeline."""
         try:
             path = path.expanduser().absolute()
@@ -402,14 +403,19 @@ class MainWindow(QMainWindow):
             # Check readability without decoding or changing the source audio.
             with path.open("rb"):
                 pass
-            self._start_track_analysis(path, external=True)
+            if chop is None:
+                self._start_track_analysis(path, external=True)
+            else:
+                self._start_track_analysis(path, external=True, chop=chop)
         except (OSError, ValueError, audio_io.AudioLoadError) as error:
             self.status_bar.showMessage(f"Could not open {path}: {error}", 10000)
 
     def _on_track_selected(self, path: Path) -> None:
         self._start_track_analysis(path)
 
-    def _start_track_analysis(self, path: Path, *, external: bool = False) -> None:
+    def _start_track_analysis(
+        self, path: Path, *, external: bool = False, chop: ChopOptions | None = None
+    ) -> None:
         if self._is_analysis_running():
             # Une analyse (piste ou album) est déjà en cours : la bibliothèque est
             # désactivée pendant ce temps (voir _set_busy), donc ce cas ne devrait
@@ -434,7 +440,11 @@ class MainWindow(QMainWindow):
         self._current_track = track
         self.status_bar.showMessage(f"Analyzing {track.title}…")
 
-        worker = TrackAnalysisWorker(track, self.settings, self.cache)
+        worker = (
+            TrackAnalysisWorker(track, self.settings, self.cache)
+            if chop is None
+            else TrackAnalysisWorker(track, self.settings, self.cache, chop=chop)
+        )
         worker.finished.connect(self._on_track_analyzed)
         worker.failed.connect(self._on_track_failed)
         self._set_busy(True)
@@ -463,6 +473,14 @@ class MainWindow(QMainWindow):
             f"{analysis.track.title} — {analysis.tempo_bpm:.1f} BPM, {len(candidates)} {sample_word}",
             5000,
         )
+        worker = self.sender()
+        if (
+            isinstance(worker, TrackAnalysisWorker)
+            and worker.chop is not None
+            and worker.chop.export_dir is not None
+            and result.candidates
+        ):
+            self._export_candidates(result.candidates, destination=worker.chop.export_dir)
 
     def _on_track_failed(self, message: str) -> None:
         self._opening_external_track = False
@@ -756,13 +774,15 @@ class MainWindow(QMainWindow):
         if item is not None:
             self._export_candidates((item.candidate,))
 
-    def _export_candidates(self, candidates: tuple[Candidate, ...]) -> bool:
+    def _export_candidates(
+        self, candidates: tuple[Candidate, ...], *, destination: Path | None = None
+    ) -> bool:
         loaded = self.sample_state.loaded_track
         if loaded is None or not candidates:
             return False
         self.sample_state.stop()
 
-        directory = self._ensure_export_directory()
+        directory = destination if destination is not None else self._ensure_export_directory()
         if directory is None:
             return False
 

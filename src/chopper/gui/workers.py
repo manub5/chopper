@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
@@ -25,8 +25,41 @@ def tracks_in_folder(folder: Path) -> list[Track]:
     return [audio_io.read_track(p) for p in paths]
 
 
+@dataclass(frozen=True)
+class ChopOptions:
+    start: float = 0.0
+    end: float | None = None
+    bars: float | None = None
+    one_shot_duration: float | None = None
+    max_samples: int | None = None
+    export_dir: Path | None = None
+
+    def window(self, sample_rate: int, frame_count: int) -> Window:
+        duration = frame_count / sample_rate
+        end = duration if self.end is None else self.end
+        if not 0 <= self.start < end <= duration:
+            raise ValueError(f"Chop range must satisfy 0 <= start < end <= {duration:.9g} seconds.")
+        if round(self.start * sample_rate) >= round(end * sample_rate):
+            raise ValueError("Chop range must contain at least one audio frame.")
+        return self.start, end
+
+    def apply(self, settings: Settings) -> Settings:
+        return replace(
+            settings,
+            loop_lengths_bars=settings.loop_lengths_bars if self.bars is None else (self.bars,),
+            one_shot_duration_seconds=(
+                settings.one_shot_duration_seconds
+                if self.one_shot_duration is None
+                else self.one_shot_duration
+            ),
+            candidates_per_track=settings.candidates_per_track
+            if self.max_samples is None
+            else self.max_samples,
+        )
+
+
 def analyze_track(
-    track: Track, settings: Settings, cache: AnalysisCache | None = None
+    track: Track, settings: Settings, cache: AnalysisCache | None = None, *, window: Window | None = None
 ) -> tuple[Analysis, list[Candidate]]:
     """Pipeline complet pour une piste : rythme + onsets (via le cache si possible),
     puis sélection des candidats boucles et one-shots."""
@@ -54,6 +87,7 @@ def analyze_track(
         analysis.downbeat_times,
         lengths_bars=settings.loop_lengths_bars,
         max_candidates=settings.candidates_per_track,
+        window=window,
     )
     shots = candidates_module.find_one_shot_candidates(
         samples,
@@ -61,6 +95,7 @@ def analyze_track(
         analysis.onset_times,
         duration_seconds=settings.one_shot_duration_seconds,
         max_candidates=settings.candidates_per_track,
+        window=window,
     )
     all_candidates = sorted(loops + shots, key=lambda c: c.score, reverse=True)
     return analysis, all_candidates
@@ -170,16 +205,31 @@ class TrackAnalysisWorker(QObject):
     finished = Signal(object)  # LoadedTrack
     failed = Signal(str)
 
-    def __init__(self, track: Track, settings: Settings, cache: AnalysisCache | None = None):
+    def __init__(
+        self,
+        track: Track,
+        settings: Settings,
+        cache: AnalysisCache | None = None,
+        *,
+        chop: ChopOptions | None = None,
+    ):
         super().__init__()
         self._track = track
         self._settings = settings
         self._cache = cache
+        self.chop = chop
 
     def run(self) -> None:
         try:
-            analysis, candidates = analyze_track(self._track, self._settings, self._cache)
-            samples, sample_rate = audio_io.load(self._track.path, mono=False)
+            if self.chop is None:
+                analysis, candidates = analyze_track(self._track, self._settings, self._cache)
+                samples, sample_rate = audio_io.load(self._track.path, mono=False)
+            else:
+                samples, sample_rate = audio_io.load(self._track.path, mono=False)
+                window = self.chop.window(sample_rate, len(samples))
+                analysis, candidates = analyze_track(
+                    self._track, self.chop.apply(self._settings), self._cache, window=window
+                )
         except Exception as exc:  # noqa: BLE001 - remonté à l'interface plutôt qu'avalé
             self.failed.emit(str(exc))
         else:
