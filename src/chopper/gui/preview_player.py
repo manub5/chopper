@@ -1,6 +1,5 @@
 """One-shot audio output, with completion tied to the actual PortAudio stream."""
 
-import math
 from typing import Any
 
 import numpy as np
@@ -8,6 +7,7 @@ import sounddevice as sd
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
 
 from chopper.core.models import Candidate
+from chopper.core.sample_render import render_candidate
 
 
 class PreviewPlayer(QObject):
@@ -27,27 +27,10 @@ class PreviewPlayer(QObject):
         if not self._stop_owned():
             self.failed.emit(token, "Could not stop the previous preview.")
             return
-        if (
-            not math.isfinite(sample_rate)
-            or sample_rate <= 0
-            or samples.ndim not in (1, 2)
-            or (samples.ndim == 2 and samples.shape[1] == 0)
-            or not math.isfinite(candidate.start_seconds)
-            or not math.isfinite(candidate.end_seconds)
-            or candidate.end_seconds <= candidate.start_seconds
-        ):
-            self.failed.emit(token, "Invalid audio or preview boundaries.")
-            return
-        # Clamp in seconds first: negative slicing and huge products are unsafe.
-        duration = len(samples) / sample_rate
-        start = round(min(duration, max(0.0, candidate.start_seconds)) * sample_rate)
-        end = round(min(duration, max(0.0, candidate.end_seconds)) * sample_rate)
-        segment = samples[start:end]
-        if len(segment) == 0:
-            self.failed.emit(token, "This sample is empty (zero length).")
-            return
-        if not np.isfinite(segment).all():
-            self.failed.emit(token, "This sample contains non-finite audio values.")
+        try:
+            segment = render_candidate(samples, sample_rate, candidate)
+        except Exception as exc:  # noqa: BLE001 - report renderer failures to Qt consumers
+            self.failed.emit(token, f"Preview failed: {exc}")
             return
 
         # Retain ownership even if starting or retrieving the stream fails midway.

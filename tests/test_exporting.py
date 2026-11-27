@@ -133,7 +133,7 @@ def test_file_in_place_of_destination_reports_error_without_collision_loop(
     samples, rate, track, candidates = stereo_source
     destination = tmp_path / "not-a-directory"
     destination.write_bytes(b"keep this file")
-    real_segment = audio_io.export_segment
+    real_segment = audio_io._write_audio
     attempts = []
 
     def bounded_segment(*args, **kwargs):
@@ -142,7 +142,7 @@ def test_file_in_place_of_destination_reports_error_without_collision_loop(
             raise RuntimeError("collision retry loop detected")
         return real_segment(*args, **kwargs)
 
-    monkeypatch.setattr(audio_io, "export_segment", bounded_segment)
+    monkeypatch.setattr(audio_io, "_write_audio", bounded_segment)
     report = export_batch(samples, rate, track, candidates, destination, "wav")
     assert len(attempts) <= 1
     assert report.paths == () and report.error

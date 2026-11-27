@@ -41,7 +41,8 @@ def build_filename(track: Track, candidate: Candidate, *, extension: str = "wav"
         return f"{artist}_{album}_{piste}_loop_{bpm}bpm_{candidate.bars:g}bars_{position}.{extension}"
 
     position = _format_position(candidate.start_seconds, with_millis=True)
-    return f"{artist}_{album}_{piste}_shot_{position}.{extension}"
+    tempo = f"{round(candidate.bpm)}bpm_" if candidate.bpm is not None else ""
+    return f"{artist}_{album}_{piste}_shot_{tempo}{position}.{extension}"
 
 
 def unique_path(directory: Path, filename: str) -> Path:

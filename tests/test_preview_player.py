@@ -280,3 +280,33 @@ def test_state_and_player_keep_stereo_marks_and_ignore_old_finish(qapp, audio_ho
     wait_until(qapp, lambda: state.playing_id is None)
     assert state.active_id == second.id
     assert state.marked_ids == frozenset({second.id})
+
+
+def test_speed_preview_matches_wav_flac_and_drag(audio_host, loaded_track, tmp_path):
+    from dataclasses import replace
+
+    import soundfile as sf
+
+    from chopper.core.exporting import export_batch, export_drag
+
+    player, events = make_player(audio_host)
+    samples = loaded_track.samples.copy()
+    # A sharp, full-scale transition can overshoot during resampling.
+    samples[1000:1100] = -1
+    samples[1100:1200] = 1
+    rate = loaded_track.sample_rate
+    track = loaded_track.analysis.track
+    candidate = replace(loaded_track.candidates[1], bpm=150, source_bpm=120, playback_rate=1.25)
+    player.play(samples, rate, candidate, 1)
+    assert events["started"] == [1]
+    preview = audio_host.received[0][0]
+    assert preview.shape == (160, 2)
+    paths = [export_drag(samples, rate, track, candidate, tmp_path)]
+    for extension in ("wav", "flac"):
+        report = export_batch(samples, rate, track, (candidate,), tmp_path, extension)
+        assert report.error is None
+        paths.extend(report.paths)
+    for path in paths:
+        audio, output_rate = sf.read(path)
+        assert output_rate == rate and "shot_150bpm" in path.name
+        np.testing.assert_allclose(audio, preview, atol=2 / 2**24)

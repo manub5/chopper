@@ -45,6 +45,8 @@ class Candidate:
     score: float
     bpm: float | None = None
     bars: float | None = None
+    source_bpm: float | None = None
+    playback_rate: float = 1.0
 
     @property
     def duration_seconds(self) -> float:

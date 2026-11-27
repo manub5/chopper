@@ -10,8 +10,9 @@ import numpy as np
 import soundfile as sf
 from mutagen import File as MutagenFile
 
-from chopper.core.models import Candidate, Track
+from chopper.core.models import Candidate, CandidateType, Track
 from chopper.core.naming import build_filename, unique_path
+from chopper.core.sample_render import render_candidate
 
 _NATIVE_EXTENSIONS = {".wav", ".flac", ".ogg", ".aiff", ".aif"}
 
@@ -126,11 +127,13 @@ def export_segment(
     silencieusement son contenu. `export_candidates` s'appuie là-dessus pour
     choisir un autre nom en cas de collision.
     """
-    start_index = max(0, round(start_seconds * sample_rate))
-    end_index = min(len(samples), round(end_seconds * sample_rate))
-    segment = samples[start_index:end_index]
+    candidate = Candidate(CandidateType.ONE_SHOT, start_seconds, end_seconds, 0)
+    segment = render_candidate(samples, sample_rate, candidate)
     destination.parent.mkdir(parents=True, exist_ok=True)
+    _write_audio(segment, sample_rate, destination, subtype=subtype)
 
+
+def _write_audio(segment: np.ndarray, sample_rate: int, destination: Path, *, subtype: str) -> None:
     fd = os.open(str(destination), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
     os.close(fd)
     try:
@@ -160,20 +163,14 @@ def export_candidates(
     exported_paths = []
     for candidate in candidates:
         filename = build_filename(track, candidate, extension=file_format)
+        segment = render_candidate(samples, sample_rate, candidate)
         while True:
             # A file or broken link in place of the folder is not a filename collision.
             # Keep its FileExistsError outside the retry handler below.
             destination.mkdir(parents=True, exist_ok=True)
             path = unique_path(destination, filename)
             try:
-                export_segment(
-                    samples,
-                    sample_rate,
-                    candidate.start_seconds,
-                    candidate.end_seconds,
-                    path,
-                    subtype=subtype,
-                )
+                _write_audio(segment, sample_rate, path, subtype=subtype)
             except FileExistsError:
                 continue  # un autre export a pris ce nom entre-temps : on retente avec le suivant
             break

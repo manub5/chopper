@@ -6,6 +6,15 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 27/11/2026 — Rendu partagé du changement de vitesse
+
+- La préécoute et les exports WAV, FLAC et glisser-déposer utilisent le même
+  extrait source et le même rééchantillonnage SoXR. À vitesse normale, les trames
+  source sont utilisées directement. À vitesse modifiée, durée et hauteur varient
+  ensemble ; la fréquence de sortie et les canaux sont conservés.
+- Le moteur refuse les rendus vides ou excessifs et borne les dépassements du
+  filtre pour que la préécoute corresponde à l’export à la quantification près.
+
 ## 27/11/2026 — Découpe au lancement depuis le terminal
 
 - Le lanceur conserve le dossier d’appel pour les chemins relatifs. Les options
