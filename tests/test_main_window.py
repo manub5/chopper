@@ -1649,3 +1649,49 @@ def test_adjusted_bounds_feed_preview_export_and_drag(qapp, make_window, tmp_pat
         data, rate = sf.read(path)
         assert rate == loaded_track.sample_rate
         np.testing.assert_allclose(data, expected, atol=2 / 2**24)
+
+
+def test_edit_bpm_from_nonactive_row_keeps_position_and_marks(qapp, make_window, loaded_track, monkeypatch):
+    window = make_window(auto_play=False)
+    window._on_track_analyzed(loaded_track)
+    window.show()
+    qapp.processEvents()
+    state = window.sample_state
+    loop, shot = state.items
+    state.click(shot.id)
+    state.toggle_mark(loop.id)
+    table = window.candidates_panel.table
+    bounds = window.sample_lanes.sample_rect(loop.id)
+    edits = iter(((150.0, True), (160.0, False), None))
+    monkeypatch.setattr(main_window_module, "choose_bpm", lambda *args: next(edits), raising=False)
+    for _ in range(3):
+        QTest.mouseDClick(
+            table.viewport(), Qt.MouseButton.LeftButton, pos=table.visualItemRect(table.item(0, 1)).center()
+        )
+    assert table.item(0, 1).text() == "160.0"
+    assert table.item(0, 2).text() == "00:00.800"
+    assert window.sample_lanes.sample_rect(loop.id) == bounds
+    assert state.active_id == shot.id and state.marked_ids == {loop.id}
+    assert not state.has_playback
+
+
+def test_bpm_edit_ignores_busy_window_and_stale_row(qapp, make_window, loaded_track, monkeypatch):
+    window = make_window(auto_play=False)
+    window._on_track_analyzed(loaded_track)
+    state = window.sample_state
+    original = state.items[0]
+    calls = []
+
+    def replace_during_edit(*args):
+        calls.append(True)
+        state.replace_candidates(loaded_track.candidates)
+        return 150.0, True
+
+    monkeypatch.setattr(main_window_module, "choose_bpm", replace_during_edit)
+    window._set_busy(True)
+    window._edit_sample_bpm(original.id)
+    assert not calls
+    window._set_busy(False)
+    window._edit_sample_bpm(original.id)
+    assert calls == [True]
+    assert state.items[0].id != original.id and state.items[0].candidate == original.candidate

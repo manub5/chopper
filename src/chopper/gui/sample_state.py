@@ -7,8 +7,9 @@ from typing import Literal
 
 from PySide6.QtCore import QObject, Signal, Slot
 
-from chopper.core.models import Candidate
+from chopper.core.models import Candidate, CandidateType
 from chopper.core.sample_offset import adjust_candidate_bounds
+from chopper.core.sample_render import rendered_frame_count
 from chopper.gui.presentation import LoadedTrack, SampleItem, Window
 
 
@@ -104,13 +105,53 @@ class SampleState(QObject):
         item = self._items[index]
         start = offset_ms if boundary == "start" else item.start_offset_ms
         end = offset_ms if boundary == "end" else item.end_offset_ms
-        candidate = adjust_candidate_bounds(
+        bounds = adjust_candidate_bounds(
             loaded.candidates[index], start, end, loaded.sample_rate, len(loaded.samples)
         )
+        candidate = replace(
+            item.candidate, start_seconds=bounds.start_seconds, end_seconds=bounds.end_seconds
+        )
         updated = SampleItem(item_id, candidate, start, end)
+        return self._apply_sample_edit(index, updated, stop_preview=True)
+
+    def sample_source_bpm(self, item_id: int) -> float | None:
+        loaded = self._loaded_track
+        if loaded is None or item_id not in self._ids:
+            return None
+        index = next(index for index, item in enumerate(self._items) if item.id == item_id)
+        original = loaded.candidates[index]
+        bpm = original.source_bpm
+        if bpm is None and original.type is CandidateType.LOOP:
+            bpm = original.bpm
+        return bpm if bpm is not None and math.isfinite(bpm) and bpm > 0 else None
+
+    def set_bpm(self, item_id: int, bpm: float, *, change_speed: bool = False) -> bool:
+        if item_id not in self._ids:
+            return False
+        if not math.isfinite(bpm) or bpm <= 0:
+            raise ValueError("BPM must be positive and finite.")
+        index = next(index for index, item in enumerate(self._items) if item.id == item_id)
+        item = self._items[index]
+        source = self.sample_source_bpm(item_id)
+        if change_speed and source is None:
+            raise ValueError("A source BPM is required to change speed.")
+        rate = bpm / source if change_speed and source is not None else item.candidate.playback_rate
+        candidate = replace(item.candidate, bpm=bpm, source_bpm=source, playback_rate=rate)
+        return self._apply_sample_edit(
+            index, replace(item, candidate=candidate), stop_preview=rate != item.candidate.playback_rate
+        )
+
+    def _apply_sample_edit(self, index: int, updated: SampleItem, *, stop_preview: bool) -> bool:
+        item = self._items[index]
         if updated == item:
             return True
-        if item_id in (self._requested_id, self._playing_id):
+        loaded = self._loaded_track
+        if loaded is not None and updated.candidate.playback_rate != 1:
+            channels = loaded.samples.shape[1] if loaded.samples.ndim == 2 else 1
+            rendered_frame_count(
+                len(loaded.samples), loaded.sample_rate, updated.candidate, channels=channels
+            )
+        if stop_preview and item.id in (self._requested_id, self._playing_id):
             self.stop()
         self._items = (*self._items[:index], updated, *self._items[index + 1 :])
         self.changed.emit()

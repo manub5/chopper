@@ -15,12 +15,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from chopper.core.sample_render import rendered_frame_count
 from chopper.gui.presentation import format_time, sample_type_label
 from chopper.gui.sample_state import SampleState
 from chopper.gui.theme import LIGHT, ThemePalette
 
 _BOUNDARY_COLUMNS = {4: "start", 5: "end"}
 _DRAG_COLUMN = 6
+_BPM_COLUMN = 1
 
 
 class _SampleHeader(QHeaderView):
@@ -44,14 +46,21 @@ class SampleTable(QTableWidget):
     handle_drag_requested = Signal(int)
     sample_export_requested = Signal(int)
     boundary_edit_requested = Signal(int, str)
+    bpm_edit_requested = Signal(int)
 
-    def _request_boundary_edit(self, row: int, column: int) -> bool:
+    def _request_edit(self, row: int, column: int) -> bool:
         boundary = _BOUNDARY_COLUMNS.get(column)
         cell = self.item(row, column)
-        if boundary is None or cell is None or not self.isEnabled():
+        if cell is None or not self.isEnabled():
             return False
-        self.boundary_edit_requested.emit(cell.data(Qt.ItemDataRole.UserRole), boundary)
-        return True
+        item_id = cell.data(Qt.ItemDataRole.UserRole)
+        if column == _BPM_COLUMN:
+            self.bpm_edit_requested.emit(item_id)
+            return True
+        if boundary is not None:
+            self.boundary_edit_requested.emit(item_id, boundary)
+            return True
+        return False
 
     def __init__(self, rows: int = 0, columns: int = 0, parent: QWidget | None = None) -> None:
         super().__init__(rows, columns, parent)
@@ -69,7 +78,7 @@ class SampleTable(QTableWidget):
             return
         if event.button() == Qt.MouseButton.LeftButton and index.isValid():
             event.accept()
-            if index.column() in _BOUNDARY_COLUMNS:
+            if index.column() in _BOUNDARY_COLUMNS or index.column() == _BPM_COLUMN:
                 return
             if index.column() != _DRAG_COLUMN:
                 self.setFocus()
@@ -88,17 +97,13 @@ class SampleTable(QTableWidget):
 
     def mouseDoubleClickEvent(self, event) -> None:
         index = self.indexAt(event.position().toPoint())
-        if event.button() == Qt.MouseButton.LeftButton and self._request_boundary_edit(
-            index.row(), index.column()
-        ):
+        if event.button() == Qt.MouseButton.LeftButton and self._request_edit(index.row(), index.column()):
             event.accept()
             return
         self.mousePressEvent(event)
 
     def keyPressEvent(self, event) -> None:
-        if event.key() == Qt.Key.Key_F2 and self._request_boundary_edit(
-            self.currentRow(), self.currentColumn()
-        ):
+        if event.key() == Qt.Key.Key_F2 and self._request_edit(self.currentRow(), self.currentColumn()):
             event.accept()
             return
         super().keyPressEvent(event)
@@ -142,6 +147,7 @@ class CandidatesPanel(QWidget):
     sample_export_requested = Signal(int)
     drag_requested = Signal(int)
     boundary_edit_requested = Signal(int, str)
+    bpm_edit_requested = Signal(int)
 
     def __init__(self, state: SampleState, parent: QWidget | None = None):
         super().__init__(parent)
@@ -172,6 +178,7 @@ class CandidatesPanel(QWidget):
         self.table.handle_drag_requested.connect(self.drag_requested.emit)
         self.table.sample_export_requested.connect(self.sample_export_requested.emit)
         self.table.boundary_edit_requested.connect(self.boundary_edit_requested.emit)
+        self.table.bpm_edit_requested.connect(self.bpm_edit_requested.emit)
         self.table.currentCellChanged.connect(self._navigate)
         self.export_marked_button = QPushButton()
         self.export_marked_button.setProperty("materialPrimary", True)
@@ -241,10 +248,20 @@ class CandidatesPanel(QWidget):
                 item_id = cell.data(Qt.ItemDataRole.UserRole)
                 item = by_id[item_id]
                 candidate = item.candidate
+                duration = candidate.duration_seconds
+                loaded = self.state.loaded_track
+                if loaded is not None and candidate.playback_rate != 1:
+                    channels = loaded.samples.shape[1] if loaded.samples.ndim == 2 else 1
+                    duration = (
+                        rendered_frame_count(
+                            len(loaded.samples), loaded.sample_rate, candidate, channels=channels
+                        )
+                        / loaded.sample_rate
+                    )
                 for column, value in enumerate(
                     (
                         f"{candidate.bpm:.1f}" if candidate.bpm else "—",
-                        format_time(candidate.duration_seconds),
+                        format_time(duration),
                         format_time(candidate.start_seconds),
                         item.start_offset_ms,
                         item.end_offset_ms,

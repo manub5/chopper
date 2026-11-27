@@ -36,6 +36,7 @@ from chopper.core.settings import (
     save_settings,
 )
 from chopper.gui.actions import ActionRegistry
+from chopper.gui.bpm_dialog import choose_bpm
 from chopper.gui.candidates_panel import CandidatesPanel
 from chopper.gui.export_folder_dialog import choose_export_folder
 from chopper.gui.library_panel import LibraryPanel
@@ -272,6 +273,7 @@ class MainWindow(QMainWindow):
         self._sync_actions()
         self.candidates_panel.drag_requested.connect(self._on_drag_requested)
         self.candidates_panel.boundary_edit_requested.connect(self._edit_sample_boundary)
+        self.candidates_panel.bpm_edit_requested.connect(self._edit_sample_bpm)
 
         self.theme_manager = ThemeManager(force_dark=self.settings.force_dark, parent=self)
         self.theme_manager.changed.connect(self._apply_theme)
@@ -691,6 +693,31 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage(self.selection_controller.status_message, 8000)
 
     # --- export -------------------------------------------------------
+
+    def _sample_edit_blocked(self) -> bool:
+        return (
+            self._closing
+            or self._analysis_busy
+            or self._is_analysis_running()
+            or self.selection_controller.locked
+        )
+
+    def _edit_sample_bpm(self, item_id: int) -> None:
+        if self._sample_edit_blocked():
+            return
+        item = next((item for item in self.sample_state.items if item.id == item_id), None)
+        if item is None:
+            return
+        result = choose_bpm(
+            self, item.candidate.bpm, self.sample_state.sample_source_bpm(item_id), self.theme_manager.palette
+        )
+        if result is None or self._sample_edit_blocked():
+            return
+        bpm, change_speed = result
+        try:
+            self.sample_state.set_bpm(item_id, bpm, change_speed=change_speed)
+        except ValueError as error:
+            self.status_bar.showMessage(str(error), 8000)
 
     def _edit_sample_boundary(self, item_id: int, boundary: Literal["start", "end"]) -> None:
         if (

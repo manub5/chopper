@@ -157,6 +157,12 @@ boundary earlier, positive values move it later, and `0` resets it. The other
 boundary stays put. Changes apply to preview and new exports only; a new chop
 or track clears them.
 
+Double-click a sample’s **BPM** cell to edit it. **BPM only** changes the
+label and the BPM used in new export names, without changing the audio or an
+already applied speed. **Change speed** also changes duration and pitch, like
+a turntable, and requires a known source tempo. **Length** shows the new
+duration; **Position** and the sample rectangle still mark the source excerpt.
+
 Choose an export folder where only you and applications you trust can write.
 The exporter avoids name collisions between ordinary exports, but is not designed
 to protect against other users changing files in a shared writable folder.

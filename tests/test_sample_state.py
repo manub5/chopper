@@ -588,3 +588,48 @@ def test_boundary_edit_stops_only_its_own_preview(qapp, loaded_track):
     assert state.set_boundary_offset(first.id, "end", -20)
     assert state.playing_id is None and stops == [True]
     assert len(requests) == 1
+
+
+def test_bpm_edit_keeps_source_speed_reference_offsets_and_identity(qapp, loaded_track):
+    from chopper.gui.sample_state import SampleState
+
+    state = SampleState(auto_play=False)
+    state.load_track(loaded_track)
+    loop, shot = state.items
+    state.toggle_mark(loop.id)
+    assert state.set_bpm(loop.id, 150, change_speed=True)
+    assert state.set_bpm(loop.id, 160)
+    assert state.items[0].candidate.bpm == 160
+    assert state.items[0].candidate.playback_rate == 1.25
+    assert state.set_boundary_offset(loop.id, "start", 20)
+    assert state.items[0].candidate.playback_rate == 1.25
+    assert state.set_bpm(loop.id, 180, change_speed=True)
+    assert state.items[0].candidate.playback_rate == 1.5
+    assert state.items[0].start_offset_ms == 20
+    assert state.marked_ids == {loop.id}
+    assert state.set_bpm(shot.id, 100)
+    with pytest.raises(ValueError):
+        state.set_bpm(shot.id, 150, change_speed=True)
+    for invalid in (0, -1, float("nan"), float("inf")):
+        with pytest.raises(ValueError):
+            state.set_bpm(loop.id, invalid)
+    state.replace_candidates(loaded_track.candidates)
+    assert not state.set_bpm(loop.id, 150)
+
+
+def test_bpm_label_does_not_interrupt_preview_but_speed_edit_does(qapp, loaded_track):
+    from chopper.gui.sample_state import SampleState
+
+    state = SampleState(auto_play=False)
+    state.load_track(loaded_track)
+    loop = state.items[0]
+    requests, stops = [], []
+    state.play_requested.connect(lambda item_id, token: requests.append((item_id, token)))
+    state.stop_requested.connect(lambda: stops.append(True))
+    state.click(loop.id)
+    state.toggle_playback()
+    state.playback_started(requests[0][1])
+    assert state.set_bpm(loop.id, 160)
+    assert state.playing_id == loop.id and not stops
+    assert state.set_bpm(loop.id, 150, change_speed=True)
+    assert state.playing_id is None and stops == [True] and len(requests) == 1

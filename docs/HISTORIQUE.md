@@ -6,6 +6,13 @@ Note : les mentions « cet environnement » / « ce bac à sable » désignent l
 sans audio, sans affichage et avec un réseau restreint — pas la machine de l'utilisateur. Depuis, semgrep tourne
 dans pre-commit et la préécoute ne joue plus en boucle.
 
+## 27/11/2026 — Édition du BPM dans le tableau
+
+- **BPM only** modifie l’étiquette et le prochain nom d’export. **Change speed**
+  repart du tempo source et modifie aussi la vitesse, la durée et la hauteur.
+- L’édition conserve les marques et les bornes du sample. Une correction de
+  borne conserve à son tour le BPM et la vitesse appliqués.
+
 ## 27/11/2026 — Rendu partagé du changement de vitesse
 
 - La préécoute et les exports WAV, FLAC et glisser-déposer utilisent le même
